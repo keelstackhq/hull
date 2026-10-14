@@ -294,7 +294,7 @@ test("every elif chain marked {# same-branches #} has identical branches", ...);
 **Interfaces:**
 - Produces: `CI_TASKS: readonly string[]` = `["lint", "format:check", "typecheck", "test", "build"]`; the root package scripts `ci` and `check` (spec §6.1); `@{{ scope }}/shared` package.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("base renders the expected classes", async () => {
@@ -315,9 +315,9 @@ test("turbo.json defines every CI task and no vp run", ...);
 test("package.json name is the scope", ...);            // vars { scope: "zeta" } → "zeta"
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.1 and §7 (full catalog table now, even for later pieces). Check pnpm 12 names for `onlyBuiltDependencies`, `minimumReleaseAge`, `peerDependencyRules` and Vite+'s shared lint/fmt config (docs or `vp lint --help`); record what you found in the commit body.
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Then dogfood by hand:**
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.1 and §7 (full catalog table now, even for later pieces). Check pnpm 12 names for `onlyBuiltDependencies`, `minimumReleaseAge`, `peerDependencyRules` and Vite+'s shared lint/fmt config (docs or `vp lint --help`); record what you found in the commit body.
+- [x] **Step 4: Run `pnpm test` — expect PASS. Then dogfood by hand:**
 
 ```bash
 node scripts/render.mjs new --template template --out /tmp/hull-base --piece base --data scope=hullci
@@ -325,7 +325,7 @@ cd /tmp/hull-base && git init -q && pnpm install --no-frozen-lockfile && pnpm tu
 ```
 
 Expected: install succeeds; every task passes for `@hullci/shared`.
-- [ ] **Step 5: Commit** — `feat(base): workspace, catalog, turbo and Vite+ config`
+- [x] **Step 5: Commit** — `feat(base): workspace, catalog, turbo and Vite+ config`
 
 ---
 

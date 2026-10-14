@@ -1,0 +1,45 @@
+packages:
+  - apps/*
+  - packages/*
+  - crates/*
+
+catalog:
+  "@astrojs/preact": 6.0.6
+  "@cascivo/react": 1.9.0
+  "@cascivo/themes": 1.0.3
+  "@cloudflare/workers-types": 5.20261014.1
+  "@preact/preset-vite": 2.10.6
+  "@sentry/cloudflare": 11.7.0
+  "@storybook/addon-docs": 10.6.2
+  "@storybook/preact-vite": 10.6.2
+  "@tauri-apps/api": 2.12.3
+  "@tauri-apps/cli": 2.12.2
+  astro: 7.3.8
+  docspack: 1.5.0
+  hono: 4.13.13
+  preact: 10.29.8
+  storybook: 10.6.2
+  turbo: 2.11.8
+  typescript: 7.0.2
+  vite-plus: 1.1.0
+  wrangler: 4.151.0
+
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@1.1.0
+
+peerDependencyRules:
+  allowedVersions:
+    storybook>vite-plus: "1"
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+
+minimumReleaseAge: 4320
+
+# turbo 2.11.8 was published 2026-10-13, inside the 3-day window; pnpm 12 fails the install
+# (strict) without this. Drop the entry once the pin has aged.
+minimumReleaseAgeExclude:
+  - turbo
+  - "@turbo/*"

@@ -2,4 +2,15 @@ id = "base"
 description = "Workspace root: pnpm, Turborepo, TypeScript, Vite+, CI and AI layer"
 
 [files]
-seed = ["README.md"]
+shared = ["package.json", "pnpm-workspace.yaml", "turbo.json", "packages/shared/package.json"]
+seed = ["README.md", "docs/agents/project.md", "packages/shared/src/**"]
+
+[merge]
+"package.json" = "json"
+"pnpm-workspace.yaml" = "yaml"
+"turbo.json" = "json"
+"packages/shared/package.json" = "json"
+
+[[post]]
+run = "pnpm install --no-frozen-lockfile"
+when = ["new"]

@@ -160,8 +160,11 @@ Root files (class in brackets):
   with every version in §7 (unused entries are harmless, so the file does not depend on pieces);
   `overrides: { vite: "npm:@voidzero-dev/vite-plus-core@<vite-plus version>" }`;
   `peerDependencyRules.allowedVersions: { "storybook>vite-plus": "1" }` (§7.2);
-  `onlyBuiltDependencies: [esbuild, workerd, sharp]`; `minimumReleaseAge: 4320`. Setting names
-  must be checked against pnpm 12 docs in the task that writes the file.
+  `allowBuilds: { esbuild: true, workerd: true, sharp: true }` (pnpm 11 replaced
+  `onlyBuiltDependencies`, which pnpm 12 silently ignores); `minimumReleaseAge: 4320` (minutes,
+  strict when set); `minimumReleaseAgeExclude` lists catalog pins younger than 3 days at render
+  time (turbo 2.11.8 today), each with a comment to drop it once the pin has aged. Checked against
+  pnpm 12.11.2 on 2026-10-14.
 - `turbo.json` [shared, json]: tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
   `deploy:preview` and `deploy` (no cache), `storybook:build` (outputs `storybook-static/**`),
@@ -170,8 +173,10 @@ Root files (class in brackets):
   `jsx: react-jsx`, `jsxImportSource: preact`, `noEmit`, `verbatimModuleSyntax`, `isolatedModules`.
 - `vite.config.ts` [owned]: root Vite+ config holding the shared `lint` and `fmt` options
   (oxlint categories `correctness` + `suspicious` as errors; ignore `dist`, `.astro`,
-  `storybook-static`, `target`). Packages import it; the exact sharing mechanism is checked
-  against https://viteplus.dev/guide/ in the task.
+  `storybook-static`, `target`). Vite+ 1.1.0 does not apply nested configs for lint/fmt: `vp lint`
+  and `vp fmt` read the root config even when run from a package, so package `vite.config.ts`
+  files hold only `pack`/`test` options. Root `vite.config.ts` and `tsconfig.base.json` are turbo
+  `globalDependencies`, and a root `//#format:check` task checks root files (checked 2026-10-14).
 - `.node-version` [owned] `24`; `.gitignore` [owned] (node_modules, dist, .turbo, .astro,
   .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
@@ -182,7 +187,7 @@ Root files (class in brackets):
   `resolver = "3"`, `members = ["crates/*", "apps/*/src-tauri"]`, `[workspace.lints]`,
   `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition, `stable`
   with `clippy`, `rustfmt`.
-- `packages/shared/` [configs owned, `src/**` seed]: a tiny library built with `vp pack`, so a
+- `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
   base-only repo runs every CI task.
 - `README.md.jinja` [seed], `docs/agents/project.md` [seed].
 - AI layer, §6.9.

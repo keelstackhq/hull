@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["vite.config.ts", "tsconfig.base.json"],
+  "tasks": {
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "lint": {},
+    "format:check": {},
+    "//#format:check": {
+      "inputs": ["package.json", "turbo.json", "tsconfig.base.json", "vite.config.ts"]
+    },
+    "typecheck": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["^build"] },
+    "dev": { "cache": false, "persistent": true },
+    "deploy:preview": { "cache": false },
+    "deploy": { "cache": false },
+    "storybook:build": { "outputs": ["storybook-static/**"] },
+    "build:desktop": { "cache": false }
+  }
+}

@@ -85,4 +85,5 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
 - oxlint does not lint `.astro` templates; oxfmt `.astro` support is experimental (off).
 - Tauri needs webkit2gtk to compile; its Rust builds only in `desktop.yml`. Rust scripts use `-p`.
 - docspack: `sync` (deps), `index --repo` (own docs), `ask "<q>" --json` (agents).
-- pnpm 12 blocks dependency build scripts unless listed (`onlyBuiltDependencies`; check the name).
+- pnpm 12 blocks dependency build scripts unless listed in `allowBuilds` (`onlyBuiltDependencies` is
+  ignored). `minimumReleaseAge` is strict: a pin younger than 3 days needs `minimumReleaseAgeExclude`.
