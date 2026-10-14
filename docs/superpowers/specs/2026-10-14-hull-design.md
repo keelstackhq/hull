@@ -325,7 +325,7 @@ files.
 ### 6.9 AI layer (owned, in `base`)
 
 - `CLAUDE.md.jinja` ≤ 80 rendered lines for every combo: what the repo is, commands (`pnpm check`,
-  `pnpm ci`), rules (test first, verify before claiming, small files), the subagent routing table,
+  `pnpm run ci`; `pnpm ci` is pnpm's built-in clean install), rules (test first, verify before claiming, small files), the subagent routing table,
   one line per present piece kind (`{% if "hono-worker" in pieces %}`), `@docs/agents/project.md`,
   and `@docs/agents/docs.md` when docs is present. Per-instance notes are `<target>/CLAUDE.md`
   (loaded on demand; §4.3.3). `AGENTS.md`: one line pointing to `CLAUDE.md`.
@@ -354,14 +354,24 @@ files.
 - `.claude/hooks/stop-checks.sh` (opt-in): does nothing unless `HULL_STOP_CHECKS=1`; then runs
   `pnpm turbo run lint typecheck test --affected` and on failure exits 2 with the first error on
   stderr, which blocks stopping. Enable by setting the env var in `.claude/settings.local.json`.
-- `.claude/statusline.sh` (opt-in via `statusLine` in settings.local.json): model, context %, cost.
+  Exits 0 when the hook input has `stop_hook_active: true` (Claude is already continuing because
+  of a stop hook), so it cannot loop.
+- `.claude/statusline.sh` (opt-in via `statusLine` in settings.local.json): model, context %, cost,
+  read from stdin `model.display_name`, `context_window.used_percentage` (may be null),
+  `cost.total_cost_usd` with `jq`; prints a fixed fallback line when `jq` is missing.
 - `.claude/settings.json`: `model: "opusplan"`; `permissions.allow` for pnpm, cargo, turbo, git
-  read and commit commands, `gh run view`, `docspack`; `deny` force-push and reading `.env*`;
+  read and commit commands, `gh run view`, `docspack`; `deny` force-push (`--force*`, `-f`, `+ref`
+  anywhere after `git push`), `pnpm|npm|cargo publish` and reading `.env*` (deny rules match only
+  commands starting with the literal program, so `git -C . push -f` is not caught; push is not
+  allowed, so it still prompts); hook entries carry `timeout: 120` (seconds);
   `hooks.SessionStart` matcher `startup|resume` → `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"`;
   `hooks.Stop` → stop-checks; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
   (`superpowers@superpowers-marketplace`, repo `obra/superpowers-marketplace`) and caveman
-  (`caveman@akramsystems-plugins`, repo `akramsystems/caveman`). UNVERIFIED shape: check against
-  https://code.claude.com/docs/en/settings in the task; the file must stay valid JSON.
+  (`caveman@akramsystems-plugins`, repo `akramsystems/caveman`). Shape checked against
+  code.claude.com/docs (settings, hooks, statusline) on 2026-10-14: `enabledPlugins` keys are
+  `<plugin>@<marketplace-key>`; repo-level `extraKnownMarketplaces` apply only after the user
+  accepts the workspace trust dialog. The marketplace names inside those repos' manifests were not
+  checked.
 
 ## 7. Versions (template pnpm catalog, exact pins)
 

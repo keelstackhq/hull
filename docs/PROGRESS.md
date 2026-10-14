@@ -11,6 +11,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · 01/5 · `test: template invariants and base skeleton` · 135/135 tests, lint+fmt clean. Invariants probed on a broken copy (two classes, `or`, `{%-`, bad merge key, `{{` in path all fail). `assertSameBranches` throws on unmarked/unclosed/single-branch chains.
 - 2026-10-14 · 01/6 · `feat(base): workspace, catalog, turbo and Vite+ config` · 146/146 tests, lint+fmt clean; dogfood base (scope hullci): install 0.35 s (warm store), turbo 6/6 tasks 2.08 s cold cache. `allowBuilds` replaces `onlyBuiltDependencies`; root config is a turbo globalDependency; root `//#format:check`.
 - 2026-10-14 · 01/7 · `feat(base): one-job CI with affected early exit and Renovate preset` · 161/161 tests, lint+fmt clean; base re-rendered, 6/6 turbo tasks pass. `ci.yml` is a plain owned file (contract gap, see Blocked). actionlint not run: no binary, Docker has no daemon (2026-10-14). Action tags checkout@v5, pnpm/action-setup@v4, setup-node@v5, cache@v4; Renovate custom manager tracks the `npx turbo@` pin.
+- 2026-10-14 · 01/8 · `feat(base): Claude Code layer — agents, skills, hooks, loop` · 176/176 tests, lint+fmt clean; base rendered → 6/6 turbo tasks, rendered CLAUDE.md 42 lines and `vp fmt --check` clean. Settings/hooks/statusline shape checked against code.claude.com docs. Uses `pnpm run ci` (`pnpm ci` is pnpm's clean install). docs-conditional tests use a stub docs piece until plan 03.
 
 ## Measurements
 

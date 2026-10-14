@@ -375,7 +375,7 @@ test("renovate preset groups vite-plus with vite-plus-core", ...);  // same pack
 - Consumes: `renderCombo`
 - Produces: owned AI files (spec §6.9). Later pieces add `<target>/CLAUDE.md` and one `{% if %}` line each to `CLAUDE.md.jinja`.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("CLAUDE.md ≤ 80 lines and imports project notes", ...);       // includes "@docs/agents/project.md"
@@ -400,10 +400,10 @@ test("session-start exits 0 even when pnpm is missing", ...);      // PATH witho
 test("skills have name and description frontmatter", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.9. Check the plugin settings shape and statusline stdin fields against https://code.claude.com/docs/en/settings and `/statusline` docs; if they differ from the spec, follow the docs and update spec §6.9 in this commit.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat(base): Claude Code layer — agents, skills, hooks, loop`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.9. Check the plugin settings shape and statusline stdin fields against https://code.claude.com/docs/en/settings and `/statusline` docs; if they differ from the spec, follow the docs and update spec §6.9 in this commit.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat(base): Claude Code layer — agents, skills, hooks, loop`
 
 ---
 

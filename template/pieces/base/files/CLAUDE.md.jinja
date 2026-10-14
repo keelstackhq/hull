@@ -1,0 +1,46 @@
+# {{ scope }}
+
+Monorepo generated from {{ template.name }} {{ template.version }}: pnpm workspaces, Turborepo,
+TypeScript, Vite+. Packages live in `apps/*`, `packages/*`, `crates/*`. Repo-specific notes are in
+`docs/agents/project.md`; per-directory notes go in `<dir>/CLAUDE.md`.
+
+## Commands
+
+```bash
+pnpm install        # install, also runs in the SessionStart hook
+pnpm check          # lint, format:check, typecheck, test (all packages)
+pnpm run ci        # the CI task list on changed packages (--affected)
+pnpm format         # vp fmt
+```
+
+Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap tasks in `vp run`.
+
+## Rules
+
+- Test first: write the failing test, watch it fail, implement, watch it pass.
+- Verify with real output (the `verify` skill) before saying a task is done or fixed.
+- Keep files small and focused; one task per change; no drive-by refactors.
+- Versions live in the catalog in `pnpm-workspace.yaml` as exact pins; use `catalog:` in packages.
+- Files owned by the template (configs, workflows, `.claude/`) are updated by `splice update`;
+  put local changes in seed files, `docs/agents/project.md` or `CLAUDE.md` in a package.
+- Never print or commit secrets; never read `.env*`.
+
+## Subagents
+
+| Agent         | Model  | Use it for                                                                        |
+| ------------- | ------ | --------------------------------------------------------------------------------- |
+| `explorer`    | haiku  | every search, "where is X", reading many files; returns paths and a short summary |
+| `implementer` | sonnet | writing code for one task, test first, then `verify`                              |
+| `reviewer`    | opus   | read-only review of a diff against the task and these rules                       |
+| `ci-fixer`    | sonnet | a red CI run: read the failed log, reproduce, fix                                 |
+
+Keep subagent reports short. Skills: `verify`, `add-piece`{% if "docs" in pieces %}, `docs-lookup`{% endif %}.
+`/loop` runs `.claude/loop.md`.
+{# One line per piece kind goes here, each in its own if on its piece id. #}{% if "docs" in pieces %}
+## Docs
+
+@docs/agents/docs.md
+{% endif %}
+## Project
+
+@docs/agents/project.md
