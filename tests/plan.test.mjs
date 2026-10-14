@@ -48,8 +48,13 @@ test("unknown piece → UsageError", () =>
     () => req(["ghost"]),
     (e) => e instanceof UsageError && /ghost/.test(e.message),
   ));
+test("repeated base is accepted and ignored", () =>
+  assert.deepEqual(
+    req(["base", "base", "app"]).map((x) => x.piece.id),
+    ["base", "app"],
+  ));
 test("non-multiple twice → UsageError", () =>
-  assert.throws(() => req(["base", "base"]), UsageError));
+  assert.throws(() => req(["app:a", "base", "app:a", "base:x"]), UsageError));
 test("name on a non-multiple piece → UsageError", () =>
   assert.throws(() => req(["base:x"]), UsageError));
 test("duplicate instance name → UsageError", () =>

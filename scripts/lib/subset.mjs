@@ -139,3 +139,40 @@ export function checkSubset(source, file) {
   for (const s of stack) report(s.line, s.tag, `unclosed ${s.kind} block`);
   return out;
 }
+
+/**
+ * Variable references of a .jinja source, with `for` loop variables resolved.
+ * Unparseable tags are skipped (checkSubset reports them).
+ * @param {string} source
+ * @returns {{ name: string, line: number, loop: boolean }[]} loop: name is a loop variable
+ */
+export function referencedNames(source) {
+  const out = [];
+  /** @type {{ kind: string, v?: string }[]} */
+  const stack = [];
+  const loops = () => stack.filter((s) => s.v).map((s) => s.v);
+  const add = (name, line) => {
+    if (KEYWORDS.has(name.split(".")[0])) return;
+    out.push({ name, line, loop: loops().includes(name.split(".")[0]) });
+  };
+  for (const m of source.matchAll(TAG_RE)) {
+    if (m[3] !== undefined) continue;
+    const line = source.slice(0, m.index).split("\n").length;
+    const expr = (m[1] ?? m[2]).trim();
+    if (m[1] !== undefined) {
+      const o = OUTPUT_RE.exec(expr) ?? new RegExp(`^(${IDENT}(?:\\.${IDENT})*)\\s*\\|`).exec(expr);
+      if (o) add(o[1], line);
+      continue;
+    }
+    const kw = /^[A-Za-z_]+/.exec(expr)?.[0] ?? "";
+    const rest = expr.slice(kw.length).trim();
+    if (kw === "if") stack.push({ kind: "if" });
+    if ((kw === "if" || kw === "elif") && NAME_RE.test(rest)) add(rest, line);
+    if (kw === "for") {
+      const f = FOR_RE.exec(expr);
+      stack.push({ kind: "for", v: f?.[1] });
+    }
+    if (kw === "endif" || kw === "endfor") stack.pop();
+  }
+  return out;
+}

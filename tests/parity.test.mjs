@@ -12,7 +12,7 @@ test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", async 
   const yml = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
   const turbo = yml.match(/pnpm turbo run ([a-z: ]+?) --affected/);
   assert.equal(turbo?.[1], tasks);
-  const query = yml.match(/query affected --tasks ([a-z: ]+?) --exit-code/);
+  const query = yml.match(/query affected --tasks ([a-z: ]+?) >/);
   assert.equal(query?.[1], tasks);
 
   const pkg = await readFile(`${base}package.json.jinja`, "utf8");

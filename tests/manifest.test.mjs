@@ -89,3 +89,23 @@ test("rejects post.when outside new|add|update", () =>
     /when "remove"/,
     mutate("pieces/base/piece.toml", (s) => s + '\n[[post]]\nrun = "true"\nwhen = ["remove"]\n'),
   ));
+
+for (const name of [
+  "pieces",
+  "piece",
+  "template",
+  "true",
+  "None",
+  "NOT",
+  "and",
+  "or",
+  "in",
+  "is",
+]) {
+  test(`reserved var name "${name}" → TemplateError`, () =>
+    rejectsWith(
+      TemplateError,
+      /reserved/,
+      mutate("splice.toml", (s) => `${s}\n[vars.${name}]\nprompt = "x"\ndefault = "y"\n`),
+    ));
+}

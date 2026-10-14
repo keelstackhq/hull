@@ -342,7 +342,7 @@ files.
   `"model": "opusplan"` in settings is the main-session default (Opus plans, Sonnet executes).
 - `.claude/skills/verify/SKILL.md`: run `pnpm turbo run lint format:check typecheck test --affected
   --output-logs=errors-only`, report ≤ 10 lines (pass/fail per task, first error per failure).
-- `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstack/splice add <id>[:<name>] --json`,
+- `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstack/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
   read the JSON `changes`, run `[[post]]`-equivalent install, then `verify`.
 - `.claude/skills/docs-lookup/SKILL.md` (only with docs): `pnpm exec docspack ask "<q>" --json`
   before any web search; web search only on exit 3/4.
@@ -423,15 +423,21 @@ upstream.
 - Job `ci`, `ubuntu-latest`, `timeout-minutes: 15`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
   the PR base sha, `merge_group.base_sha`, or `github.event.before`:
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
-  2. Early exit: `npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build --exit-code`
-     (exit 0 = nothing affected → set `skip=true`; 1 = affected; 2 = error → run everything).
+  2. Early exit: `npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build`
+     writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
+     package `//` unless `git diff BASE...HEAD` touches a root trigger (root package/workspace/lock/
+     turbo/tsconfig/vite config, `.node-version`, `.npmrc`, anything under `.github/`), and sets
+     `skip=true` when nothing remains. A turbo error, bad JSON or an unknown base → run everything.
+     Root `format:check` covers every root-owned file, but docs-only changes (e.g. `CLAUDE.md`,
+     `docs/**`) do not trigger it on PRs (§8.4).
      All later steps have `if: steps.affected.outputs.skip != 'true'`.
   3. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
   4. `pnpm install --frozen-lockfile --prefer-offline`.
   5. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
      restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstack/hoard@v1` once released.
-  6. Rust (rendered only with rust-tool): `.github/scripts/rust-affected.mjs` [owned] reads
+  6. Rust (present in the plain `ci.yml`, guarded at runtime by `hashFiles('Cargo.toml') != ''`,
+     because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
      `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,
      `Swatinem/rust-cache`, `taiki-e/install-action` (`cargo-nextest`), all `if: rust == 'true'`.
@@ -459,6 +465,8 @@ deps (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf
 ### 8.4 Budget and measurement
 
 Typical PR (1–2 packages, warm caches) ≤ 45 s for job `ci`; docs-only ≤ 15 s (early exit).
+Trade-off for the docs-only budget: formatting of root docs is checked by local
+`pnpm format:check`, the stop hook and full runs on pushes to the default branch, not on PRs.
 Measure with `scripts/ci-timing.mjs` (hull) or by hand:
 `gh run list -w ci.yml -L 20 --json databaseId` then `gh run view <id> --json jobs` and
 `completedAt − startedAt` of job `ci`. The script reports p50/p90 and exits 1 when p50 exceeds
@@ -536,7 +544,9 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
    and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
    selected combo contains rust-tool.
-4. The turbo cache dir is cached with `actions/cache` (later hoard).
+4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
+   on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
+   download time, never correctness.
 
 Sequential in one job is the default. Plan 02 measures it; a matrix is adopted only if the
 measured sequential time exceeds 3 minutes warm and a matrix would cut it by more than half.
@@ -580,4 +590,7 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 cascivo package choice for Preact (§6.2); Vite+ shared lint/fmt config mechanism; pnpm 12 setting
 names; `$TURBO_ROOT$` in outputs; Renovate preset path syntax; Claude Code plugin settings shape and
 statusline input fields; `astro check` with TypeScript 7; Cloudflare OTel destination syntax;
-splice CLI flags (§4.3.7); whether `add` re-renders other pieces (§4.3.1).
+splice CLI flags (§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm
+manager bumps the `overrides.vite` `npm:@voidzero-dev/vite-plus-core@x` alias together with
+`vite-plus` (needs a live Renovate run); whether `preview.yml`/`desktop.yml` use runtime guards or
+wait for a `{% raw %}` contract addition (§4.3 item 8).

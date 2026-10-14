@@ -31,8 +31,10 @@ export function resolveRequest(t, req) {
     return i === -1 ? { id: item } : { id: item.slice(0, i), explicit: item.slice(i + 1) };
   });
   const requested = [
-    ...(parsed.some((p) => p.id === t.base) ? [] : [{ id: t.base }]),
-    ...parsed.filter((p) => p.id === t.base),
+    {
+      id: t.base,
+      explicit: parsed.find((p) => p.id === t.base && p.explicit !== undefined)?.explicit,
+    },
     ...parsed.filter((p) => p.id !== t.base),
   ];
   const seen = new Map(); // id -> instances

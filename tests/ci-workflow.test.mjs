@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { appendFile, cp, mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 import YAML from "yaml";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
@@ -55,14 +58,13 @@ test("checkout has full blobless history", () => {
   assert.equal(s.with.filter, "blob:none");
 });
 
-test("early exit uses turbo query affected --exit-code with CI_TASKS", async () => {
+test("early exit uses turbo query affected with CI_TASKS and affected.mjs", async () => {
   const s = steps[affectedIdx];
   assert.ok(affectedIdx > steps.indexOf(step("actions/checkout")));
   const ws = YAML.parse(await read(dir, "pnpm-workspace.yaml"));
-  assert.ok(
-    s.run.includes(`turbo@${ws.catalog.turbo} query affected --tasks ${tasks} --exit-code`),
-  );
-  assert.match(s.run, /skip=true/);
+  assert.ok(s.run.includes(`turbo@${ws.catalog.turbo} query affected --tasks ${tasks} >`));
+  assert.ok(!s.run.includes("--exit-code"));
+  assert.match(s.run, /node \.github\/scripts\/affected\.mjs/);
   assert.match(s.run, /skip=false/);
   assert.match(s.run, /::warning::/);
 });
@@ -136,4 +138,120 @@ test("preset has a custom manager for the workflow turbo pin", async () => {
   assert.equal(new RegExp(m.matchStrings[0]).exec(line).groups.currentValue, "2.11.8");
   const rule = p.packageRules.find((r) => r.groupName === "turbo");
   assert.ok(rule.matchPackageNames.includes("turbo"));
+});
+
+test("affected.mjs is an owned plain file", () => {
+  const c = result.changes.find((x) => x.path === ".github/scripts/affected.mjs");
+  assert.equal(c.class, "owned");
+});
+
+test("root format:check script and turbo inputs cover the same root files", async () => {
+  const pkg = JSON.parse(await read(dir, "package.json"));
+  const turbo = JSON.parse(await read(dir, "turbo.json"));
+  const args = pkg.scripts["format:check"].replace("vp fmt --check ", "").split(" ");
+  const inputs = turbo.tasks["//#format:check"].inputs;
+  const norm = (i) => i.replace(/\/\*\*$/, "");
+  assert.deepEqual([...args].sort(), inputs.map(norm).sort());
+  for (const f of ["CLAUDE.md", "AGENTS.md", ".claude", ".github", "pnpm-workspace.yaml", "docs"]) {
+    assert.ok(args.includes(f), f);
+  }
+  assert.ok(!args.some((a) => /^(apps|packages|crates)/.test(a)));
+});
+
+test("affected.mjs triggers are a subset of the root format:check inputs", async () => {
+  const { ROOT_TRIGGERS } = await import(join(dir, ".github/scripts/affected.mjs"));
+  const turbo = JSON.parse(await read(dir, "turbo.json"));
+  const inputs = turbo.tasks["//#format:check"].inputs;
+  for (const t of ROOT_TRIGGERS.filter(
+    (t) => !["pnpm-lock.yaml", ".node-version", ".npmrc"].includes(t),
+  )) {
+    assert.ok(inputs.includes(t), t);
+  }
+});
+
+test("affected.mjs: docs-only skips; package or root config change runs", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "hull-affected-"));
+  await cp(dir, repo, { recursive: true });
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.email=a@b.c", "-c", "user.name=t", ...a], {
+      cwd: repo,
+      encoding: "utf8",
+    });
+  git("init", "-q");
+  git("add", "-A");
+  git("commit", "-qm", "base");
+  const base = git("rev-parse", "HEAD").trim();
+  const run = (stdin) =>
+    execFileSync("node", [".github/scripts/affected.mjs"], {
+      cwd: repo,
+      input: JSON.stringify(stdin),
+      encoding: "utf8",
+      env: { ...process.env, TURBO_SCM_BASE: base, TURBO_SCM_HEAD: "HEAD" },
+    }).trim();
+  const rootOnly = {
+    data: { affectedTasks: { items: [{ package: { name: "//" }, fullName: "//#format:check" }] } },
+  };
+  const pkgTask = {
+    data: { affectedTasks: { items: [{ package: { name: "shared" }, fullName: "shared#test" }] } },
+  };
+  const none = { data: { affectedTasks: { items: [] } } };
+  const commit = async (rel) => {
+    await mkdir(join(repo, rel, ".."), { recursive: true });
+    await writeFile(join(repo, rel), `// ${Math.random()}\n`);
+    git("add", "-A");
+    git("commit", "-qm", rel);
+  };
+  await commit("CLAUDE.md");
+  assert.equal(run(rootOnly), "skip=true");
+  assert.equal(run(none), "skip=true");
+  await commit("packages/shared/src/x.ts");
+  assert.equal(run(pkgTask), "skip=false");
+  await commit("vite.config.ts");
+  assert.equal(run(rootOnly), "skip=false");
+  assert.equal(
+    execFileSync("node", [".github/scripts/affected.mjs"], {
+      cwd: repo,
+      input: "not json",
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim(),
+    "skip=false",
+  );
+});
+
+test("affected.mjs: ci.yml, scripts, .node-version, .npmrc each force a run", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "hull-affected2-"));
+  await cp(dir, repo, { recursive: true });
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.email=a@b.c", "-c", "user.name=t", ...a], {
+      cwd: repo,
+      encoding: "utf8",
+    });
+  git("init", "-q");
+  git("add", "-A");
+  git("commit", "-qm", "base");
+  const base = git("rev-parse", "HEAD").trim();
+  const rootOnly = {
+    data: { affectedTasks: { items: [{ package: { name: "//" }, fullName: "//#format:check" }] } },
+  };
+  for (const rel of [
+    ".github/workflows/ci.yml",
+    ".github/scripts/affected.mjs",
+    ".github/dependabot.yml",
+    ".node-version",
+    ".npmrc",
+  ]) {
+    git("reset", "-q", "--hard", base);
+    await mkdir(join(repo, rel, ".."), { recursive: true });
+    await appendFile(join(repo, rel), `\n// ${Math.random()}\n`);
+    git("add", "-A");
+    git("commit", "-qm", rel);
+    const out = execFileSync("node", [".github/scripts/affected.mjs"], {
+      cwd: repo,
+      input: JSON.stringify(rootOnly),
+      encoding: "utf8",
+      env: { ...process.env, TURBO_SCM_BASE: base, TURBO_SCM_HEAD: "HEAD" },
+    }).trim();
+    assert.equal(out, "skip=false", rel);
+  }
 });

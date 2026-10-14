@@ -14,7 +14,8 @@ const ALL_EXACT = new Set([
   "scripts/combos.json",
   "package.json",
   "pnpm-lock.yaml",
-  ".github/workflows/ci.yml",
+  "scripts/affected-combos.mjs",
+  ".node-version",
 ]);
 
 /**
@@ -27,7 +28,8 @@ export function affectedCombos(changed, combos) {
   const all = combos.map((c) => c.name);
   const hit = new Set();
   for (const f of changed) {
-    if (ALL_EXACT.has(f) || f.startsWith("scripts/lib/")) return all;
+    if (ALL_EXACT.has(f) || f.startsWith("scripts/lib/") || f.startsWith(".github/workflows/"))
+      return all;
     const m = f.match(/^template\/pieces\/([^/]+)\//);
     if (m) {
       if (m[1] === "base") return all;

@@ -38,12 +38,27 @@ function stringArray(v, where) {
   return v;
 }
 
+const RESERVED_VARS = new Set([
+  "pieces",
+  "piece",
+  "template",
+  "true",
+  "false",
+  "none",
+  "not",
+  "and",
+  "or",
+  "in",
+  "is",
+]);
+
 function loadVars(raw, where) {
   if (raw === undefined) return {};
   if (!isObject(raw)) throw new TemplateError(`${where}: [vars] must be a table`);
   const vars = {};
   for (const [name, spec] of Object.entries(raw)) {
     const w = `${where}: var "${name}"`;
+    if (RESERVED_VARS.has(name.toLowerCase())) throw new TemplateError(`${w} is a reserved name`);
     if (!isObject(spec)) throw new TemplateError(`${w} must be a table`);
     checkKeys(spec, VAR_KEYS, w);
     if (typeof spec.prompt !== "string") throw new TemplateError(`${w} needs a string "prompt"`);

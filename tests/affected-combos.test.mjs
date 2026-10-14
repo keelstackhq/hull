@@ -26,6 +26,9 @@ test("renderer, manifest, workflow and root package changes select all", () => {
     "package.json",
     "pnpm-lock.yaml",
     ".github/workflows/ci.yml",
+    ".github/workflows/other.yml",
+    "scripts/affected-combos.mjs",
+    ".node-version",
   ]) {
     assert.deepEqual(affectedCombos([f], combos), ["base", "web"], f);
   }

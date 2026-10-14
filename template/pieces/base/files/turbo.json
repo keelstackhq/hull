@@ -6,7 +6,20 @@
     "lint": {},
     "format:check": {},
     "//#format:check": {
-      "inputs": ["package.json", "turbo.json", "tsconfig.base.json", "vite.config.ts"]
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.base.json",
+        "vite.config.ts",
+        "pnpm-workspace.yaml",
+        "renovate.json",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "README.md",
+        ".claude/**",
+        ".github/**",
+        "docs/**"
+      ]
     },
     "typecheck": { "dependsOn": ["^build"] },
     "test": { "dependsOn": ["^build"] },

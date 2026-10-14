@@ -29,17 +29,15 @@ jobs:
         id: affected
         run: |
           set +e
-          npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build --exit-code
+          npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build > "$RUNNER_TEMP/affected.json"
           code=$?
           set -e
-          case "$code" in
-            0) echo "skip=true" >> "$GITHUB_OUTPUT" ;;
-            1) echo "skip=false" >> "$GITHUB_OUTPUT" ;;
-            *)
-              echo "::warning::turbo query affected failed (exit $code); running everything"
-              echo "skip=false" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
+          if [ "$code" -eq 0 ]; then
+            node .github/scripts/affected.mjs < "$RUNNER_TEMP/affected.json" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::turbo query affected failed (exit $code); running everything"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v4
         if: steps.affected.outputs.skip != 'true'
       - uses: actions/setup-node@v5
