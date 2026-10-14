@@ -111,7 +111,7 @@ test("rejects base naming a missing piece", ...);
 **Interfaces:**
 - Produces: `checkSubset(source: string, file: string): Violation[]`, `Violation = { file, line: number, tag: string, reason: string }`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 const ok = ['{{ scope }}', '{{ piece.name | upper }}', '{{ name | lower }}', '{% if scope %}a{% elif x %}b{% else %}c{% endif %}',
@@ -128,8 +128,8 @@ test("reports the line number", () => assert.equal(checkSubset("a\nb\n{% set x %
 test("flags unbalanced if/endif", () => assert.match(checkSubset("{% if a %}", "f")[0].reason, /unclosed/));
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement `checkSubset`**: scan `{{…}}`, `{%…%}`, `{#…#}` with one regex; validate each tag against these grammars and keep a block stack:
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement `checkSubset`**: scan `{{…}}`, `{%…%}`, `{#…#}` with one regex; validate each tag against these grammars and keep a block stack:
   - output: `^\s*IDENT(\.IDENT)*(\s*\|\s*(lower|upper))?\s*$`
   - `if`/`elif`: `IDENT` (not `pieces`), an allowed dotted name, or `"<id>" in pieces`; reject `not`, `and`, `or` and any operator (contract §9.2)
   - dotted names allowed only: `piece.id`, `piece.name`, `template.name`, `template.version` (§9.3)
@@ -137,8 +137,8 @@ test("flags unbalanced if/endif", () => assert.match(checkSubset("{% if a %}", "
   - `for`: `IDENT in pieces`
   - `else`, `endif`, `endfor`
   - `IDENT` = `[A-Za-z_][A-Za-z0-9_]*`
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat: check templates against the portable subset`
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat: check templates against the portable subset`
 
 ---
 
