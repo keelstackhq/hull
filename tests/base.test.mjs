@@ -37,7 +37,14 @@ test("catalog pins exact versions from the spec", async () => {
   for (const [k, v] of Object.entries(ws.catalog)) assert.match(v, /^\d+\.\d+\.\d+$/, k);
   assert.deepEqual(ws.packages, ["apps/*", "packages/*", "crates/*"]);
   assert.equal(ws.minimumReleaseAge, 4320);
-  assert.deepEqual(ws.minimumReleaseAgeExclude, ["turbo", "@turbo/*"]);
+  assert.deepEqual(ws.minimumReleaseAgeExclude, [
+    "turbo",
+    "@turbo/*",
+    "wrangler",
+    "miniflare",
+    "workerd",
+    "@cloudflare/workerd-*",
+  ]);
   assert.deepEqual(ws.allowBuilds, { esbuild: true, workerd: true, sharp: true });
   assert.equal(ws.peerDependencyRules.allowedVersions["storybook>vite-plus"], "1");
 });

@@ -6,7 +6,7 @@
 
 **Architecture:** Each piece is a directory under `template/pieces/` with `target = "<dir>/{{ name }}"` (or `packages/ui`), configs owned, `package.json` shared (json), `wrangler.jsonc` shared (text), source seed. Root-level effects (preview workflow, CLAUDE.md lines) are `{% if %}` blocks in `base` files. One Vite: every Vite consumer resolves to `@voidzero-dev/vite-plus-core` through the base override, enforced by `check-single-vite`.
 
-**Tech Stack:** As milestone 1, plus generated-repo packages from spec §7: preact 10.29.8, @preact/preset-vite 2.10.6, @cascivo/react 1.9.0, @cascivo/themes 1.0.3, storybook / @storybook/preact-vite / @storybook/addon-docs 10.6.2, astro 7.3.8, @astrojs/preact 6.0.6, hono 4.13.13, wrangler 4.151.0, @cloudflare/workers-types 5.20261014.1, @sentry/cloudflare 11.7.0.
+**Tech Stack:** As milestone 1, plus generated-repo packages from spec §7: preact 10.29.8, @preact/preset-vite 2.10.6, @cascivo/react 1.9.0, @cascivo/themes 1.0.3, @preact/signals-react 3.12.0, react/react-dom 19.3.0 (dev-only), happy-dom 20.14.6 (added 2026-10-14 with user approval), storybook / @storybook/preact-vite / @storybook/addon-docs 10.6.2, astro 7.3.8, @astrojs/preact 6.0.6, hono 4.13.13, wrangler 4.151.0, @cloudflare/workers-types 5.20261014.1, @sentry/cloudflare 11.7.0.
 
 **Spec:** `docs/superpowers/specs/2026-10-14-hull-design.md` (§4, §6.2–§6.5, §7.2, §8.2, §10)
 
@@ -84,8 +84,8 @@ test("peer-suffixed keys count once", ...);  // "@voidzero-dev/vite-plus-core@1.
 - Consumes: `renderCombo`, `CI_TASKS`, `checkSingleVite`
 - Produces: package `@{{ scope }}/{{ name }}` with `dist/` output; `deploy:preview` script (used by Task 6); `tauri-app` (plan 03) relies on scripts `dev` and `build` and on `vite` dev port 5173.
 
-- [ ] **Step 1: Verify cascivo.** Run `npm view @cascivo/react peerDependencies` and read the cascivo docs (`pnpm dlx docspack ask` with `@cascivo/docspack`, or the cascivo README) to confirm the Preact path (prebuilt `@cascivo/react` via `preact/compat`, or the `cascivo` CLI). Record the decision in spec §6.2 in this task's commit. If the packages cannot be installed (private or broken), keep a plain Preact app, put "cascivo package access" under Blocked, and continue.
-- [ ] **Step 2: Write failing tests:**
+- [x] **Step 1: Verify cascivo.** Run `npm view @cascivo/react peerDependencies` and read the cascivo docs (`pnpm dlx docspack ask` with `@cascivo/docspack`, or the cascivo README) to confirm the Preact path (prebuilt `@cascivo/react` via `preact/compat`, or the `cascivo` CLI). Record the decision in spec §6.2 in this task's commit. If the packages cannot be installed (private or broken), keep a plain Preact app, put "cascivo package access" under Blocked, and continue.
+- [x] **Step 2: Write failing tests:**
 
 ```js
 test("piece manifest", ...);   // multiple, target "apps/{{ name }}", name default "web", requires ["base"]
@@ -100,10 +100,10 @@ test("wrangler.jsonc serves dist as an SPA with observability", ...);  // strip 
 test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 lines", ...);
 ```
 
-- [ ] **Step 3: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 4: Write the piece** per spec §6.2. Seed app: one component using a cascivo component and theme, one Vitest test rendering it.
-- [ ] **Step 5: Run `pnpm test` — expect PASS. Dogfood by hand:** render `base preact-app:web`, `pnpm install --no-frozen-lockfile`, `pnpm turbo run lint format:check typecheck test build`, `node scripts/check-single-vite.mjs <dir>` — all pass.
-- [ ] **Step 6: Commit** — `feat(preact-app): Preact app on Vite+ with cascivo`
+- [x] **Step 3: Run `pnpm test` — expect FAIL.**
+- [x] **Step 4: Write the piece** per spec §6.2. Seed app: one component using a cascivo component and theme, one Vitest test rendering it.
+- [x] **Step 5: Run `pnpm test` — expect PASS. Dogfood by hand:** render `base preact-app:web`, `pnpm install --no-frozen-lockfile`, `pnpm turbo run lint format:check typecheck test build`, `node scripts/check-single-vite.mjs <dir>` — all pass.
+- [x] **Step 6: Commit** — `feat(preact-app): Preact app on Vite+ with cascivo`
 
 ---
 

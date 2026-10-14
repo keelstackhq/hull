@@ -202,7 +202,7 @@ Root files (class in brackets):
 ### 6.2 `preact-app`
 
 `package.json.jinja` [shared, json] scripts: `dev` `vp dev`, `build` `vp build`, `lint` `vp lint`,
-`format:check` `vp fmt --check`, `typecheck` `tsc --noEmit`, `test` `vp test`, `preview` `vp preview`,
+`format:check` `vp fmt --check`, `typecheck` `tsc --noEmit`, `test` `vp test run`, `preview` `vp preview`,
 `deploy:preview` `wrangler versions upload --preview-alias pr-$PR_NUMBER`, `deploy` `wrangler deploy`.
 Dependencies: `preact`, cascivo (below); dev: `@preact/preset-vite`, `vite-plus`, `typescript`,
 `wrangler`. `vite.config.ts` [owned] with `@preact/preset-vite`; `tsconfig.json` [owned] extends
@@ -210,12 +210,17 @@ Dependencies: `preact`, cascivo (below); dev: `@preact/preset-vite`, `vite-plus`
 `not_found_handling: "single-page-application"`, `observability.enabled: true`;
 `index.html`, `src/main.tsx`, `src/app.tsx`, `src/app.test.tsx` [seed]; `CLAUDE.md` [owned].
 
-cascivo: the app uses the prebuilt components `@cascivo/react` 1.9.0 and `@cascivo/themes` 1.0.3
-through `preact/compat` (the Preact preset aliases `react` to `preact/compat`). To verify in the
-task with `npm view` and the cascivo docs (`@cascivo/docspack`): that these are the right packages
-for Preact, and whether the `cascivo` CLI (copy-in components) should be the default instead.
-`npm view` on 2026-10-14: `cascivo` 1.8.0 is the CLI (`init/add/list/update`); `@cascivo/core`
-1.9.0 peers on `react >= 18`.
+cascivo (decided 2026-10-14): the app uses the prebuilt components `@cascivo/react` 1.9.0 and
+`@cascivo/themes` 1.0.3 through `preact/compat`, following cascivo's "Using cascivo with Preact"
+guide (`docs/USING-WITH-PREACT.md`, linked from the `@cascivo/react` README; Vite CSR with
+`@preact/preset-vite` is marked verified there). The `cascivo` CLI (copy-in components) is not the
+default. `@cascivo/react` peers on `react`, `react-dom`, `@types/react` (all `>=18`) and
+`@preact/signals-react >=3`: the piece depends on `@preact/signals-react` and has `react`/`react-dom`
+as dev-only peers (aliased to `preact/compat` by the preset and by `tsconfig` `paths`; not bundled);
+`@types/react` is listed in `peerDependencyRules.ignoreMissing`. `vite.config.ts` inlines
+`@cascivo/*` for tests so the alias applies; the seed test renders with `happy-dom`. SSR/prerender
+is unverified, and cascivo under `@astrojs/preact` compat is documented as broken, so astro-site
+does not use cascivo. These four packages were added to the stack with the user's approval.
 
 ### 6.3 `ui-storybook`
 
@@ -393,7 +398,10 @@ Checked with `npm view` on 2026-10-14.
 | `@cloudflare/workers-types` | 5.20261014.1 | |
 | `@sentry/cloudflare` | 11.7.0 | |
 | `@tauri-apps/cli` | 2.12.2 | `@tauri-apps/api` 2.12.3 |
-| `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | to verify (§6.2) |
+| `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
+| `@preact/signals-react` | 3.12.0 | cascivo peer |
+| `react`, `react-dom` | 19.3.0 | dev-only cascivo peers, aliased to `preact/compat`; published 2026-09-09 |
+| `happy-dom` | 20.14.6 | DOM environment for component tests; published 2026-10-08 |
 | `docspack` | 1.5.0 | |
 | pnpm / Node | 12.11.2 / 24 | Node 24 is the active LTS |
 
