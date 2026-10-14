@@ -135,11 +135,11 @@ test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 l
 **Interfaces:**
 - Produces: package `@{{ scope }}/{{ name }}` (`dist/` static output), `deploy:preview` script.
 
-- [ ] **Step 1: Write failing tests:** manifest (name default `site`); `build` is `astro build`, `typecheck` is `tsc --noEmit`, `format:check` excludes `.astro`; `astro.config.mjs` uses `@astrojs/preact` and `output: "static"`; the piece `CLAUDE.md` states that oxlint does not lint `.astro` templates and oxfmt `.astro` support is experimental.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the piece** per spec §6.4. Try `astro check` once with TypeScript 7.0.2; if it works, use it for `typecheck` and update spec §6.4; if not, keep `tsc --noEmit` and note the error in PROGRESS.
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base astro-site:site`: CI tasks pass, `check-single-vite` passes (Astro's own `vite ^8.3.1` resolves to the core alias).
-- [ ] **Step 5: Commit** — `feat(astro-site): Astro 7 static site sharing Vite+ core`
+- [x] **Step 1: Write failing tests:** manifest (name default `site`); `build` is `astro build`, `typecheck` is `tsc --noEmit`, `format:check` excludes `.astro`; `astro.config.mjs` uses `@astrojs/preact` and `output: "static"`; the piece `CLAUDE.md` states that oxlint does not lint `.astro` templates and oxfmt `.astro` support is experimental.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the piece** per spec §6.4. Try `astro check` once with TypeScript 7.0.2; if it works, use it for `typecheck` and update spec §6.4; if not, keep `tsc --noEmit` and note the error in PROGRESS.
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base astro-site:site`: CI tasks pass, `check-single-vite` passes (Astro's own `vite ^8.3.1` resolves to the core alias).
+- [x] **Step 5: Commit** — `feat(astro-site): Astro 7 static site sharing Vite+ core`
 
 ---
 

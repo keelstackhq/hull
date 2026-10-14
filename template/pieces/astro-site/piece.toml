@@ -1,0 +1,17 @@
+id = "astro-site"
+description = "Astro 7 static site with Preact islands, sharing the Vite+ core, deployed to Cloudflare static assets"
+multiple = true
+requires = ["base"]
+target = "apps/{{ name }}"
+
+[vars]
+name = { prompt = "site name", default = "site", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["astro.config.mjs", "tsconfig.json", "CLAUDE.md"]
+shared = ["package.json", "wrangler.jsonc"]
+seed = ["src/**"]
+
+[merge]
+"package.json" = "json"
+"wrangler.jsonc" = "text"
