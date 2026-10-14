@@ -57,7 +57,7 @@ tests/single-vite.test.mjs preact-app.test.mjs ui-storybook.test.mjs astro-site.
 **Interfaces:**
 - Produces: `checkSingleVite(lockText: string): { ok: boolean, coreVersions: string[], viteEntries: string[] }`; CLI `node scripts/check-single-vite.mjs <repoDir>` exits 1 with the offending keys.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("single core, no vite → ok", () => assert.deepEqual(checkSingleVite(fx("single")), { ok: true, coreVersions: ["1.1.0"], viteEntries: [] }));
@@ -66,10 +66,10 @@ test("two core versions → not ok", ...);
 test("peer-suffixed keys count once", ...);  // "@voidzero-dev/vite-plus-core@1.1.0(@types/node@24.0.0)"
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** by parsing `pnpm-lock.yaml` with `yaml` and reading the `packages:` keys (strip the `(...)` peer suffix). Fixtures: trimmed real lockfiles (generate `single.yaml` from a rendered base+preact-app install in Task 2 if easier, then trim).
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat: check that a lockfile resolves a single vite`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** by parsing `pnpm-lock.yaml` with `yaml` and reading the `packages:` keys (strip the `(...)` peer suffix). Fixtures: trimmed real lockfiles (generate `single.yaml` from a rendered base+preact-app install in Task 2 if easier, then trim).
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat: check that a lockfile resolves a single vite`
 
 ---
 

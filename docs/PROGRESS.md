@@ -14,6 +14,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · 01/8 · `feat(base): Claude Code layer — agents, skills, hooks, loop` · 176/176 tests, lint+fmt clean; base rendered → 6/6 turbo tasks, rendered CLAUDE.md 42 lines and `vp fmt --check` clean. Settings/hooks/statusline shape checked against code.claude.com docs. Uses `pnpm run ci` (`pnpm ci` is pnpm's clean install). docs-conditional tests use a stub docs piece until plan 03.
 - 2026-10-14 · 01/9 · `ci: dogfood rendered combos in hull CI` · 185/185 tests, lint+fmt clean; `node scripts/dogfood.mjs --combo base` → `base ok 3.4s` (cold turbo cache, warm pnpm store), `base ok 0.9s` warm. Unknown base selects all combos.
 - 2026-10-14 · Milestone 1 reviewed · `fix: milestone 1 review findings` · 213/213 tests, lint+fmt clean, dogfood base ok. Fixed: undefined vars in if/elif/filters are template errors (contract §9.12); docs-only PRs early-exit (root package ignored unless a root trigger changed; docs formatting checked locally/on main only, spec §8.4); add-piece uses contract §9.14 CLI; root format:check covers all root files; repeated `--piece base` ignored; reserved var names rejected.
+- 2026-10-14 · 02/1 · `feat: check that a lockfile resolves a single vite` · 223/223 tests, lint+fmt clean; CLI on rendered base → ok, single vite-plus-core@1.1.0. Reads packages+snapshots of all YAML docs, resolves `npm:` aliases.
 
 ## Measurements
 
