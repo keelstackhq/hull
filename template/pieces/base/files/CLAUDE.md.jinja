@@ -38,6 +38,8 @@ Keep subagent reports short. Skills: `verify`, `add-piece`{% if "docs" in pieces
 `/loop` runs `.claude/loop.md`.
 {# One line per piece kind goes here, each in its own if on its piece id. #}{% if "preact-app" in pieces %}
 - `apps/*` (preact-app): Preact apps on Vite+ with cascivo; see `apps/<name>/CLAUDE.md`.
+{% endif %}{% if "ui-storybook" in pieces %}
+- `packages/ui` (ui-storybook): Preact components with Storybook; see `packages/ui/CLAUDE.md`.
 {% endif %}{% if "docs" in pieces %}
 ## Docs
 

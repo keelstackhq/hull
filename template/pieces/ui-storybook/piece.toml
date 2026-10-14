@@ -1,0 +1,12 @@
+id = "ui-storybook"
+description = "Preact UI component package on cascivo with Storybook 10.6"
+requires = ["base"]
+target = "packages/ui"
+
+[files]
+owned = ["vite.config.ts", "tsconfig.json", ".storybook/main.ts", "CLAUDE.md"]
+shared = ["package.json"]
+seed = ["src/**", ".storybook/preview.ts"]
+
+[merge]
+"package.json" = "json"

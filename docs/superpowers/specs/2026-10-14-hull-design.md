@@ -226,9 +226,11 @@ does not use cascivo. These four packages were added to the stack with the user'
 
 `packages/ui`: a Preact component package on cascivo with Storybook 10.6
 (`@storybook/preact-vite`). Scripts: `build` `vp pack`, `lint`, `format:check`, `typecheck`, `test`
-`vp test` (unit tests only), `storybook` `storybook dev -p 6006`, `storybook:build` `storybook build`
-(not on the PR path). `.storybook/main.ts` [owned], `.storybook/preview.ts` [seed],
-`src/button.tsx`, `src/button.stories.tsx`, `src/button.test.tsx` [seed].
+`vp test run` (unit tests only), `storybook` `storybook dev -p 6006`, `storybook:build` `storybook build`
+(not on the PR path). `preact` and `@cascivo/*` are `peerDependencies` (and dev copies), externalised
+by `vp pack`, so consumers keep one preact. `vite.config.ts` uses `@preact/preset-vite` for the
+`react` → `preact/compat` alias. `.storybook/main.ts` [owned], `.storybook/preview.ts` [seed],
+`src/index.ts`, `src/button.tsx`, `src/button.stories.tsx`, `src/button.test.tsx` [seed].
 
 ### 6.4 `astro-site`
 

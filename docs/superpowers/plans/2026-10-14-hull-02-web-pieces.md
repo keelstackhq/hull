@@ -117,11 +117,11 @@ test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 l
 **Interfaces:**
 - Produces: package `@{{ scope }}/ui` built with `vp pack` (`dist/`), task `storybook:build` (outputs `storybook-static/**`, defined in base `turbo.json`).
 
-- [ ] **Step 1: Write failing tests:** manifest (`multiple = false`, `target = "packages/ui"`); classes (`.storybook/main.ts` owned, `.storybook/preview.ts` seed, stories seed); `main.ts` names framework `@storybook/preact-vite`; scripts include `storybook:build` and `test` is `vp test` (no Storybook browser tests); `build` is `vp pack`.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the piece** per spec §6.3.
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** with `base preact-app:web ui-storybook`: CI tasks pass, `check-single-vite` passes, and `pnpm --filter @hullci/ui storybook:build` succeeds once (off the PR path; proves the override works). Paste any `vite-plus` peer warning into PROGRESS.
-- [ ] **Step 5: Commit** — `feat(ui-storybook): Preact UI package with Storybook 10.6`
+- [x] **Step 1: Write failing tests:** manifest (`multiple = false`, `target = "packages/ui"`); classes (`.storybook/main.ts` owned, `.storybook/preview.ts` seed, stories seed); `main.ts` names framework `@storybook/preact-vite`; scripts include `storybook:build` and `test` is `vp test` (no Storybook browser tests); `build` is `vp pack`.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the piece** per spec §6.3.
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** with `base preact-app:web ui-storybook`: CI tasks pass, `check-single-vite` passes, and `pnpm --filter @hullci/ui storybook:build` succeeds once (off the PR path; proves the override works). Paste any `vite-plus` peer warning into PROGRESS.
+- [x] **Step 5: Commit** — `feat(ui-storybook): Preact UI package with Storybook 10.6`
 
 ---
 

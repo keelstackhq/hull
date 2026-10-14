@@ -16,6 +16,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · Milestone 1 reviewed · `fix: milestone 1 review findings` · 213/213 tests, lint+fmt clean, dogfood base ok. Fixed: undefined vars in if/elif/filters are template errors (contract §9.12); docs-only PRs early-exit (root package ignored unless a root trigger changed; docs formatting checked locally/on main only, spec §8.4); add-piece uses contract §9.14 CLI; root format:check covers all root files; repeated `--piece base` ignored; reserved var names rejected.
 - 2026-10-14 · 02/1 · `feat: check that a lockfile resolves a single vite` · 223/223 tests, lint+fmt clean; CLI on rendered base → ok, single vite-plus-core@1.1.0. Reads packages+snapshots of all YAML docs, resolves `npm:` aliases.
 - 2026-10-14 · 02/2 · `feat(preact-app): Preact app on Vite+ with cascivo` · 230/230 tests, lint+fmt clean; base+preact-app:web rendered → install 0.62 s (warm store), turbo 11/11 tasks 7.8 s cold cache, check-single-vite ok (vite-plus-core 1.1.0). cascivo via `@cascivo/react` + `preact/compat`; new deps @preact/signals-react, react/react-dom (dev), happy-dom approved by user. wrangler/miniflare/workerd in minimumReleaseAgeExclude (published 2026-10-12..14).
+- 2026-10-14 · 02/3 · `feat(ui-storybook): Preact UI package with Storybook 10.6` · 237/237 tests, lint+fmt clean; base+preact-app:web+ui-storybook → turbo 16/16 tasks 12.3 s cold cache, check-single-vite ok, `storybook:build` ok in 7.3 s (off PR path). No vite-plus peer warning text; install reports only expected unmet `vite` peers (override). preact/cascivo are peers of @scope/ui.
 
 ## Measurements
 
@@ -26,7 +27,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Blocked
 
-- Time-gated (no human needed): after 2026-10-17 drop `wrangler`, `miniflare`, `workerd`, `@cloudflare/workerd-*` from `minimumReleaseAgeExclude` (base `pnpm-workspace.yaml`) and the matching test assertion.
+- Time-gated (no human needed): after 2026-10-17 drop `wrangler`, `miniflare`, `workerd`, `@cloudflare/workerd-*` (and after 2026-10-15 `storybook`, `@storybook/*`) from `minimumReleaseAgeExclude` (base `pnpm-workspace.yaml`) and the matching test assertion.
 
 - Contract gap (keelstack/splice + hull, same week): the subset cannot emit `${{ … }}` from a `.jinja` file. Action: agree a contract §4 addition (proposed `{% raw %}…{% endraw %}`) in both repos' `docs/template-format.md`. Until then `ci.yml` is a plain owned file; plan 02 Task 6 (`preview.yml`) and plan 03 (`desktop.yml`, Rust steps in `ci.yml`) must use runtime guards (`hashFiles(...)`) or wait for the addition.
 
