@@ -3,6 +3,21 @@ import { join, posix } from "node:path";
 import { TemplateError, UsageError } from "./errors.mjs";
 import { classify, outputPath } from "./ownership.mjs";
 import { renderString } from "./render-file.mjs";
+import { checkSubset } from "./subset.mjs";
+
+function renderChecked(source, context, where) {
+  const violations = checkSubset(source, where);
+  if (violations.length > 0) {
+    throw new TemplateError(
+      violations.map((v) => `${v.file}:${v.line}: ${v.tag}: ${v.reason}`).join("\n"),
+    );
+  }
+  try {
+    return renderString(source, context);
+  } catch (e) {
+    throw new TemplateError(`${where}: ${e.message}`);
+  }
+}
 
 function checkPattern(spec, name, value) {
   if (spec?.pattern !== undefined && !new RegExp(spec.pattern).test(value)) {
@@ -116,10 +131,17 @@ export async function buildPlan(t, instances, opts) {
       piece: { id: inst.piece.id, name: inst.name },
       template: { name: t.name, version: opts.templateVersion },
     };
-    const target = inst.piece.target === undefined ? "" : renderString(inst.piece.target, context);
+    const target =
+      inst.piece.target === undefined
+        ? ""
+        : renderChecked(inst.piece.target, context, `piece ${inst.piece.id}: piece.toml target`);
     const rels = (await walk(inst.piece.filesDir)).sort();
     for (const rel of rels) {
-      const rendered = renderString(outputPath(rel), context);
+      const rendered = renderChecked(
+        outputPath(rel),
+        context,
+        `piece ${inst.piece.id}: path ${rel}`,
+      );
       const path = target ? posix.join(target, rendered) : rendered;
       const label = `${inst.piece.id}:${inst.name}`;
       if (owners.has(path)) {
@@ -133,6 +155,15 @@ export async function buildPlan(t, instances, opts) {
         render: rel.endsWith(".jinja"),
         context,
       });
+    }
+  }
+  const all = new Set(plan.map((e) => e.path));
+  for (const e of plan) {
+    for (let i = e.path.indexOf("/"); i !== -1; i = e.path.indexOf("/", i + 1)) {
+      const parent = e.path.slice(0, i);
+      if (all.has(parent)) {
+        throw new TemplateError(`${parent} is a file but ${e.path} needs it to be a directory`);
+      }
     }
   }
   return plan;

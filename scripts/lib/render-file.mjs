@@ -10,5 +10,5 @@ export function createEnv() {
 }
 
 export function renderString(source, context) {
-  return createEnv().renderString(source, context);
+  return createEnv().renderString(source.replace(/\r\n/g, "\n"), context).replace(/\r\n/g, "\n");
 }

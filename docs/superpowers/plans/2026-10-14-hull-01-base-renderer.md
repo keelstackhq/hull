@@ -216,7 +216,7 @@ test("two instances writing the same path → TemplateError", ...);
   - CLI per spec §9; `main(argv): Promise<number>` (exit code) exported for tests
   - `tests/helpers.mjs` `renderCombo` (see File Structure)
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("renders, copies, strips .jinja", async () => {
@@ -246,10 +246,10 @@ test("usage error with --json → exit 2 and ok:false", ...);
 test("for-loop and in-pieces render identically to the contract examples", ...); // golden file in fixtures
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement.** Order: load → subset-check every `.jinja` of the requested pieces → resolve → plan → render all in memory → only then write (no partial output on error). Args via `node:util` `parseArgs` (`--piece`/`--data` multiple).
-- [ ] **Step 4: Run `pnpm test`, then by hand:** `node scripts/render.mjs new --template tests/fixtures/template --out /tmp/hull-x --piece app --json` — expect `"ok":true`.
-- [ ] **Step 5: Commit** — `feat: dev renderer writes new repos from the template`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement.** Order: load → subset-check every `.jinja` of the requested pieces → resolve → plan → render all in memory → only then write (no partial output on error). Args via `node:util` `parseArgs` (`--piece`/`--data` multiple).
+- [x] **Step 4: Run `pnpm test`, then by hand:** `node scripts/render.mjs new --template tests/fixtures/template --out /tmp/hull-x --piece app --json` — expect `"ok":true`.
+- [x] **Step 5: Commit** — `feat: dev renderer writes new repos from the template`
 
 ---
 
