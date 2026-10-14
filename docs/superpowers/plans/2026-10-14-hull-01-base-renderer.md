@@ -158,7 +158,7 @@ test("flags unbalanced if/endif", () => assert.match(checkSubset("{% if a %}", "
   - `resolveRequest(t: Template, req: { pieces: string[], vars: Record<string,string> }): Instance[]`, `Instance = { piece: Piece, name: string, vars: Record<string,string> }`
   - `buildPlan(t: Template, instances: Instance[], opts: { templateVersion: string }): Promise<PlannedFile[]>`, `PlannedFile = { src: string, path: string, class, render: boolean, context: object }`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("outputPath strips .jinja", () => assert.equal(outputPath("a/package.json.jinja"), "a/package.json"));
@@ -194,10 +194,10 @@ test("plan applies target and context", async () => {
 test("two instances writing the same path → TemplateError", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** with `picomatch` (`dot: true`). `target` is rendered with the instance context through `renderString` from Task 4 — define `renderString` in `scripts/lib/render-file.mjs` now (Task 4 adds its tests). Instance `name` = `vars.name` or the piece id; non-multiple pieces have no `name` var.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat: classify ownership and plan renders`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** with `picomatch` (`dot: true`). `target` is rendered with the instance context through `renderString` from Task 4 — define `renderString` in `scripts/lib/render-file.mjs` now (Task 4 adds its tests). Instance `name` = `vars.name` or the piece id; non-multiple pieces have no `name` var.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat: classify ownership and plan renders`
 
 ---
 
