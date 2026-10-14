@@ -263,7 +263,7 @@ test("for-loop and in-pieces render identically to the contract examples", ...);
 - Consumes: `loadTemplate`, `checkSubset`, `overlaps`, `outputPath`
 - Produces: invariant suite that every later task's template change must pass; `tests/invariants.mjs` exports `elifBranches(source: string): string[]` (branch bodies of a chain marked `{# same-branches #}`) and `assertSameBranches(path: string): void` (used by plan 02 Task 6 and plan 03 Task 1)
 
-- [ ] **Step 1: Write failing tests** (they iterate over every piece found in `template/pieces/`):
+- [x] **Step 1: Write failing tests** (they iterate over every piece found in `template/pieces/`):
 
 ```js
 test("template loads", async () => { const t = await loadTemplate("template"); assert.equal(t.name, "hull"); assert.equal(t.minSplice, "0.1.0"); });
@@ -276,10 +276,10 @@ test("every multiple piece has target containing {{ name }} and a name var with 
 test("every elif chain marked {# same-branches #} has identical branches", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL (no `template/`).**
-- [ ] **Step 3: Create the skeleton** per spec §2 and §5 (`base` piece: `id = "base"`, description, `[files] seed = ["README.md"]`). Write `tests/invariants.mjs` with `elifBranches`.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `test: template invariants and base skeleton`
+- [x] **Step 2: Run `pnpm test` — expect FAIL (no `template/`).**
+- [x] **Step 3: Create the skeleton** per spec §2 and §5 (`base` piece: `id = "base"`, description, `[files] seed = ["README.md"]`). Write `tests/invariants.mjs` with `elifBranches`.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `test: template invariants and base skeleton`
 
 ---
 

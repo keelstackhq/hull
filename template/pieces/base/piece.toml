@@ -1,0 +1,5 @@
+id = "base"
+description = "Workspace root: pnpm, Turborepo, TypeScript, Vite+, CI and AI layer"
+
+[files]
+seed = ["README.md"]

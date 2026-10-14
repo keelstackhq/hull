@@ -1,0 +1,7 @@
+format = 1
+name = "hull"
+min_splice = "0.1.0"
+base = "base"
+
+[vars]
+scope = { prompt = "npm scope without @", default = "acme", pattern = "^[a-z0-9-]+$" }
