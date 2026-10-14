@@ -250,7 +250,7 @@ Hono on Workers. `wrangler.jsonc` [shared, text]: `main: "src/index.ts"`,
 `observability: { enabled: true, head_sampling_rate: 1 }`, `vars: { LOG_LEVEL: "info",
 SENTRY_DSN: "" }`, and commented lines showing OTel export destinations (Axiom), marked
 "verify against Cloudflare docs". Scripts: `dev` `wrangler dev`, `build`
-`wrangler deploy --dry-run --outdir dist`, `test` `vp test`, `typecheck` `tsc --noEmit`, `lint`,
+`wrangler deploy --dry-run --outdir dist`, `test` `vp test run`, `typecheck` `tsc --noEmit`, `lint`,
 `format:check`, `deploy:preview`, `deploy`.
 
 Files: `src/index.ts` [seed] (the app; imports hull glue), `src/hull/logging.ts` [owned],
@@ -261,13 +261,22 @@ Logging contract (`src/hull/logging.ts`):
   writes exactly one `console.log(JSON.stringify(line))` per request, with
   `line = { level: "info"|"warn"|"error", msg: "request", requestId, method, path, status,
   durationMs, colo?, country? }`; `level` is `error` for status ≥ 500, `warn` for ≥ 400.
-  No query string, no headers, no body (no secrets or PII in logs).
-- `onErrorHandler(err, c)` — logs `{ level: "error", msg: err.message, requestId, stack }` once
-  and returns `500` JSON `{ error: "internal", requestId }`.
+  No query string, no headers, no body (no secrets or PII in logs). `LOG_LEVEL` (from `env`,
+  default `info`) drops lines below that level.
+- `onErrorHandler(err, c)` — an `HTTPException` returns its own response (jsonLogger writes the
+  normal warn line). Any other error logs once `{ level: "error", msg: err.name, requestId,
+  method, path, status: 500, stack }` with the stack's first (message) line removed, because error
+  messages can quote request data (e.g. `JSON.parse` quotes the body); jsonLogger skips its own
+  line for that request. Returns `500` JSON `{ error: "internal", requestId }`.
 - Workers Logs indexes these JSON fields. Optional: OTel export to Axiom (free 500 GB/month),
   configured in the Cloudflare dashboard plus `observability` in `wrangler.jsonc`.
-- `src/hull/sentry.ts`: `withOptionalSentry(app)` wraps the app with `@sentry/cloudflare`
-  `withSentry` only when `env.SENTRY_DSN` is non-empty; otherwise returns the app unchanged.
+- `src/hull/sentry.ts`: `withOptionalSentry(app)` returns an `ExportedHandler` that delegates to
+  `app.fetch`; only when `env.SENTRY_DSN` is non-empty does it import `@sentry/cloudflare` (once per
+  isolate) and wrap with `withSentry`, registering a reporter that `onErrorHandler` calls. A
+  `beforeSend` scrubber removes query strings, headers, cookies, bodies, breadcrumbs and exception
+  messages (type and stack frames are kept). Wrangler bundles the
+  SDK (≈1.2 MB) but it is evaluated only when the DSN is set. Whether the empty `vars.SENTRY_DSN`
+  is overridden by `wrangler secret put SENTRY_DSN` on deploy is unverified (needs an account).
 
 Pricing note: Workers Logs free tier becomes 0.5 GB/day from 2026-12-01; the README says how to
 lower `head_sampling_rate`.

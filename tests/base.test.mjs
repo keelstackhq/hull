@@ -46,6 +46,8 @@ test("catalog pins exact versions from the spec", async () => {
     "@cloudflare/workerd-*",
     "storybook",
     "@storybook/*",
+    "@cloudflare/workers-types",
+    "@sentry/*",
   ]);
   assert.deepEqual(ws.allowBuilds, { esbuild: true, workerd: true, sharp: true });
   assert.equal(ws.peerDependencyRules.allowedVersions["storybook>vite-plus"], "1");

@@ -51,6 +51,8 @@ minimumReleaseAge: 4320
 # wrangler 4.151.0 (2026-10-14) pulls miniflare 5.20261012.0-beta (2026-10-14) and workerd
 # 1.20261012.1 (2026-10-12) with its @cloudflare/workerd-* binaries; same rule, drop once aged.
 # storybook and @storybook/* 10.6.2 were published 2026-10-12; same rule, drop once aged.
+# @cloudflare/workers-types 5.20261014.1 (2026-10-14) and @sentry/* 11.7.0 and its @sentry/*
+# dependencies (2026-10-12); same rule, drop once aged.
 minimumReleaseAgeExclude:
   - turbo
   - "@turbo/*"
@@ -60,3 +62,5 @@ minimumReleaseAgeExclude:
   - "@cloudflare/workerd-*"
   - storybook
   - "@storybook/*"
+  - "@cloudflare/workers-types"
+  - "@sentry/*"

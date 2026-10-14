@@ -156,7 +156,7 @@ test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 l
   - `onErrorHandler(err: Error, c: Context): Response`
   - `withOptionalSentry<E extends { SENTRY_DSN?: string }>(app: Hono<{ Bindings: E }>): ExportedHandler<E>`
 
-- [ ] **Step 1: Write failing tests.** Template-level (`tests/hono-worker.test.mjs`): classes (`src/hull/*.ts` owned, `src/index.ts` seed, `wrangler.jsonc` shared text); wrangler config values from Global Constraints; scripts. Generated `src/hull/logging.test.ts` (Vitest, `app.request()`, spy on `console.log`):
+- [x] **Step 1: Write failing tests.** Template-level (`tests/hono-worker.test.mjs`): classes (`src/hull/*.ts` owned, `src/index.ts` seed, `wrangler.jsonc` shared text); wrangler config values from Global Constraints; scripts. Generated `src/hull/logging.test.ts` (Vitest, `app.request()`, spy on `console.log`):
 
 ```ts
 it("logs one JSON line per request", async () => {
@@ -177,10 +177,10 @@ it("echoes x-request-id", ...);
 it("withOptionalSentry returns the app unchanged when SENTRY_DSN is empty", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` (template-level) — expect FAIL.**
-- [ ] **Step 3: Write the piece** per spec §6.5. `src/index.ts` seed: `requestId()`, `jsonLogger()`, `onError(onErrorHandler)`, a `/` route, `export default withOptionalSentry(app)`. Test app for the logging tests is built inside the test file (routes `/hello`, `/boom`). The OTel/Axiom lines in `wrangler.jsonc` are comments marked "verify against https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/".
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base hono-worker:api`: CI tasks pass, including the generated logging tests; `pnpm --filter @hullci/api build` produces `dist/`.
-- [ ] **Step 5: Commit** — `feat(hono-worker): Hono worker with JSON request logs and optional Sentry`
+- [x] **Step 2: Run `pnpm test` (template-level) — expect FAIL.**
+- [x] **Step 3: Write the piece** per spec §6.5. `src/index.ts` seed: `requestId()`, `jsonLogger()`, `onError(onErrorHandler)`, a `/` route, `export default withOptionalSentry(app)`. Test app for the logging tests is built inside the test file (routes `/hello`, `/boom`). The OTel/Axiom lines in `wrangler.jsonc` are comments marked "verify against https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/".
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base hono-worker:api`: CI tasks pass, including the generated logging tests; `pnpm --filter @hullci/api build` produces `dist/`.
+- [x] **Step 5: Commit** — `feat(hono-worker): Hono worker with JSON request logs and optional Sentry`
 
 ---
 

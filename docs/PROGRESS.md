@@ -18,6 +18,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · 02/2 · `feat(preact-app): Preact app on Vite+ with cascivo` · 230/230 tests, lint+fmt clean; base+preact-app:web rendered → install 0.62 s (warm store), turbo 11/11 tasks 7.8 s cold cache, check-single-vite ok (vite-plus-core 1.1.0). cascivo via `@cascivo/react` + `preact/compat`; new deps @preact/signals-react, react/react-dom (dev), happy-dom approved by user. wrangler/miniflare/workerd in minimumReleaseAgeExclude (published 2026-10-12..14).
 - 2026-10-14 · 02/3 · `feat(ui-storybook): Preact UI package with Storybook 10.6` · 237/237 tests, lint+fmt clean; base+preact-app:web+ui-storybook → turbo 16/16 tasks 12.3 s cold cache, check-single-vite ok, `storybook:build` ok in 7.3 s (off PR path). No vite-plus peer warning text; install reports only expected unmet `vite` peers (override). preact/cascivo are peers of @scope/ui.
 - 2026-10-14 · 02/4 · `feat(astro-site): Astro 7 static site sharing Vite+ core` · 243/243 tests, lint+fmt clean; base+astro-site:site → turbo 11/11 tasks 7.5 s cold cache, check-single-vite ok (Astro's vite resolves to vite-plus-core 1.1.0). `astro check` (@astrojs/check 0.9.10) with TypeScript 7.0.2 fails: "astro check does not currently support TypeScript 7.0. To continue using astro check, install TypeScript 6 instead." → `typecheck` stays `tsc --noEmit`. No cascivo in astro-site.
+- 2026-10-14 · 02/5 · `feat(hono-worker): Hono worker with JSON request logs and optional Sentry` · 251/251 tests, lint+fmt clean; base+hono-worker:api → turbo 11/11 tasks (16 generated api tests), build writes dist/. Security: request line never reads query/headers/body; error line logs err.name + stack frames only; HTTPException passes through; Sentry scrubbed (query, headers, cookies, body, breadcrumbs, exception messages); leak/401/scrub tests proven red. `@cloudflare/workers-types`, `@sentry/*` in minimumReleaseAgeExclude.
 
 ## Measurements
 
@@ -28,7 +29,9 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Blocked
 
-- Time-gated (no human needed): after 2026-10-17 drop `wrangler`, `miniflare`, `workerd`, `@cloudflare/workerd-*` (and after 2026-10-15 `storybook`, `@storybook/*`) from `minimumReleaseAgeExclude` (base `pnpm-workspace.yaml`) and the matching test assertion.
+- Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
+
+- Time-gated (no human needed): after 2026-10-17 drop `wrangler`, `miniflare`, `workerd`, `@cloudflare/workerd-*` (and after 2026-10-15 `storybook`, `@storybook/*`, `@sentry/*`; after 2026-10-17 `@cloudflare/workers-types`) from `minimumReleaseAgeExclude` (base `pnpm-workspace.yaml`) and the matching test assertion.
 
 - Contract gap (keelstack/splice + hull, same week): the subset cannot emit `${{ … }}` from a `.jinja` file. Action: agree a contract §4 addition (proposed `{% raw %}…{% endraw %}`) in both repos' `docs/template-format.md`. Until then `ci.yml` is a plain owned file; plan 02 Task 6 (`preview.yml`) and plan 03 (`desktop.yml`, Rust steps in `ci.yml`) must use runtime guards (`hashFiles(...)`) or wait for the addition.
 
