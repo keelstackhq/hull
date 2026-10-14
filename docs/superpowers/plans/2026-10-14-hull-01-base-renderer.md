@@ -421,7 +421,7 @@ test("skills have name and description frontmatter", ...);
   - `dogfood(opts: { combos: string[], root?: string, cacheDir?: string }): Promise<{ name, ok, seconds }[]>`; CLI `node scripts/dogfood.mjs --combo <name>...` exits 1 if any combo fails
   - `ciCommand(): string[]` exported from `dogfood.mjs` = `["pnpm", "turbo", "run", ...CI_TASKS]`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 const combos = [{ name: "base", pieces: ["base"] }, { name: "web", pieces: ["base", "preact-app:web"] }];
@@ -431,10 +431,10 @@ test("docs and tests select none", () => assert.deepEqual(affectedCombos(["docs/
 test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** per spec §10.2. `dogfood.mjs` renders into `<root>/<name>` (default `os.tmpdir()/hull-dogfood`), runs `git init -q`, `pnpm install --no-frozen-lockfile --prefer-offline`, then `ciCommand()` with `--cache-dir=<cacheDir>`, streaming output with a `[combo]` prefix and printing seconds per combo. Workflow: one job + `ci-ok` (spec §10.2), steps: checkout (depth 0, blobless), pnpm + setup-node (cache pnpm), install, lint, format:check, test, affected-combos → dogfood (skipped when the list is empty), `actions/cache` on `$RUNNER_TEMP/turbo-cache`.
-- [ ] **Step 4: Run `pnpm test`, then `node scripts/dogfood.mjs --combo base`** — expect `base ok <n>s` and exit 0. Paste the timing into PROGRESS.
-- [ ] **Step 5: Commit** — `ci: dogfood rendered combos in hull CI`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** per spec §10.2. `dogfood.mjs` renders into `<root>/<name>` (default `os.tmpdir()/hull-dogfood`), runs `git init -q`, `pnpm install --no-frozen-lockfile --prefer-offline`, then `ciCommand()` with `--cache-dir=<cacheDir>`, streaming output with a `[combo]` prefix and printing seconds per combo. Workflow: one job + `ci-ok` (spec §10.2), steps: checkout (depth 0, blobless), pnpm + setup-node (cache pnpm), install, lint, format:check, test, affected-combos → dogfood (skipped when the list is empty), `actions/cache` on `$RUNNER_TEMP/turbo-cache`.
+- [x] **Step 4: Run `pnpm test`, then `node scripts/dogfood.mjs --combo base`** — expect `base ok <n>s` and exit 0. Paste the timing into PROGRESS.
+- [x] **Step 5: Commit** — `ci: dogfood rendered combos in hull CI`
 
 ---
 

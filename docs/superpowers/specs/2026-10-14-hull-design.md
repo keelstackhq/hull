@@ -529,7 +529,8 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
 2. `node scripts/affected-combos.mjs --base $BASE` → list. Changes under
    `template/pieces/<id>/` select combos containing `<id>`; `base`, `template/splice.toml`,
    `scripts/render.mjs`, `scripts/lib/**`, `scripts/dogfood.mjs`, `scripts/combos.json`, root
-   `package.json`/lockfile and the workflow select all; docs and tests select none.
+   `package.json`/lockfile, the workflow and any other path under `template/` select all; docs and
+   tests select none. An unknown or missing base (first push, force-push) selects all.
 3. `node scripts/dogfood.mjs --combo <each>`: render into `$RUNNER_TEMP/combos/<name>`, then in
    sequence per combo `pnpm install --no-frozen-lockfile --prefer-offline` (shared pnpm store),
    `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,

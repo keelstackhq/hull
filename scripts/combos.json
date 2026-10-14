@@ -1,0 +1,4 @@
+{
+  "vars": { "scope": "hullci" },
+  "combos": [{ "name": "base", "pieces": ["base"] }]
+}
