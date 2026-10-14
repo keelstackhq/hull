@@ -30,7 +30,7 @@ tests/                          node:test: renderer units + template invariants
 
 ```bash
 pnpm install
-pnpm test                                   # node --test tests/
+pnpm test                                   # node --test "tests/**/*.test.mjs"
 pnpm lint && pnpm format:check              # vp lint / vp fmt --check on scripts and tests
 node scripts/render.mjs new --template template --out /tmp/x --piece base --piece preact-app:web --json
 node scripts/dogfood.mjs --combo base       # render + install + lint/format/typecheck/test/build

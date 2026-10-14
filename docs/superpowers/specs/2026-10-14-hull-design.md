@@ -503,7 +503,7 @@ Template var `scope = "hullci"` for all.
 
 One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
 1. `pnpm install --frozen-lockfile --prefer-offline`; `vp lint`, `vp fmt --check`, `pnpm test`
-   (`node --test tests/`: renderer unit tests + template invariants). Always runs (seconds).
+   (`node --test "tests/**/*.test.mjs"`: renderer unit tests + template invariants). Always runs (seconds).
 2. `node scripts/affected-combos.mjs --base $BASE` → list. Changes under
    `template/pieces/<id>/` select combos containing `<id>`; `base`, `template/splice.toml`,
    `scripts/render.mjs`, `scripts/lib/**`, `scripts/dogfood.mjs`, `scripts/combos.json`, root

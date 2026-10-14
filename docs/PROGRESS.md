@@ -4,6 +4,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Done
 
+- 2026-10-14 · 01/1 · `feat: scaffold hull and load template manifests` · 9/9 tests, lint+fmt clean (Node 24.21, pnpm 12.11.2). `test` script is `node --test "tests/**/*.test.mjs"` (`node --test tests/` fails on Node 24). Deferred review notes: multiple-piece `name` var → Task 5 invariant; `[merge]` globs vs `shared` → Task 3.
+
 ## Measurements
 
 <!-- Dogfood and CI timings: date, combo(s), cold/warm, seconds, machine or runner. -->

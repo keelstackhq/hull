@@ -74,8 +74,8 @@ Shared test helper: `tests/helpers.mjs` exports `renderCombo(pieces: string[], v
   - `VarSpec = { prompt: string, default?: string, pattern?: string }`
   - `Piece = { id, dir, filesDir, description, multiple: boolean, requires: string[], target?: string, vars: Record<string, VarSpec>, files: { owned: string[], shared: string[], seed: string[] }, merge: Record<string, "json"|"yaml"|"toml"|"text">, post: { run: string, when: string[] }[] }`
 
-- [ ] **Step 1: Scaffold.** `package.json`: `"private": true`, `"type": "module"`, `packageManager: "pnpm@12.11.2"`, scripts `test` = `node --test tests/`, `lint` = `vp lint scripts tests`, `format:check` = `vp fmt --check scripts tests`, `render` = `node scripts/render.mjs`. Deps per Tech Stack. Fixture template: `splice.toml` + pieces `base` (files `package.json.jinja`, `README.md`) and `app` (`multiple = true`, `target = "apps/{{ name }}"`, files `src/main.ts`, `config.json`).
-- [ ] **Step 2: Write failing tests** in `tests/manifest.test.mjs`:
+- [x] **Step 1: Scaffold.** `package.json`: `"private": true`, `"type": "module"`, `packageManager: "pnpm@12.11.2"`, scripts `test` = `node --test "tests/**/*.test.mjs"`, `lint` = `vp lint scripts tests`, `format:check` = `vp fmt --check scripts tests`, `render` = `node scripts/render.mjs`. Deps per Tech Stack. Fixture template: `splice.toml` + pieces `base` (files `package.json.jinja`, `README.md`) and `app` (`multiple = true`, `target = "apps/{{ name }}"`, files `src/main.ts`, `config.json`).
+- [x] **Step 2: Write failing tests** in `tests/manifest.test.mjs`:
 
 ```js
 test("loads the fixture template", async () => {
@@ -95,10 +95,10 @@ test("rejects base naming a missing piece", ...);
 ```
 
 `mutate(file, fn)` copies the fixture to a temp dir and edits one file; `rejectsWith` is `assert.rejects` with class + message regex.
-- [ ] **Step 3: Run `pnpm test` — expect FAIL (`loadTemplate` missing).**
-- [ ] **Step 4: Implement `loadTemplate`** with `smol-toml`. Validation is strict: unknown keys are errors; defaults `multiple = false`, `requires = []`, empty `files`/`merge`/`post`; `post.when` ⊆ `new|add|update`.
-- [ ] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
-- [ ] **Step 6: Commit** — `feat: scaffold hull and load template manifests`
+- [x] **Step 3: Run `pnpm test` — expect FAIL (`loadTemplate` missing).**
+- [x] **Step 4: Implement `loadTemplate`** with `smol-toml`. Validation is strict: unknown keys are errors; defaults `multiple = false`, `requires = []`, empty `files`/`merge`/`post`; `post.when` ⊆ `new|add|update`.
+- [x] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
+- [x] **Step 6: Commit** — `feat: scaffold hull and load template manifests`
 
 ---
 
