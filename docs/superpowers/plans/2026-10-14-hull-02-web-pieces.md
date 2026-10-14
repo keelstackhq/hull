@@ -39,7 +39,7 @@ template/pieces/preact-app/{piece.toml,files/**}
 template/pieces/ui-storybook/{piece.toml,files/**}
 template/pieces/astro-site/{piece.toml,files/**}
 template/pieces/hono-worker/{piece.toml,files/**}  # files/src/hull/{logging,sentry}.ts owned
-template/pieces/base/files/.github/workflows/preview.yml.jinja
+template/pieces/base/files/.github/workflows/preview.yml
 template/pieces/base/files/CLAUDE.md.jinja         # + one line per piece kind
 scripts/combos.json                                # + web, site
 tests/fixtures/lockfiles/{single,duplicate}.yaml
@@ -187,28 +187,29 @@ it("withOptionalSentry returns the app unchanged when SENTRY_DSN is empty", ...)
 ### Task 6: Cloudflare PR preview workflow
 
 **Files:**
-- Create: `template/pieces/base/files/.github/workflows/preview.yml.jinja`
+- Create: `template/pieces/base/files/.github/workflows/preview.yml` (plain, owned; was `.jinja` — changed 2026-10-14 by user decision, contract cannot emit `${{`)
 - Test: `tests/preview.test.mjs`
 
 **Interfaces:**
-- Consumes: `deploy:preview` scripts (Tasks 2, 4, 5), `elifBranches` from `tests/invariants.mjs`
+- Consumes: `deploy:preview` scripts (Tasks 2, 4, 5)
 - Produces: generated `.github/workflows/preview.yml` (spec §8.2)
+- Deviation (user decision 2026-10-14): tests "absent for base only" and "elif branches are identical" become "base-only: every step after detection is guarded by the deploy output"; no same-branches chain.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
-test("absent for base only", ...);
-for (const p of ["preact-app", "astro-site", "hono-worker"]) test(`present with ${p}`, ...);
-test("elif branches are identical", () => assertSameBranches("template/pieces/base/files/.github/workflows/preview.yml.jinja"));
-test("runs deploy:preview --affected with PR_NUMBER and Cloudflare env", ...);
+test("base only: every step after detection is guarded by the deploy output", ...);
+for (const p of ["preact-app", "astro-site", "hono-worker"]) test(`apps/*/wrangler.jsonc matches with ${p}`, ...);
+test("runs deploy:preview --affected with PR_NUMBER and Cloudflare env, shell bash (pipefail)", ...);
+test("turbo passes PR_NUMBER and Cloudflare env through to deploy:preview", ...);
 test("deploy step is skipped without the secret", ...);   // step.if mentions CLOUDFLARE_API_TOKEN != ''
-test("pull_request only, concurrency per PR, contents: read + pull-requests: write", ...);
+test("pull_request only, concurrency per PR, contents: read", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the workflow** per spec §8.2, as an `if/elif` chain marked `{# same-branches #}`. Put the secret into job `env` so the step `if` can test `env.CLOUDFLARE_API_TOKEN != ''`. Preview URLs: grep wrangler output for `https://` and append to `$GITHUB_STEP_SUMMARY`.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.** A real preview run needs a Cloudflare account and token: put "Cloudflare preview smoke test" under Blocked with the exact secrets needed.
-- [ ] **Step 5: Commit** — `feat(base): Cloudflare PR previews for deployable pieces`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the workflow** per spec §8.2 as a plain owned file with a detection step (`apps/*/wrangler.jsonc`) guarding every later step. Put the secret into job `env` so the step `if` can test `env.CLOUDFLARE_API_TOKEN != ''`. Preview URLs: grep wrangler output for `*.workers.dev` URLs and append to `$GITHUB_STEP_SUMMARY`. `deploy:preview`/`deploy` in base `turbo.json` declare `passThroughEnv`.
+- [x] **Step 4: Run `pnpm test` — expect PASS.** A real preview run needs a Cloudflare account and token: put "Cloudflare preview smoke test" under Blocked with the exact secrets needed.
+- [x] **Step 5: Commit** — `feat(base): Cloudflare PR previews for deployable pieces`
 
 ---
 

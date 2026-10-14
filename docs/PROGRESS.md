@@ -19,6 +19,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · 02/3 · `feat(ui-storybook): Preact UI package with Storybook 10.6` · 237/237 tests, lint+fmt clean; base+preact-app:web+ui-storybook → turbo 16/16 tasks 12.3 s cold cache, check-single-vite ok, `storybook:build` ok in 7.3 s (off PR path). No vite-plus peer warning text; install reports only expected unmet `vite` peers (override). preact/cascivo are peers of @scope/ui.
 - 2026-10-14 · 02/4 · `feat(astro-site): Astro 7 static site sharing Vite+ core` · 243/243 tests, lint+fmt clean; base+astro-site:site → turbo 11/11 tasks 7.5 s cold cache, check-single-vite ok (Astro's vite resolves to vite-plus-core 1.1.0). `astro check` (@astrojs/check 0.9.10) with TypeScript 7.0.2 fails: "astro check does not currently support TypeScript 7.0. To continue using astro check, install TypeScript 6 instead." → `typecheck` stays `tsc --noEmit`. No cascivo in astro-site.
 - 2026-10-14 · 02/5 · `feat(hono-worker): Hono worker with JSON request logs and optional Sentry` · 251/251 tests, lint+fmt clean; base+hono-worker:api → turbo 11/11 tasks (16 generated api tests), build writes dist/. Security: request line never reads query/headers/body; error line logs err.name + stack frames only; HTTPException passes through; Sentry scrubbed (query, headers, cookies, body, breadcrumbs, exception messages); leak/401/scrub tests proven red. `@cloudflare/workers-types`, `@sentry/*` in minimumReleaseAgeExclude.
+- 2026-10-14 · 02/6 · `feat(base): Cloudflare PR previews for deployable pieces` · 263/263 tests, lint+fmt clean; base+hono-worker:api → turbo 11/11; `turbo run deploy:preview --dry=json` resolves passThroughEnv PR_NUMBER/CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID. preview.yml is a plain owned file with a runtime detect step (user decision: contract cannot emit `${{`); deploy skipped without the secret; shell bash (pipefail).
 
 ## Measurements
 
@@ -28,6 +29,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · dogfood base · cold turbo / warm turbo · 3.4 s / 0.9 s (render+install+5 CI tasks) · cloud container
 
 ## Blocked
+
+- Cloudflare preview smoke test (needs account): in a repo rendered from the `web` combo, add repo secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts:Edit + Account Settings:Read) and `CLOUDFLARE_ACCOUNT_ID`, open a PR, and check that `preview.yml` uploads `pr-<n>` versions and lists the `*.workers.dev` URLs in the job summary.
 
 - Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
 

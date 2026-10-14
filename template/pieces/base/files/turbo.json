@@ -24,8 +24,14 @@
     "typecheck": { "dependsOn": ["^build"] },
     "test": { "dependsOn": ["^build"] },
     "dev": { "cache": false, "persistent": true },
-    "deploy:preview": { "cache": false },
-    "deploy": { "cache": false },
+    "deploy:preview": {
+      "cache": false,
+      "passThroughEnv": ["PR_NUMBER", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
+    "deploy": {
+      "cache": false,
+      "passThroughEnv": ["PR_NUMBER", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
     "storybook:build": { "outputs": ["storybook-static/**"] },
     "build:desktop": { "cache": false }
   }

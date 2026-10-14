@@ -186,7 +186,7 @@ Root files (class in brackets):
   .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstack/hull//renovate/default"]}` (§8.6).
-- `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml.jinja` [owned] (§8.2),
+- `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
   `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
   `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
   piece conditions; see §4.3 item 8.
@@ -468,10 +468,15 @@ upstream.
 
 ### 8.2 `preview.yml`
 
-Rendered only if hono-worker, astro-site or preact-app is present (§4.3.2). `on: pull_request`;
+A plain owned file rendered by `base` for every repo (user decision 2026-10-14: the contract subset
+cannot emit `${{` from a `.jinja` file, §4.3 item 8). A first step checks for `apps/*/wrangler.jsonc`
+and every later step is skipped when there is none, so base-only repos pay a ~5 s no-op. `on: pull_request`;
 same checkout/install; step skipped when `secrets.CLOUDFLARE_API_TOKEN` is empty (forks); runs
 `pnpm turbo run deploy:preview --affected` with `PR_NUMBER`, `CLOUDFLARE_API_TOKEN`,
-`CLOUDFLARE_ACCOUNT_ID`; writes the preview URLs from wrangler's output to the job summary.
+`CLOUDFLARE_ACCOUNT_ID` (declared as `passThroughEnv` of `deploy:preview`/`deploy` in `turbo.json`,
+because turbo 2's strict env mode filters undeclared variables) under `shell: bash` (pipefail);
+writes the `*.workers.dev` preview URLs from wrangler's output to the job summary.
+`permissions: contents: read` only.
 Caveats in the README: preview URLs are public unless Cloudflare Access protects them, and do not
 work for Workers with Durable Objects.
 
