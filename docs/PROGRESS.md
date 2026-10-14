@@ -10,6 +10,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · 01/4 · `feat: dev renderer writes new repos from the template` · 116/116 tests, lint+fmt clean; manual `render.mjs new --piece app --json` → ok, exit 0, root mode 755. Writes via a sibling staging dir renamed into place (no partial output); target/path strings subset-checked; unexpected errors exit 3.
 - 2026-10-14 · 01/5 · `test: template invariants and base skeleton` · 135/135 tests, lint+fmt clean. Invariants probed on a broken copy (two classes, `or`, `{%-`, bad merge key, `{{` in path all fail). `assertSameBranches` throws on unmarked/unclosed/single-branch chains.
 - 2026-10-14 · 01/6 · `feat(base): workspace, catalog, turbo and Vite+ config` · 146/146 tests, lint+fmt clean; dogfood base (scope hullci): install 0.35 s (warm store), turbo 6/6 tasks 2.08 s cold cache. `allowBuilds` replaces `onlyBuiltDependencies`; root config is a turbo globalDependency; root `//#format:check`.
+- 2026-10-14 · 01/7 · `feat(base): one-job CI with affected early exit and Renovate preset` · 161/161 tests, lint+fmt clean; base re-rendered, 6/6 turbo tasks pass. `ci.yml` is a plain owned file (contract gap, see Blocked). actionlint not run: no binary, Docker has no daemon (2026-10-14). Action tags checkout@v5, pnpm/action-setup@v4, setup-node@v5, cache@v4; Renovate custom manager tracks the `npx turbo@` pin.
 
 ## Measurements
 
@@ -18,6 +19,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · base · warm pnpm store, cold turbo cache · install 0.35 s, `turbo run lint format:check typecheck test build` 2.08 s (6 tasks) · cloud container, Node 24.21
 
 ## Blocked
+
+- Contract gap (keelstack/splice + hull, same week): the subset cannot emit `${{ … }}` from a `.jinja` file. Action: agree a contract §4 addition (proposed `{% raw %}…{% endraw %}`) in both repos' `docs/template-format.md`. Until then `ci.yml` is a plain owned file; plan 02 Task 6 (`preview.yml`) and plan 03 (`desktop.yml`, Rust steps in `ci.yml`) must use runtime guards (`hashFiles(...)`) or wait for the addition.
 
 - Time-gated (no human needed): after 2026-10-16 drop `turbo`/`@turbo/*` from `minimumReleaseAgeExclude` in `template/pieces/base/files/pnpm-workspace.yaml` and the matching assertion in `tests/base.test.mjs` (turbo 2.11.8 published 2026-10-13).
 

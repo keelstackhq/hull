@@ -117,6 +117,11 @@ The items below are the gaps as hull first found them.
 7. **Non-interactive `new`.** The contract has no CLI. hull assumes
    `splice new <source> <dest> --piece <id>[:<name>]... --data <key>=<value>... --yes --json`
    and adapts in plan 03 when splice publishes its CLI.
+8. **Literal `{{` in `.jinja` output.** GitHub Actions expressions (`${{ … }}`) collide with the
+   subset, which has no `{% raw %}` and no string-literal output. Workflows without piece
+   conditions are plain files (`ci.yml`). Piece-dependent workflows need a contract addition
+   (proposed: `{% raw %}…{% endraw %}` in §4) or a runtime guard instead of a template condition.
+   Raised with keelstack/splice (Blocked in `docs/PROGRESS.md`).
 
 ## 5. Template variables
 
@@ -181,8 +186,10 @@ Root files (class in brackets):
   .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstack/hull//renovate/default"]}` (§8.6).
-- `.github/workflows/ci.yml.jinja` [owned] (§8.1), `preview.yml.jinja` [owned] (§8.2),
-  `desktop.yml.jinja` [owned] (§8.3).
+- `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml.jinja` [owned] (§8.2),
+  `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
+  `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
+  piece conditions; see §4.3 item 8.
 - `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-tool or tauri-app:
   `resolver = "3"`, `members = ["crates/*", "apps/*/src-tauri"]`, `[workspace.lints]`,
   `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition, `stable`

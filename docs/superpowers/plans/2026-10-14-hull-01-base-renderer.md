@@ -339,7 +339,7 @@ Expected: install succeeds; every task passes for `@hullci/shared`.
 - Consumes: `CI_TASKS`, `renderCombo`
 - Produces: the generated `ci.yml` (spec §8.1) — plan 02 adds nothing to it; plan 03 adds Rust steps and hoard.
 
-- [ ] **Step 1: Write failing tests** on the rendered, YAML-parsed workflow:
+- [x] **Step 1: Write failing tests** on the rendered, YAML-parsed workflow:
 
 ```js
 test("triggers and no path filters", () => {
@@ -358,10 +358,10 @@ test("renovate.json extends the hull preset", ...);
 test("renovate preset groups vite-plus with vite-plus-core", ...);  // same packageRule
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the workflow** per spec §8.1 and the preset per §8.6. The affected step: run turbo; map exit 0 → `skip=true`, 1 → `skip=false`, 2 → `skip=false` plus a warning annotation. If `actionlint` is available (`pnpm dlx` is not; use `docker run rhysd/actionlint` only if Docker exists), run it on the rendered file; otherwise note it in PROGRESS.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat(base): one-job CI with affected early exit and Renovate preset`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the workflow** per spec §8.1 and the preset per §8.6. The affected step: run turbo; map exit 0 → `skip=true`, 1 → `skip=false`, 2 → `skip=false` plus a warning annotation. If `actionlint` is available (`pnpm dlx` is not; use `docker run rhysd/actionlint` only if Docker exists), run it on the rendered file; otherwise note it in PROGRESS.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat(base): one-job CI with affected early exit and Renovate preset`
 
 ---
 

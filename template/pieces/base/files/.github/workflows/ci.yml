@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+      TURBO_SCM_HEAD: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - name: Anything affected?
+        id: affected
+        run: |
+          set +e
+          npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build --exit-code
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "skip=true" >> "$GITHUB_OUTPUT" ;;
+            1) echo "skip=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "::warning::turbo query affected failed (exit $code); running everything"
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+      - uses: pnpm/action-setup@v4
+        if: steps.affected.outputs.skip != 'true'
+      - uses: actions/setup-node@v5
+        if: steps.affected.outputs.skip != 'true'
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install
+        if: steps.affected.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: actions/cache@v4
+        if: steps.affected.outputs.skip != 'true'
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - name: Run affected tasks
+        if: steps.affected.outputs.skip != 'true'
+        run: pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only
+
+  ci-ok:
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require ci success
+        run: |
+          if [ "${{ needs.ci.result }}" != "success" ]; then
+            echo "ci result: ${{ needs.ci.result }}"
+            exit 1
+          fi
