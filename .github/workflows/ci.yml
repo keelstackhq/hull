@@ -1,0 +1,96 @@
+name: ci
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+    steps:
+      - name: Start timer
+        run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Lint
+        run: pnpm lint
+      - name: Format
+        run: pnpm format:check
+      - name: Test
+        run: pnpm test
+      - name: Affected combos
+        id: combos
+        run: |
+          set -e
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            list=$(node scripts/affected-combos.mjs --all)
+          else
+            list=$(node scripts/affected-combos.mjs --base "$BASE")
+          fi
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          args=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).map((c) => `--combo ${c}`).join(" "))' "$list")
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+      - name: Rust needed?
+        id: rust
+        env:
+          LIST: ${{ steps.combos.outputs.list }}
+        run: |
+          if node -e 'process.exit(JSON.parse(process.argv[1]).some((c) => JSON.parse(process.argv[2]).combos.find((x) => x.name === c)?.pieces.some((p) => p.split(":")[0] === "rust-tool")) ? 0 : 1)' "$LIST" "$(cat scripts/combos.json)"; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.rust.outputs.needed == 'true'
+        with:
+          components: clippy, rustfmt
+      - uses: taiki-e/install-action@v2
+        if: steps.rust.outputs.needed == 'true'
+        with:
+          tool: cargo-nextest
+      - uses: actions/cache@v4
+        if: steps.combos.outputs.args != ''
+        with:
+          path: ${{ runner.temp }}/turbo-cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - name: Dogfood combos
+        if: steps.combos.outputs.args != ''
+        run: node scripts/dogfood.mjs ${{ steps.combos.outputs.args }} --root "$RUNNER_TEMP/combos" --cache-dir "$RUNNER_TEMP/turbo-cache"
+      - name: Job duration
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "ci job: $(( $(date +%s) - ${CI_START:-$(date +%s)} ))s (hull budget: 120s warm with one piece changed, 20s docs-only)" >> "$GITHUB_STEP_SUMMARY"
+
+  ci-ok:
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require ci success
+        run: |
+          if [ "${{ needs.ci.result }}" != "success" ]; then
+            echo "ci result: ${{ needs.ci.result }}"
+            exit 1
+          fi

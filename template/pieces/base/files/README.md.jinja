@@ -1,0 +1,14 @@
+# {{ scope }}
+
+Generated from {{ template.name }} {{ template.version }}.
+
+## Measure CI time
+
+Budget for job `ci`: 45 s on a typical PR, 15 s docs-only. Measure the last 20 runs:
+
+```bash
+gh run list -w ci.yml -L 20 --json databaseId
+gh run view <id> --json jobs   # completedAt - startedAt of job "ci"
+```
+
+Ignore cancelled and skipped runs. The job summary of each run also shows its duration.

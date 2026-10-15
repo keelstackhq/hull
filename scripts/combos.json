@@ -1,0 +1,28 @@
+{
+  "vars": {
+    "scope": "hullci"
+  },
+  "combos": [
+    {
+      "name": "base",
+      "pieces": ["base"]
+    },
+    {
+      "name": "web",
+      "pieces": ["base", "preact-app:web", "ui-storybook", "hono-worker:api"]
+    },
+    {
+      "name": "desktop",
+      "pieces": ["base", "preact-app:web", "tauri-app:desktop"],
+      "scheduled": true
+    },
+    {
+      "name": "site",
+      "pieces": ["base", "astro-site:site", "rust-tool:tool"]
+    },
+    {
+      "name": "docs",
+      "pieces": ["base", "docs"]
+    }
+  ]
+}

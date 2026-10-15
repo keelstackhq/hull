@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "packs": {
+    "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
+    "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
+    "cloudflare": {
+      "package": "@docspack-community/cloudflare",
+      "source": "community",
+      "build": "cloudflare"
+    },
+    "vite-plus": {
+      "package": "@docspack-community/vite-plus",
+      "source": "community",
+      "recipe": "gh:keelstackhq/hull//community-packs/vite-plus"
+    }
+  }
+}

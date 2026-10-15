@@ -1,0 +1,47 @@
+{
+  "$schema": "https://turbo.build/schema.json",{% if "rust-tool" in pieces %}
+  "globalDependencies": [
+    "vite.config.ts",
+    "tsconfig.base.json",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml"
+  ],{% else %}
+  "globalDependencies": ["vite.config.ts", "tsconfig.base.json"],{% endif %}
+  "tasks": {
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "lint": {},
+    "format:check": {},
+    "//#format:check": {
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.base.json",
+        "vite.config.ts",
+        "pnpm-workspace.yaml",
+        "renovate.json",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "README.md",
+        ".claude/**",
+        ".github/**",
+        "docs/**"
+      ]
+    },
+    "typecheck": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["^build"] },
+    "dev": { "cache": false, "persistent": true },
+    "deploy:preview": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["PR_NUMBER", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
+    "deploy": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["PR_NUMBER", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
+    "storybook:build": { "outputs": ["storybook-static/**"] },
+    "build:desktop": { "cache": false }
+  }
+}

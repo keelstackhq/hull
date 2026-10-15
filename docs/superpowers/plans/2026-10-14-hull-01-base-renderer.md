@@ -74,8 +74,8 @@ Shared test helper: `tests/helpers.mjs` exports `renderCombo(pieces: string[], v
   - `VarSpec = { prompt: string, default?: string, pattern?: string }`
   - `Piece = { id, dir, filesDir, description, multiple: boolean, requires: string[], target?: string, vars: Record<string, VarSpec>, files: { owned: string[], shared: string[], seed: string[] }, merge: Record<string, "json"|"yaml"|"toml"|"text">, post: { run: string, when: string[] }[] }`
 
-- [ ] **Step 1: Scaffold.** `package.json`: `"private": true`, `"type": "module"`, `packageManager: "pnpm@12.11.2"`, scripts `test` = `node --test tests/`, `lint` = `vp lint scripts tests`, `format:check` = `vp fmt --check scripts tests`, `render` = `node scripts/render.mjs`. Deps per Tech Stack. Fixture template: `splice.toml` + pieces `base` (files `package.json.jinja`, `README.md`) and `app` (`multiple = true`, `target = "apps/{{ name }}"`, files `src/main.ts`, `config.json`).
-- [ ] **Step 2: Write failing tests** in `tests/manifest.test.mjs`:
+- [x] **Step 1: Scaffold.** `package.json`: `"private": true`, `"type": "module"`, `packageManager: "pnpm@12.11.2"`, scripts `test` = `node --test "tests/**/*.test.mjs"`, `lint` = `vp lint scripts tests`, `format:check` = `vp fmt --check scripts tests`, `render` = `node scripts/render.mjs`. Deps per Tech Stack. Fixture template: `splice.toml` + pieces `base` (files `package.json.jinja`, `README.md`) and `app` (`multiple = true`, `target = "apps/{{ name }}"`, files `src/main.ts`, `config.json`).
+- [x] **Step 2: Write failing tests** in `tests/manifest.test.mjs`:
 
 ```js
 test("loads the fixture template", async () => {
@@ -95,10 +95,10 @@ test("rejects base naming a missing piece", ...);
 ```
 
 `mutate(file, fn)` copies the fixture to a temp dir and edits one file; `rejectsWith` is `assert.rejects` with class + message regex.
-- [ ] **Step 3: Run `pnpm test` — expect FAIL (`loadTemplate` missing).**
-- [ ] **Step 4: Implement `loadTemplate`** with `smol-toml`. Validation is strict: unknown keys are errors; defaults `multiple = false`, `requires = []`, empty `files`/`merge`/`post`; `post.when` ⊆ `new|add|update`.
-- [ ] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
-- [ ] **Step 6: Commit** — `feat: scaffold hull and load template manifests`
+- [x] **Step 3: Run `pnpm test` — expect FAIL (`loadTemplate` missing).**
+- [x] **Step 4: Implement `loadTemplate`** with `smol-toml`. Validation is strict: unknown keys are errors; defaults `multiple = false`, `requires = []`, empty `files`/`merge`/`post`; `post.when` ⊆ `new|add|update`.
+- [x] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
+- [x] **Step 6: Commit** — `feat: scaffold hull and load template manifests`
 
 ---
 
@@ -111,7 +111,7 @@ test("rejects base naming a missing piece", ...);
 **Interfaces:**
 - Produces: `checkSubset(source: string, file: string): Violation[]`, `Violation = { file, line: number, tag: string, reason: string }`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 const ok = ['{{ scope }}', '{{ piece.name | upper }}', '{{ name | lower }}', '{% if scope %}a{% elif x %}b{% else %}c{% endif %}',
@@ -128,8 +128,8 @@ test("reports the line number", () => assert.equal(checkSubset("a\nb\n{% set x %
 test("flags unbalanced if/endif", () => assert.match(checkSubset("{% if a %}", "f")[0].reason, /unclosed/));
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement `checkSubset`**: scan `{{…}}`, `{%…%}`, `{#…#}` with one regex; validate each tag against these grammars and keep a block stack:
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement `checkSubset`**: scan `{{…}}`, `{%…%}`, `{#…#}` with one regex; validate each tag against these grammars and keep a block stack:
   - output: `^\s*IDENT(\.IDENT)*(\s*\|\s*(lower|upper))?\s*$`
   - `if`/`elif`: `IDENT` (not `pieces`), an allowed dotted name, or `"<id>" in pieces`; reject `not`, `and`, `or` and any operator (contract §9.2)
   - dotted names allowed only: `piece.id`, `piece.name`, `template.name`, `template.version` (§9.3)
@@ -137,8 +137,8 @@ test("flags unbalanced if/endif", () => assert.match(checkSubset("{% if a %}", "
   - `for`: `IDENT in pieces`
   - `else`, `endif`, `endfor`
   - `IDENT` = `[A-Za-z_][A-Za-z0-9_]*`
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat: check templates against the portable subset`
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat: check templates against the portable subset`
 
 ---
 
@@ -158,7 +158,7 @@ test("flags unbalanced if/endif", () => assert.match(checkSubset("{% if a %}", "
   - `resolveRequest(t: Template, req: { pieces: string[], vars: Record<string,string> }): Instance[]`, `Instance = { piece: Piece, name: string, vars: Record<string,string> }`
   - `buildPlan(t: Template, instances: Instance[], opts: { templateVersion: string }): Promise<PlannedFile[]>`, `PlannedFile = { src: string, path: string, class, render: boolean, context: object }`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("outputPath strips .jinja", () => assert.equal(outputPath("a/package.json.jinja"), "a/package.json"));
@@ -194,10 +194,10 @@ test("plan applies target and context", async () => {
 test("two instances writing the same path → TemplateError", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** with `picomatch` (`dot: true`). `target` is rendered with the instance context through `renderString` from Task 4 — define `renderString` in `scripts/lib/render-file.mjs` now (Task 4 adds its tests). Instance `name` = `vars.name` or the piece id; non-multiple pieces have no `name` var.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat: classify ownership and plan renders`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** with `picomatch` (`dot: true`). `target` is rendered with the instance context through `renderString` from Task 4 — define `renderString` in `scripts/lib/render-file.mjs` now (Task 4 adds its tests). Instance `name` = `vars.name` or the piece id; non-multiple pieces have no `name` var.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat: classify ownership and plan renders`
 
 ---
 
@@ -216,7 +216,7 @@ test("two instances writing the same path → TemplateError", ...);
   - CLI per spec §9; `main(argv): Promise<number>` (exit code) exported for tests
   - `tests/helpers.mjs` `renderCombo` (see File Structure)
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("renders, copies, strips .jinja", async () => {
@@ -246,10 +246,10 @@ test("usage error with --json → exit 2 and ok:false", ...);
 test("for-loop and in-pieces render identically to the contract examples", ...); // golden file in fixtures
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement.** Order: load → subset-check every `.jinja` of the requested pieces → resolve → plan → render all in memory → only then write (no partial output on error). Args via `node:util` `parseArgs` (`--piece`/`--data` multiple).
-- [ ] **Step 4: Run `pnpm test`, then by hand:** `node scripts/render.mjs new --template tests/fixtures/template --out /tmp/hull-x --piece app --json` — expect `"ok":true`.
-- [ ] **Step 5: Commit** — `feat: dev renderer writes new repos from the template`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement.** Order: load → subset-check every `.jinja` of the requested pieces → resolve → plan → render all in memory → only then write (no partial output on error). Args via `node:util` `parseArgs` (`--piece`/`--data` multiple).
+- [x] **Step 4: Run `pnpm test`, then by hand:** `node scripts/render.mjs new --template tests/fixtures/template --out /tmp/hull-x --piece app --json` — expect `"ok":true`.
+- [x] **Step 5: Commit** — `feat: dev renderer writes new repos from the template`
 
 ---
 
@@ -263,7 +263,7 @@ test("for-loop and in-pieces render identically to the contract examples", ...);
 - Consumes: `loadTemplate`, `checkSubset`, `overlaps`, `outputPath`
 - Produces: invariant suite that every later task's template change must pass; `tests/invariants.mjs` exports `elifBranches(source: string): string[]` (branch bodies of a chain marked `{# same-branches #}`) and `assertSameBranches(path: string): void` (used by plan 02 Task 6 and plan 03 Task 1)
 
-- [ ] **Step 1: Write failing tests** (they iterate over every piece found in `template/pieces/`):
+- [x] **Step 1: Write failing tests** (they iterate over every piece found in `template/pieces/`):
 
 ```js
 test("template loads", async () => { const t = await loadTemplate("template"); assert.equal(t.name, "hull"); assert.equal(t.minSplice, "0.1.0"); });
@@ -276,10 +276,10 @@ test("every multiple piece has target containing {{ name }} and a name var with 
 test("every elif chain marked {# same-branches #} has identical branches", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL (no `template/`).**
-- [ ] **Step 3: Create the skeleton** per spec §2 and §5 (`base` piece: `id = "base"`, description, `[files] seed = ["README.md"]`). Write `tests/invariants.mjs` with `elifBranches`.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `test: template invariants and base skeleton`
+- [x] **Step 2: Run `pnpm test` — expect FAIL (no `template/`).**
+- [x] **Step 3: Create the skeleton** per spec §2 and §5 (`base` piece: `id = "base"`, description, `[files] seed = ["README.md"]`). Write `tests/invariants.mjs` with `elifBranches`.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `test: template invariants and base skeleton`
 
 ---
 
@@ -294,7 +294,7 @@ test("every elif chain marked {# same-branches #} has identical branches", ...);
 **Interfaces:**
 - Produces: `CI_TASKS: readonly string[]` = `["lint", "format:check", "typecheck", "test", "build"]`; the root package scripts `ci` and `check` (spec §6.1); `@{{ scope }}/shared` package.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("base renders the expected classes", async () => {
@@ -315,9 +315,9 @@ test("turbo.json defines every CI task and no vp run", ...);
 test("package.json name is the scope", ...);            // vars { scope: "zeta" } → "zeta"
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.1 and §7 (full catalog table now, even for later pieces). Check pnpm 12 names for `onlyBuiltDependencies`, `minimumReleaseAge`, `peerDependencyRules` and Vite+'s shared lint/fmt config (docs or `vp lint --help`); record what you found in the commit body.
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Then dogfood by hand:**
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.1 and §7 (full catalog table now, even for later pieces). Check pnpm 12 names for `onlyBuiltDependencies`, `minimumReleaseAge`, `peerDependencyRules` and Vite+'s shared lint/fmt config (docs or `vp lint --help`); record what you found in the commit body.
+- [x] **Step 4: Run `pnpm test` — expect PASS. Then dogfood by hand:**
 
 ```bash
 node scripts/render.mjs new --template template --out /tmp/hull-base --piece base --data scope=hullci
@@ -325,7 +325,7 @@ cd /tmp/hull-base && git init -q && pnpm install --no-frozen-lockfile && pnpm tu
 ```
 
 Expected: install succeeds; every task passes for `@hullci/shared`.
-- [ ] **Step 5: Commit** — `feat(base): workspace, catalog, turbo and Vite+ config`
+- [x] **Step 5: Commit** — `feat(base): workspace, catalog, turbo and Vite+ config`
 
 ---
 
@@ -339,7 +339,7 @@ Expected: install succeeds; every task passes for `@hullci/shared`.
 - Consumes: `CI_TASKS`, `renderCombo`
 - Produces: the generated `ci.yml` (spec §8.1) — plan 02 adds nothing to it; plan 03 adds Rust steps and hoard.
 
-- [ ] **Step 1: Write failing tests** on the rendered, YAML-parsed workflow:
+- [x] **Step 1: Write failing tests** on the rendered, YAML-parsed workflow:
 
 ```js
 test("triggers and no path filters", () => {
@@ -358,10 +358,10 @@ test("renovate.json extends the hull preset", ...);
 test("renovate preset groups vite-plus with vite-plus-core", ...);  // same packageRule
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the workflow** per spec §8.1 and the preset per §8.6. The affected step: run turbo; map exit 0 → `skip=true`, 1 → `skip=false`, 2 → `skip=false` plus a warning annotation. If `actionlint` is available (`pnpm dlx` is not; use `docker run rhysd/actionlint` only if Docker exists), run it on the rendered file; otherwise note it in PROGRESS.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat(base): one-job CI with affected early exit and Renovate preset`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the workflow** per spec §8.1 and the preset per §8.6. The affected step: run turbo; map exit 0 → `skip=true`, 1 → `skip=false`, 2 → `skip=false` plus a warning annotation. If `actionlint` is available (`pnpm dlx` is not; use `docker run rhysd/actionlint` only if Docker exists), run it on the rendered file; otherwise note it in PROGRESS.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat(base): one-job CI with affected early exit and Renovate preset`
 
 ---
 
@@ -375,7 +375,7 @@ test("renovate preset groups vite-plus with vite-plus-core", ...);  // same pack
 - Consumes: `renderCombo`
 - Produces: owned AI files (spec §6.9). Later pieces add `<target>/CLAUDE.md` and one `{% if %}` line each to `CLAUDE.md.jinja`.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("CLAUDE.md ≤ 80 lines and imports project notes", ...);       // includes "@docs/agents/project.md"
@@ -400,10 +400,10 @@ test("session-start exits 0 even when pnpm is missing", ...);      // PATH witho
 test("skills have name and description frontmatter", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.9. Check the plugin settings shape and statusline stdin fields against https://code.claude.com/docs/en/settings and `/statusline` docs; if they differ from the spec, follow the docs and update spec §6.9 in this commit.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat(base): Claude Code layer — agents, skills, hooks, loop`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.9. Check the plugin settings shape and statusline stdin fields against https://code.claude.com/docs/en/settings and `/statusline` docs; if they differ from the spec, follow the docs and update spec §6.9 in this commit.
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat(base): Claude Code layer — agents, skills, hooks, loop`
 
 ---
 
@@ -421,7 +421,7 @@ test("skills have name and description frontmatter", ...);
   - `dogfood(opts: { combos: string[], root?: string, cacheDir?: string }): Promise<{ name, ok, seconds }[]>`; CLI `node scripts/dogfood.mjs --combo <name>...` exits 1 if any combo fails
   - `ciCommand(): string[]` exported from `dogfood.mjs` = `["pnpm", "turbo", "run", ...CI_TASKS]`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 const combos = [{ name: "base", pieces: ["base"] }, { name: "web", pieces: ["base", "preact-app:web"] }];
@@ -431,10 +431,10 @@ test("docs and tests select none", () => assert.deepEqual(affectedCombos(["docs/
 test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** per spec §10.2. `dogfood.mjs` renders into `<root>/<name>` (default `os.tmpdir()/hull-dogfood`), runs `git init -q`, `pnpm install --no-frozen-lockfile --prefer-offline`, then `ciCommand()` with `--cache-dir=<cacheDir>`, streaming output with a `[combo]` prefix and printing seconds per combo. Workflow: one job + `ci-ok` (spec §10.2), steps: checkout (depth 0, blobless), pnpm + setup-node (cache pnpm), install, lint, format:check, test, affected-combos → dogfood (skipped when the list is empty), `actions/cache` on `$RUNNER_TEMP/turbo-cache`.
-- [ ] **Step 4: Run `pnpm test`, then `node scripts/dogfood.mjs --combo base`** — expect `base ok <n>s` and exit 0. Paste the timing into PROGRESS.
-- [ ] **Step 5: Commit** — `ci: dogfood rendered combos in hull CI`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** per spec §10.2. `dogfood.mjs` renders into `<root>/<name>` (default `os.tmpdir()/hull-dogfood`), runs `git init -q`, `pnpm install --no-frozen-lockfile --prefer-offline`, then `ciCommand()` with `--cache-dir=<cacheDir>`, streaming output with a `[combo]` prefix and printing seconds per combo. Workflow: one job + `ci-ok` (spec §10.2), steps: checkout (depth 0, blobless), pnpm + setup-node (cache pnpm), install, lint, format:check, test, affected-combos → dogfood (skipped when the list is empty), `actions/cache` on `$RUNNER_TEMP/turbo-cache`.
+- [x] **Step 4: Run `pnpm test`, then `node scripts/dogfood.mjs --combo base`** — expect `base ok <n>s` and exit 0. Paste the timing into PROGRESS.
+- [x] **Step 5: Commit** — `ci: dogfood rendered combos in hull CI`
 
 ---
 

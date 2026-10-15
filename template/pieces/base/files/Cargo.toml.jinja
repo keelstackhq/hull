@@ -1,0 +1,31 @@
+{# same-branches #}{% if "rust-tool" in pieces %}[workspace]
+resolver = "3"
+members = [
+{% if "rust-tool" in pieces %}  "crates/*",
+{% endif %}{% if "tauri-app" in pieces %}  "apps/*/src-tauri",
+{% endif %}]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+{% elif "tauri-app" in pieces %}[workspace]
+resolver = "3"
+members = [
+{% if "rust-tool" in pieces %}  "crates/*",
+{% endif %}{% if "tauri-app" in pieces %}  "apps/*/src-tauri",
+{% endif %}]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+{% endif %}

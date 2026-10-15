@@ -1,0 +1,9 @@
+{% if "docs" in pieces %}---
+name: docs-lookup
+description: Answer questions about libraries and tools in this repository from the local docspack index before any web search. Use for API or usage questions about the dependencies.
+---
+
+Run `pnpm exec docspack ask "<question>" --json` first and answer from its results.
+
+Search the web only when it exits with code 3 or 4 (nothing relevant found, or no index yet). If
+the index is missing, run `pnpm exec docspack sync` and `pnpm exec docspack index --repo` once.{% endif %}

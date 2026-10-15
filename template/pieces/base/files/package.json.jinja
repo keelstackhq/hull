@@ -1,0 +1,24 @@
+{
+  "name": "{{ scope }}",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ci": "turbo run lint format:check typecheck test build --affected",
+    "check": "turbo run lint format:check typecheck test",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "vp fmt",
+{% if "docs" in pieces %}    "docs:packs": "node scripts/docs-packs.mjs",
+    "docs:sync": "docspack sync && docspack index --repo",
+{% endif %}    "format:check": "vp fmt --check package.json turbo.json tsconfig.base.json vite.config.ts pnpm-workspace.yaml renovate.json CLAUDE.md AGENTS.md README.md .claude .github docs",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+{% if "docs" in pieces %}    "docspack": "catalog:",
+{% endif %}    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "packageManager": "pnpm@12.11.2"
+}

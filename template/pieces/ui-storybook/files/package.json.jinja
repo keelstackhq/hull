@@ -1,0 +1,47 @@
+{
+  "name": "@{{ scope }}/ui",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "lint": "vp lint",
+    "format:check": "vp fmt --check",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build"
+  },
+  "devDependencies": {
+    "@cascivo/react": "catalog:",
+    "@cascivo/themes": "catalog:",
+    "@preact/preset-vite": "catalog:",
+    "@preact/signals-react": "catalog:",
+    "@storybook/addon-docs": "catalog:",
+    "@storybook/preact-vite": "catalog:",
+    "happy-dom": "catalog:",
+    "preact": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@cascivo/react": "catalog:",
+    "@cascivo/themes": "catalog:",
+    "@preact/signals-react": "catalog:",
+    "preact": "catalog:"
+  }
+}

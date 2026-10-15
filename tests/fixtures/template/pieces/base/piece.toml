@@ -1,0 +1,9 @@
+id = "base"
+description = "Workspace root"
+
+[files]
+shared = ["package.json"]
+seed = ["README.md"]
+
+[merge]
+"package.json" = "json"

@@ -1,0 +1,10 @@
+id = "docs"
+description = "docspack: local, version-locked docs for AI agents, with a packs manifest"
+requires = ["base"]
+
+[files]
+shared = ["docs/packs.json"]
+owned = ["docs/agents/docs.md", "scripts/docs-packs.mjs"]
+
+[merge]
+"docs/packs.json" = "json"

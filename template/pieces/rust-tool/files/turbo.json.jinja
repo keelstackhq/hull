@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": ["src/**", "Cargo.toml", "$TURBO_ROOT$/Cargo.toml", "$TURBO_ROOT$/Cargo.lock"],
+      "outputs": ["$TURBO_ROOT$/target/release/{{ name }}"]
+    },
+    "lint": {
+      "inputs": ["src/**", "Cargo.toml", "$TURBO_ROOT$/Cargo.toml", "$TURBO_ROOT$/Cargo.lock"]
+    },
+    "format:check": { "inputs": ["src/**", "Cargo.toml"] },
+    "typecheck": {
+      "inputs": ["src/**", "Cargo.toml", "$TURBO_ROOT$/Cargo.toml", "$TURBO_ROOT$/Cargo.lock"]
+    },
+    "test": {
+      "inputs": ["src/**", "Cargo.toml", "$TURBO_ROOT$/Cargo.toml", "$TURBO_ROOT$/Cargo.lock"]
+    }
+  }
+}

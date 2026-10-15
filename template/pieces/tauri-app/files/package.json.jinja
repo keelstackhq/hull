@@ -1,0 +1,14 @@
+{
+  "name": "@{{ scope }}/{{ name }}",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "build:desktop": "tauri build",
+    "format:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "catalog:"
+  }
+}

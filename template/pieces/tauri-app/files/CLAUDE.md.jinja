@@ -1,0 +1,12 @@
+# Desktop app
+
+Tauri v2 shell around the `{{ frontend }}` app. Rust lives in `src-tauri/` (a member of the root Cargo workspace).
+
+- `pnpm tauri dev` runs the frontend dev server (port 5173) and the native window.
+- `pnpm build:desktop` is `tauri build`. It needs webkit2gtk on Linux, so it runs only in
+  `.github/workflows/desktop.yml` (manual + weekly), never on the PR path.
+- This package has no `lint`/`test`/`build` scripts on purpose; `format:check` is `cargo fmt`, which needs no system libraries.
+- Never run `cargo ... --workspace`; other crates' scripts pass `-p <crate>`.
+- `tauri.conf.json` points `frontendDist` at `../../{{ frontend }}/dist`; keep it in sync if the frontend is renamed.
+- Releases with `tauri-apps/tauri-action` are not wired.
+- Bundles are `deb` only (AppImage downloads tools at build time and is flaky); add `rpm`, `appimage`, `msi`, `nsis` or `dmg` to `bundle.targets` in `src-tauri/tauri.conf.json`.

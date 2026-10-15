@@ -1,10 +1,10 @@
 # hull — design
 
-Date: 2026-10-14 · Status: approved for build · Org `keelstack`, repo `keelstack/hull`
+Date: 2026-10-14 · Status: approved for build · Org `keelstackhq`, repo `keelstackhq/hull`
 
 hull is an opinionated, AI-native monorepo template. It owns structure, stack, tool versions and
-config, never app logic. Consumers render it with `splice` (`keelstack/splice`, Rust) from
-`gh:keelstack/hull//template`. Public product, private use first.
+config, never app logic. Consumers render it with `splice` (`keelstackhq/splice`, Rust) from
+`gh:keelstackhq/hull//template`. Public product, private use first.
 
 This document is the source of truth. The template layout follows the shared contract
 `docs/template-format.md` (format 1) exactly; where the contract is silent, §4.3 says what hull does.
@@ -12,7 +12,7 @@ This document is the source of truth. The template layout follows the shared con
 ## 1. Goals and non-goals
 
 Goals:
-1. Bootstrap a repo by choosing pieces: `splice new gh:keelstack/hull//template my-repo`.
+1. Bootstrap a repo by choosing pieces: `splice new gh:keelstackhq/hull//template my-repo`.
 2. Keep generated repos current: owned files are replaced, shared files merged, seed files never touched.
 3. CI in seconds: ≤ 45 s for a typical PR, ≤ 15 s for a docs-only PR, on GitHub's own runners.
 4. AI-native for Claude Code first: lean CLAUDE.md, subagents with fixed models, skills, loops, hooks.
@@ -23,7 +23,7 @@ visual tests on the PR path, React (Preact only), Cloudflare Pages, our own remo
 
 ## 2. Names, versions, distribution
 
-- Template source: `gh:keelstack/hull//template`. A template version is a git tag `v<semver>` on hull.
+- Template source: `gh:keelstackhq/hull//template`. A template version is a git tag `v<semver>` on hull.
 - `template/splice.toml`: `format = 1`, `name = "hull"`, `min_splice = "0.1.0"`, `base = "base"`.
 - First release `v0.1.0` after milestone 3. Breaking template changes bump the minor until 1.0 and
   ship a migration (`template/migrations/<semver>.toml`) when files move or disappear.
@@ -72,6 +72,10 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
   `lower`/`upper`. The dev renderer and the invariant tests both enforce this.
 - Final newline kept exactly as in the source; no auto-escaping (§9.4). All vars are strings.
 - `pieces` = unique ids in add order; a `multiple = false` piece has `name` = its `id` (§9.5).
+- Dev-renderer rules (agreed with splice, contract change pending): identifiers are ASCII `[a-z_][a-z0-9_]*` and
+  never `loop/self/range/namespace` or the reserved words; no symlinks anywhere in a template; every
+  rendered path segment is portable (no Windows-reserved names, `.git`, trailing dot/space, `/ \\ :`,
+  control chars) and paths must not collide ignoring case; `[[post]].when` is required.
 - Every path under `files/` matches the ownership globs of at most one class, so "first match
   wins" never decides anything (invariant test). Files matching no glob are `owned` by contract;
   hull lists every class explicitly anyway, except owned files may rely on the default.
@@ -117,6 +121,11 @@ The items below are the gaps as hull first found them.
 7. **Non-interactive `new`.** The contract has no CLI. hull assumes
    `splice new <source> <dest> --piece <id>[:<name>]... --data <key>=<value>... --yes --json`
    and adapts in plan 03 when splice publishes its CLI.
+8. **Literal `{{` in `.jinja` output.** GitHub Actions expressions (`${{ … }}`) collide with the
+   subset, which has no `{% raw %}` and no string-literal output. Workflows without piece
+   conditions are plain files (`ci.yml`). Piece-dependent workflows need a contract addition
+   (proposed: `{% raw %}…{% endraw %}` in §4) or a runtime guard instead of a template condition.
+   Raised with keelstackhq/splice (Blocked in `docs/PROGRESS.md`).
 
 ## 5. Template variables
 
@@ -160,29 +169,43 @@ Root files (class in brackets):
   with every version in §7 (unused entries are harmless, so the file does not depend on pieces);
   `overrides: { vite: "npm:@voidzero-dev/vite-plus-core@<vite-plus version>" }`;
   `peerDependencyRules.allowedVersions: { "storybook>vite-plus": "1" }` (§7.2);
-  `onlyBuiltDependencies: [esbuild, workerd, sharp]`; `minimumReleaseAge: 4320`. Setting names
-  must be checked against pnpm 12 docs in the task that writes the file.
-- `turbo.json` [shared, json]: tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
+  `allowBuilds: { esbuild: true, workerd: true, sharp: true }` (pnpm 11 replaced
+  `onlyBuiltDependencies`, which pnpm 12 silently ignores); `minimumReleaseAge: 4320` (minutes,
+  strict when set); `minimumReleaseAgeExclude` lists only exact `name@version` entries (pnpm 12
+  supports them) for pins, and their resolved transitive packages, younger than 3 days at render
+  time, so a rendered repo never bypasses the gate for later versions; each entry is dropped once
+  it has aged. `peerDependencyRules.allowedVersions.vite: "1"` accepts the override's vite-plus-core
+  for vitest/preset-vite/Storybook peers (`check-single-vite` still guards against a real second
+  vite). Checked against pnpm 12.11.2 on 2026-10-14/15.
+- `turbo.json.jinja` [shared, json]: `globalDependencies` = root `vite.config.ts`, `tsconfig.base.json`, plus
+  `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` when rust-tool is present (otherwise turbo maps
+  root Cargo changes only to `//` and `--affected` would skip the crates); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
-  `deploy:preview` and `deploy` (no cache), `storybook:build` (outputs `storybook-static/**`),
+  `deploy:preview` and `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv` §8.2), `storybook:build` (outputs `storybook-static/**`),
   `build:desktop` (no cache). No `vp run` cache anywhere (Turbo caches, §7.1).
 - `tsconfig.base.json` [owned]: strict, `module: preserve`, `moduleResolution: bundler`,
   `jsx: react-jsx`, `jsxImportSource: preact`, `noEmit`, `verbatimModuleSyntax`, `isolatedModules`.
 - `vite.config.ts` [owned]: root Vite+ config holding the shared `lint` and `fmt` options
   (oxlint categories `correctness` + `suspicious` as errors; ignore `dist`, `.astro`,
-  `storybook-static`, `target`). Packages import it; the exact sharing mechanism is checked
-  against https://viteplus.dev/guide/ in the task.
+  `storybook-static`, `target`, `**/*.astro`; `fmt.sortPackageJson: false`, because a piece's
+  `@<scope>/…` dependency would sort differently per scope). Vite+ 1.1.0 does not apply nested configs for lint/fmt: `vp lint`
+  and `vp fmt` read the root config even when run from a package, so package `vite.config.ts`
+  files hold only `pack`/`test` options. Root `vite.config.ts` and `tsconfig.base.json` are turbo
+  `globalDependencies`, and a root `//#format:check` task checks root files (checked 2026-10-14).
 - `.node-version` [owned] `24`; `.gitignore` [owned] (node_modules, dist, .turbo, .astro,
   .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
-- `renovate.json` [owned]: `{"extends": ["github>keelstack/hull//renovate/default"]}` (§8.6).
-- `.github/workflows/ci.yml.jinja` [owned] (§8.1), `preview.yml.jinja` [owned] (§8.2),
-  `desktop.yml.jinja` [owned] (§8.3).
+- `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
+- `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
+  `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
+  `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
+  piece conditions; see §4.3 item 8.
 - `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-tool or tauri-app:
-  `resolver = "3"`, `members = ["crates/*", "apps/*/src-tauri"]`, `[workspace.lints]`,
+  `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-tool, `"apps/*/src-tauri"` only
+  with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
   `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition, `stable`
   with `clippy`, `rustfmt`.
-- `packages/shared/` [configs owned, `src/**` seed]: a tiny library built with `vp pack`, so a
+- `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
   base-only repo runs every CI task.
 - `README.md.jinja` [seed], `docs/agents/project.md` [seed].
 - AI layer, §6.9.
@@ -190,28 +213,36 @@ Root files (class in brackets):
 ### 6.2 `preact-app`
 
 `package.json.jinja` [shared, json] scripts: `dev` `vp dev`, `build` `vp build`, `lint` `vp lint`,
-`format:check` `vp fmt --check`, `typecheck` `tsc --noEmit`, `test` `vp test`, `preview` `vp preview`,
+`format:check` `vp fmt --check`, `typecheck` `tsc --noEmit`, `test` `vp test run`, `preview` `vp preview`,
 `deploy:preview` `wrangler versions upload --preview-alias pr-$PR_NUMBER`, `deploy` `wrangler deploy`.
-Dependencies: `preact`, cascivo (below); dev: `@preact/preset-vite`, `vite-plus`, `typescript`,
+Dependencies: `preact`, cascivo (below), and `@<scope>/ui` (`workspace:*`) when `ui-storybook` is
+present, so turbo sees the ui → app edge; dev: `@preact/preset-vite`, `vite-plus`, `typescript`,
 `wrangler`. `vite.config.ts` [owned] with `@preact/preset-vite`; `tsconfig.json` [owned] extends
 `../../tsconfig.base.json`; `wrangler.jsonc` [shared, text]: static assets from `./dist`,
 `not_found_handling: "single-page-application"`, `observability.enabled: true`;
 `index.html`, `src/main.tsx`, `src/app.tsx`, `src/app.test.tsx` [seed]; `CLAUDE.md` [owned].
 
-cascivo: the app uses the prebuilt components `@cascivo/react` 1.9.0 and `@cascivo/themes` 1.0.3
-through `preact/compat` (the Preact preset aliases `react` to `preact/compat`). To verify in the
-task with `npm view` and the cascivo docs (`@cascivo/docspack`): that these are the right packages
-for Preact, and whether the `cascivo` CLI (copy-in components) should be the default instead.
-`npm view` on 2026-10-14: `cascivo` 1.8.0 is the CLI (`init/add/list/update`); `@cascivo/core`
-1.9.0 peers on `react >= 18`.
+cascivo (decided 2026-10-14): the app uses the prebuilt components `@cascivo/react` 1.9.0 and
+`@cascivo/themes` 1.0.3 through `preact/compat`, following cascivo's "Using cascivo with Preact"
+guide (`docs/USING-WITH-PREACT.md`, linked from the `@cascivo/react` README; Vite CSR with
+`@preact/preset-vite` is marked verified there). The `cascivo` CLI (copy-in components) is not the
+default. `@cascivo/react` peers on `react`, `react-dom`, `@types/react` (all `>=18`) and
+`@preact/signals-react >=3`: the piece depends on `@preact/signals-react` and has `react`/`react-dom`
+as dev-only peers (aliased to `preact/compat` by the preset and by `tsconfig` `paths`; not bundled);
+`@types/react` is listed in `peerDependencyRules.ignoreMissing`. `vite.config.ts` inlines
+`@cascivo/*` for tests so the alias applies; the seed test renders with `happy-dom`. SSR/prerender
+is unverified, and cascivo under `@astrojs/preact` compat is documented as broken, so astro-site
+does not use cascivo. These four packages were added to the stack with the user's approval.
 
 ### 6.3 `ui-storybook`
 
 `packages/ui`: a Preact component package on cascivo with Storybook 10.6
 (`@storybook/preact-vite`). Scripts: `build` `vp pack`, `lint`, `format:check`, `typecheck`, `test`
-`vp test` (unit tests only), `storybook` `storybook dev -p 6006`, `storybook:build` `storybook build`
-(not on the PR path). `.storybook/main.ts` [owned], `.storybook/preview.ts` [seed],
-`src/button.tsx`, `src/button.stories.tsx`, `src/button.test.tsx` [seed].
+`vp test run` (unit tests only), `storybook` `storybook dev -p 6006`, `storybook:build` `storybook build`
+(not on the PR path). `preact` and `@cascivo/*` are `peerDependencies` (and dev copies), externalised
+by `vp pack`, so consumers keep one preact. `vite.config.ts` uses `@preact/preset-vite` for the
+`react` → `preact/compat` alias. `.storybook/main.ts` [owned], `.storybook/preview.ts` [seed],
+`src/index.ts`, `src/button.tsx`, `src/button.stories.tsx`, `src/button.test.tsx` [seed].
 
 ### 6.4 `astro-site`
 
@@ -219,8 +250,8 @@ Astro 7 static site with `@astrojs/preact`. Scripts: `dev` `astro dev`, `build` 
 `lint` `vp lint` (TS/TSX only — oxlint does not lint `.astro` templates), `format:check`
 `vp fmt --check` (`.astro` excluded; oxfmt's `.astro` support is experimental and needs
 `@astrojs/compiler-rs`, so it stays off in v1), `typecheck` `tsc --noEmit` (`astro check` needs the
-TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test
---passWithNoTests`, `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
+TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test run`
+(the same in every piece), `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
 `wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `CLAUDE.md` [owned].
 Astro runs through package scripts (`vp run` would add a second cache; not used).
 
@@ -231,7 +262,7 @@ Hono on Workers. `wrangler.jsonc` [shared, text]: `main: "src/index.ts"`,
 `observability: { enabled: true, head_sampling_rate: 1 }`, `vars: { LOG_LEVEL: "info",
 SENTRY_DSN: "" }`, and commented lines showing OTel export destinations (Axiom), marked
 "verify against Cloudflare docs". Scripts: `dev` `wrangler dev`, `build`
-`wrangler deploy --dry-run --outdir dist`, `test` `vp test`, `typecheck` `tsc --noEmit`, `lint`,
+`wrangler deploy --dry-run --outdir dist`, `test` `vp test run`, `typecheck` `tsc --noEmit`, `lint`,
 `format:check`, `deploy:preview`, `deploy`.
 
 Files: `src/index.ts` [seed] (the app; imports hull glue), `src/hull/logging.ts` [owned],
@@ -242,13 +273,22 @@ Logging contract (`src/hull/logging.ts`):
   writes exactly one `console.log(JSON.stringify(line))` per request, with
   `line = { level: "info"|"warn"|"error", msg: "request", requestId, method, path, status,
   durationMs, colo?, country? }`; `level` is `error` for status ≥ 500, `warn` for ≥ 400.
-  No query string, no headers, no body (no secrets or PII in logs).
-- `onErrorHandler(err, c)` — logs `{ level: "error", msg: err.message, requestId, stack }` once
-  and returns `500` JSON `{ error: "internal", requestId }`.
+  No query string, no headers, no body (no secrets or PII in logs). `LOG_LEVEL` (from `env`,
+  default `info`) drops lines below that level.
+- `onErrorHandler(err, c)` — an `HTTPException` returns its own response (jsonLogger writes the
+  normal warn line). Any other error logs once `{ level: "error", msg: err.name, requestId,
+  method, path, status: 500, stack }` with the stack's first (message) line removed, because error
+  messages can quote request data (e.g. `JSON.parse` quotes the body); jsonLogger skips its own
+  line for that request. Returns `500` JSON `{ error: "internal", requestId }`.
 - Workers Logs indexes these JSON fields. Optional: OTel export to Axiom (free 500 GB/month),
   configured in the Cloudflare dashboard plus `observability` in `wrangler.jsonc`.
-- `src/hull/sentry.ts`: `withOptionalSentry(app)` wraps the app with `@sentry/cloudflare`
-  `withSentry` only when `env.SENTRY_DSN` is non-empty; otherwise returns the app unchanged.
+- `src/hull/sentry.ts`: `withOptionalSentry(app)` returns an `ExportedHandler` that delegates to
+  `app.fetch`; only when `env.SENTRY_DSN` is non-empty does it import `@sentry/cloudflare` (once per
+  isolate) and wrap with `withSentry`, registering a reporter that `onErrorHandler` calls. A
+  `beforeSend` scrubber removes query strings, headers, cookies, bodies, breadcrumbs and exception
+  messages (type and stack frames are kept). Wrangler bundles the
+  SDK (≈1.2 MB) but it is evaluated only when the DSN is set. Whether the empty `vars.SENTRY_DSN`
+  is overridden by `wrangler secret put SENTRY_DSN` on deploy is unverified (needs an account).
 
 Pricing note: Workers Logs free tier becomes 0.5 GB/day from 2026-12-01; the README says how to
 lower `head_sampling_rate`.
@@ -259,15 +299,19 @@ lower `head_sampling_rate`.
 `src/main.rs` [seed] with one unit test, `package.json.jinja` [shared, json] whose scripts call
 cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `cargo clippy -p {{ name }} --all-targets -- -D warnings`, `format:check` `cargo fmt -p {{ name }} --check`,
-`test` `cargo nextest run -p {{ name }}`. `turbo.json` [owned] extends `//`: build outputs
+`typecheck` `cargo check -p {{ name }} --all-targets` (CI_TASKS needs it), `test` `cargo nextest run -p {{ name }}`. `turbo.json` [owned] extends `//`: build outputs
 `$TURBO_ROOT$/target/release/{{ name }}`, inputs `src/**`, `Cargo.toml`, `$TURBO_ROOT$/Cargo.lock`
-(verify the `$TURBO_ROOT$` syntax). `[[post]]` `cargo generate-lockfile` on `new`/`add`.
+(`$TURBO_ROOT$` verified with turbo 2.11.8 on 2026-10-15: a cached build restores the binary). `[[post]]`
+`cargo generate-lockfile` on `new` and `cargo update --workspace` on `add` (adds the new member
+without bumping locked crates); dogfood runs the same command, because the dev renderer
+does not run `[[post]]`.
 `CLAUDE.md` [owned].
 
 ### 6.7 `tauri-app`
 
-Tauri v2 desktop shell around an existing preact-app instance. Vars: `name` (default `desktop`),
-`frontend` (default `web`, must be a preact-app instance; checked by the renderer only as a
+Tauri v2 desktop shell around an existing preact-app instance. `multiple = true` (only multiple
+pieces can be named, contract §9.5), so vars are `name` (default `desktop`) and `tauri-app.frontend`
+(default `web`, must be a preact-app instance; checked by the renderer only as a
 pattern). `src-tauri/` is a member of the root Cargo workspace. `tauri.conf.json` [shared, json]:
 `build.beforeDevCommand` `pnpm --filter @{{ scope }}/{{ frontend }} dev`, `beforeBuildCommand`
 `pnpm --filter @{{ scope }}/{{ frontend }} build`, `devUrl` `http://localhost:5173`,
@@ -276,7 +320,13 @@ pattern). `src-tauri/` is a member of the root Cargo workspace. `tauri.conf.json
 (fmt needs no system libraries). No `lint`/`test`/`build` on the PR path: compiling Tauri needs
 webkit2gtk, so the Rust build runs only in `desktop.yml`. `src-tauri/Cargo.toml` [shared, toml],
 `src-tauri/build.rs` [owned], `src-tauri/src/{main,lib}.rs` [seed], `src-tauri/capabilities/default.json`
-[seed], `src-tauri/icons/*` [owned, binary].
+[seed], `src-tauri/icons/*` [owned, binary]. `src-tauri/Cargo.toml` pins `tauri = "2.12.4"` and
+`tauri-build = "2.7.3"` (`cargo info`, 2026-10-15; `latest` is already 3.0.0-alpha) so the crates
+match `@tauri-apps/cli` 2.12.2; Renovate's `tauri` group covers them. Bundle `targets: ["deb"]`
+(AppImage downloads linuxdeploy at build time, which is flaky in scheduled CI). No workspace lints
+(`unsafe_code = "forbid"` could break Tauri's macros) and no `[[post]]` (`tauri build` writes the
+lockfile). `rust-toolchain.toml` lists only `rustfmt` when rust-tool is absent, so the PR-path
+`cargo fmt` does not pull clippy.
 
 ### 6.8 `docs` (docspack)
 
@@ -298,7 +348,7 @@ blocks in base files (`docspack` devDependency, SessionStart sync, `docs-lookup`
     "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
     "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
     "cloudflare": { "package": "@docspack-community/cloudflare", "source": "community", "build": "cloudflare" },
-    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "community-packs/vite-plus" }
+    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "gh:keelstackhq/hull//community-packs/vite-plus" }
   }
 }
 ```
@@ -313,8 +363,9 @@ files.
 ### 6.9 AI layer (owned, in `base`)
 
 - `CLAUDE.md.jinja` ≤ 80 rendered lines for every combo: what the repo is, commands (`pnpm check`,
-  `pnpm ci`), rules (test first, verify before claiming, small files), the subagent routing table,
-  one line per present piece kind (`{% if "hono-worker" in pieces %}`), `@docs/agents/project.md`,
+  `pnpm run ci`; `pnpm ci` is pnpm's built-in clean install), rules (test first, verify before claiming, small files), the subagent routing table,
+  a `## Pieces` section (rendered only when a piece is present, via a `same-branches` chain) with one
+  bullet per present piece kind (`{% if "hono-worker" in pieces %}`), `@docs/agents/project.md`,
   and `@docs/agents/docs.md` when docs is present. Per-instance notes are `<target>/CLAUDE.md`
   (loaded on demand; §4.3.3). `AGENTS.md`: one line pointing to `CLAUDE.md`.
 - `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`):
@@ -330,7 +381,7 @@ files.
   `"model": "opusplan"` in settings is the main-session default (Opus plans, Sonnet executes).
 - `.claude/skills/verify/SKILL.md`: run `pnpm turbo run lint format:check typecheck test --affected
   --output-logs=errors-only`, report ≤ 10 lines (pass/fail per task, first error per failure).
-- `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstack/splice add <id>[:<name>] --json`,
+- `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstackhq/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
   read the JSON `changes`, run `[[post]]`-equivalent install, then `verify`.
 - `.claude/skills/docs-lookup/SKILL.md` (only with docs): `pnpm exec docspack ask "<q>" --json`
   before any web search; web search only on exit 3/4.
@@ -342,14 +393,24 @@ files.
 - `.claude/hooks/stop-checks.sh` (opt-in): does nothing unless `HULL_STOP_CHECKS=1`; then runs
   `pnpm turbo run lint typecheck test --affected` and on failure exits 2 with the first error on
   stderr, which blocks stopping. Enable by setting the env var in `.claude/settings.local.json`.
-- `.claude/statusline.sh` (opt-in via `statusLine` in settings.local.json): model, context %, cost.
+  Exits 0 when the hook input has `stop_hook_active: true` (Claude is already continuing because
+  of a stop hook), so it cannot loop.
+- `.claude/statusline.sh` (opt-in via `statusLine` in settings.local.json): model, context %, cost,
+  read from stdin `model.display_name`, `context_window.used_percentage` (may be null),
+  `cost.total_cost_usd` with `jq`; prints a fixed fallback line when `jq` is missing.
 - `.claude/settings.json`: `model: "opusplan"`; `permissions.allow` for pnpm, cargo, turbo, git
-  read and commit commands, `gh run view`, `docspack`; `deny` force-push and reading `.env*`;
+  read and commit commands, `gh run view`, `docspack`; `deny` force-push (`--force*`, `-f`, `+ref`
+  anywhere after `git push`), `pnpm|npm|cargo publish` and reading `.env*` (deny rules match only
+  commands starting with the literal program, so `git -C . push -f` is not caught; push is not
+  allowed, so it still prompts); hook entries carry `timeout: 120` (seconds);
   `hooks.SessionStart` matcher `startup|resume` → `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"`;
   `hooks.Stop` → stop-checks; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
   (`superpowers@superpowers-marketplace`, repo `obra/superpowers-marketplace`) and caveman
-  (`caveman@akramsystems-plugins`, repo `akramsystems/caveman`). UNVERIFIED shape: check against
-  https://code.claude.com/docs/en/settings in the task; the file must stay valid JSON.
+  (`caveman@akramsystems-plugins`, repo `akramsystems/caveman`). Shape checked against
+  code.claude.com/docs (settings, hooks, statusline) on 2026-10-14: `enabledPlugins` keys are
+  `<plugin>@<marketplace-key>`; repo-level `extraKnownMarketplaces` apply only after the user
+  accepts the workspace trust dialog. The marketplace names inside those repos' manifests were not
+  checked.
 
 ## 7. Versions (template pnpm catalog, exact pins)
 
@@ -370,8 +431,11 @@ Checked with `npm view` on 2026-10-14.
 | `wrangler` | 4.151.0 | |
 | `@cloudflare/workers-types` | 5.20261014.1 | |
 | `@sentry/cloudflare` | 11.7.0 | |
-| `@tauri-apps/cli` | 2.12.2 | `@tauri-apps/api` 2.12.3 |
-| `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | to verify (§6.2) |
+| `@tauri-apps/cli` | 2.12.2 | `@tauri-apps/api` 2.12.3; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7) |
+| `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
+| `@preact/signals-react` | 3.12.0 | cascivo peer |
+| `react`, `react-dom` | 19.3.0 | dev-only cascivo peers, aliased to `preact/compat`; published 2026-09-09 |
+| `happy-dom` | 20.14.6 | DOM environment for component tests; published 2026-10-08 |
 | `docspack` | 1.5.0 | |
 | pnpm / Node | 12.11.2 / 24 | Node 24 is the active LTS |
 
@@ -401,19 +465,28 @@ upstream.
 - Job `ci`, `ubuntu-latest`, `timeout-minutes: 15`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
   the PR base sha, `merge_group.base_sha`, or `github.event.before`:
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
-  2. Early exit: `npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build --exit-code`
-     (exit 0 = nothing affected → set `skip=true`; 1 = affected; 2 = error → run everything).
+  2. Early exit: `npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build`
+     writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
+     package `//` unless `git diff BASE...HEAD` touches a root trigger (root package/workspace/lock/
+     turbo/tsconfig/vite config, `.node-version`, `.npmrc`, anything under `.github/`), and sets
+     `skip=true` when nothing remains. A turbo error, bad JSON or an unknown base → run everything.
+     Root `format:check` covers every root-owned file, but docs-only changes (e.g. `CLAUDE.md`,
+     `docs/**`) do not trigger it on PRs (§8.4).
      All later steps have `if: steps.affected.outputs.skip != 'true'`.
   3. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
   4. `pnpm install --frozen-lockfile --prefer-offline`.
   5. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
-     restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstack/hoard@v1` once released.
-  6. Rust (rendered only with rust-tool): `.github/scripts/rust-affected.mjs` [owned] reads
+     restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstackhq/hoard@v1` once released.
+  6. Rust (present in the plain `ci.yml`, guarded at runtime by
+     `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
+     because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
      `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,
      `Swatinem/rust-cache`, `taiki-e/install-action` (`cargo-nextest`), all `if: rust == 'true'`.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
+  8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
+     step summary, timed from a first `Start timer` step.
 - Job `ci-ok`: `needs: [ci]`, `if: always()`, fails unless `needs.ci.result == 'success'`. It is
   the only required check.
 - Actions are pinned by tag in the template; Renovate pins digests (§8.6).
@@ -421,10 +494,15 @@ upstream.
 
 ### 8.2 `preview.yml`
 
-Rendered only if hono-worker, astro-site or preact-app is present (§4.3.2). `on: pull_request`;
+A plain owned file rendered by `base` for every repo (user decision 2026-10-14: the contract subset
+cannot emit `${{` from a `.jinja` file, §4.3 item 8). A first step checks for `apps/*/wrangler.jsonc`
+and every later step is skipped when there is none, so base-only repos pay a ~5 s no-op. `on: pull_request`;
 same checkout/install; step skipped when `secrets.CLOUDFLARE_API_TOKEN` is empty (forks); runs
 `pnpm turbo run deploy:preview --affected` with `PR_NUMBER`, `CLOUDFLARE_API_TOKEN`,
-`CLOUDFLARE_ACCOUNT_ID`; writes the preview URLs from wrangler's output to the job summary.
+`CLOUDFLARE_ACCOUNT_ID` (declared as `passThroughEnv` of `deploy:preview`/`deploy` in `turbo.json`,
+because turbo 2's strict env mode filters undeclared variables) under `shell: bash` (pipefail);
+writes the `*.workers.dev` preview URLs from wrangler's output to the job summary.
+`permissions: contents: read` only.
 Caveats in the README: preview URLs are public unless Cloudflare Access protects them, and do not
 work for Workers with Durable Objects.
 
@@ -437,6 +515,8 @@ deps (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf
 ### 8.4 Budget and measurement
 
 Typical PR (1–2 packages, warm caches) ≤ 45 s for job `ci`; docs-only ≤ 15 s (early exit).
+Trade-off for the docs-only budget: formatting of root docs is checked by local
+`pnpm format:check`, the stop hook and full runs on pushes to the default branch, not on PRs.
 Measure with `scripts/ci-timing.mjs` (hull) or by hand:
 `gh run list -w ci.yml -L 20 --json databaseId` then `gh run view <id> --json jobs` and
 `completedAt − startedAt` of job `ci`. The script reports p50/p90 and exits 1 when p50 exceeds
@@ -449,11 +529,12 @@ pnpm store cache. No template option in v1.
 
 ### 8.6 Renovate
 
-`renovate/default.json` in hull (preset `github>keelstack/hull//renovate/default`, syntax to
+`renovate/default.json` in hull (preset `github>keelstackhq/hull//renovate/default`, syntax to
 verify): `config:recommended`, `helpers:pinGitHubActionDigests`, `rangeStrategy: pin`,
 `minimumReleaseAge: "3 days"`, groups `vite-plus` (`vite-plus` + `@voidzero-dev/vite-plus-core`,
 which must move together), `storybook`, `astro`, `tauri`, `cloudflare` (wrangler + workers-types),
-`turbo`; automerge for minor/patch and digests with `platformAutomerge`; weekly
+`turbo`, `react` (react + react-dom), `cascivo` (`@cascivo/*`), `sentry` (`@sentry/*`), `preact`
+(preact + `@preact/*`); automerge for minor/patch and digests with `platformAutomerge`; weekly
 `lockFileMaintenance`. Open question: once `splice update` runs as a bot, template-managed catalog
 entries move to `ignoreDeps` so Renovate and the template do not both bump them.
 
@@ -503,20 +584,25 @@ Template var `scope = "hullci"` for all.
 
 One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
 1. `pnpm install --frozen-lockfile --prefer-offline`; `vp lint`, `vp fmt --check`, `pnpm test`
-   (`node --test tests/`: renderer unit tests + template invariants). Always runs (seconds).
+   (`node --test "tests/**/*.test.mjs"`: renderer unit tests + template invariants). Always runs (seconds).
 2. `node scripts/affected-combos.mjs --base $BASE` → list. Changes under
    `template/pieces/<id>/` select combos containing `<id>`; `base`, `template/splice.toml`,
    `scripts/render.mjs`, `scripts/lib/**`, `scripts/dogfood.mjs`, `scripts/combos.json`, root
-   `package.json`/lockfile and the workflow select all; docs and tests select none.
+   `package.json`/lockfile, the workflow and any other path under `template/` select all; docs and
+   tests select none. An unknown or missing base (first push, force-push) selects all.
 3. `node scripts/dogfood.mjs --combo <each>`: render into `$RUNNER_TEMP/combos/<name>`, then in
    sequence per combo `pnpm install --no-frozen-lockfile --prefer-offline` (shared pnpm store),
    `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
    and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
    selected combo contains rust-tool.
-4. The turbo cache dir is cached with `actions/cache` (later hoard).
+4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
+   on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
+   download time, never correctness.
 
 Sequential in one job is the default. Plan 02 measures it; a matrix is adopted only if the
 measured sequential time exceeds 3 minutes warm and a matrix would cut it by more than half.
+Measured 2026-10-15 (cloud container, warm pnpm store): base+web+site cold 24–42 s, warm 4.5–6.8 s,
+so hull CI stays sequential. `scripts/check-single-vite.mjs` changes also select all combos.
 Budget for hull's own PR CI: ≤ 120 s warm when one piece changes, ≤ 20 s docs-only.
 
 ### 10.3 `desktop.yml` (hull)
@@ -533,14 +619,14 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 ## 11. Switching to splice and hoard (blocked)
 
 - **splice v0.1** (blocked until released): hull CI renders with
-  `pnpm dlx @keelstack/splice@0.1 new ./template <dir> ... --yes --json`; the dev renderer stays as
+  `pnpm dlx @keelstackhq/splice@0.1 new ./template <dir> ... --yes --json`; the dev renderer stays as
   an oracle: a test renders every combo with both and diffs the trees (excluding `.splice/`).
   Update test: render the `web` combo from the previous hull tag, commit, apply scripted user edits
   (edit a seed file, add a dependency to `apps/web/package.json`, edit an owned file), run
   `splice update` to the working tree's template: seed unchanged, the user's dependency kept, the
   owned edit reported by `check` and replaced only with `--force`, `splice check` exit 0 at the end.
 - **hoard v1** (blocked until released): the `actions/cache` turbo step becomes
-  `uses: keelstack/hoard@v1` in the generated `ci.yml` and in hull's CI.
+  `uses: keelstackhq/hoard@v1` in the generated `ci.yml` and in hull's CI.
 
 ## 12. Testing
 
@@ -554,7 +640,13 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 
 ## 13. Unverified / to check during the build
 
-cascivo package choice for Preact (§6.2); Vite+ shared lint/fmt config mechanism; pnpm 12 setting
-names; `$TURBO_ROOT$` in outputs; Renovate preset path syntax; Claude Code plugin settings shape and
-statusline input fields; `astro check` with TypeScript 7; Cloudflare OTel destination syntax;
-splice CLI flags (§4.3.7); whether `add` re-renders other pieces (§4.3.1).
+Still open: Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
+(§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm manager bumps the
+`overrides.vite` `npm:@voidzero-dev/vite-plus-core@x` alias together with `vite-plus` (needs a live
+Renovate run); whether the empty `vars.SENTRY_DSN` is overridden by `wrangler secret put` on deploy
+(needs an account); the Tauri desktop build (needs webkit2gtk, runs in `desktop.yml`).
+
+Verified during the build (removed from this list): Vite+ shared lint/fmt config mechanism; pnpm 12
+setting names; `$TURBO_ROOT$` in outputs; Claude Code settings and statusline shape; cascivo for
+Preact (`@cascivo/react` via `preact/compat`); `astro check` does not work with TypeScript 7
+(astro-site uses `tsc --noEmit`); `preview.yml`/`desktop.yml` use runtime guards, not `{% raw %}`.

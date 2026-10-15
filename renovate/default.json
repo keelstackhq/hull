@@ -1,0 +1,39 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "rangeStrategy": "pin",
+  "minimumReleaseAge": "3 days",
+  "platformAutomerge": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on monday"]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
+      "matchStrings": ["turbo@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "turbo",
+      "datasourceTemplate": "npm"
+    }
+  ],
+  "packageRules": [
+    {
+      "groupName": "vite-plus",
+      "matchPackageNames": ["vite-plus", "@voidzero-dev/vite-plus-core"]
+    },
+    { "groupName": "storybook", "matchPackageNames": ["storybook", "@storybook/**"] },
+    { "groupName": "astro", "matchPackageNames": ["astro", "@astrojs/**"] },
+    { "groupName": "tauri", "matchManagers": ["npm", "cargo"], "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build"] },
+    { "groupName": "cloudflare", "matchPackageNames": ["wrangler", "@cloudflare/workers-types"] },
+    { "groupName": "react", "matchPackageNames": ["react", "react-dom"] },
+    { "groupName": "cascivo", "matchPackageNames": ["@cascivo/**"] },
+    { "groupName": "sentry", "matchPackageNames": ["@sentry/**"] },
+    { "groupName": "preact", "matchPackageNames": ["preact", "@preact/**"] },
+    { "groupName": "turbo", "matchPackageNames": ["turbo", "@turbo/**"] },
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    }
+  ]
+}

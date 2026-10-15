@@ -1,0 +1,66 @@
+---
+lockfileVersion: "9.0"
+
+importers:
+  .:
+    configDependencies: {}
+    packageManagerDependencies:
+      pnpm:
+        specifier: 12.11.2
+        version: 12.11.2
+
+packages:
+  "@pnpm/exe.linux-x64@12.11.2":
+    resolution:
+      {
+        integrity: sha512-owLw13OfPkEoY+hLBNeeG+dCFhywr7q2d/EHPz4mNL2RhKnv8gNwMARkjkiDQu234aItVwFNDeGnmQXm+ikkAg==,
+      }
+    cpu: [x64]
+    os: [linux]
+
+snapshots:
+  "@pnpm/exe.linux-x64@12.11.2":
+    optional: true
+
+---
+lockfileVersion: "9.0"
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@1.1.0
+
+importers:
+  .:
+    devDependencies:
+      vite-plus:
+        specifier: "catalog:"
+        version: 1.1.0(@types/node@24.0.0)(typescript@7.0.2)
+
+packages:
+  "@voidzero-dev/vite-plus-core@1.1.0":
+    resolution:
+      {
+        integrity: sha512-Ai6HQP1zG0H3ZrmStEaMVKtDzW0xU3VgMzm3LFaXDQMEp8nAqvp0VGoU8HmpB9xv9vDSl+UxiSNOpuY9T714OQ==,
+      }
+    engines: { node: ^20.19.0 || ^22.18.0 || >=24.11.0 }
+
+  vite@8.3.3:
+    resolution: { integrity: sha512-Zm9yZGF1bHR2aXRlMzNzdHViZml4dHVyZQ== }
+    engines: { node: ^20.19.0 || >=22.12.0 }
+    hasBin: true
+
+  typescript@7.0.2:
+    resolution:
+      {
+        integrity: sha512-IBnAdNVMswWbJcM7woPluOudectJzFjJ1N8jVRxP9Uq4CIv5hZdBIcdmtRbFDYF/Ph2j2gVup4YJ4N9mh0jYFA==,
+      }
+
+snapshots:
+  "@voidzero-dev/vite-plus-core@1.1.0(@types/node@24.0.0)(typescript@7.0.2)": {}
+
+  vite@8.3.3(@types/node@24.0.0): {}
+
+  typescript@7.0.2: {}

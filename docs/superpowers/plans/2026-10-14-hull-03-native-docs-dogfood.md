@@ -6,7 +6,7 @@
 
 **Architecture:** Rust crates live in a root virtual Cargo workspace rendered by `base` when a Rust piece is present; each crate has a thin `package.json` whose scripts call cargo for that crate only, so Turbo orchestrates and caches Rust like JS. Tauri compiles only in a scheduled workflow. The docs piece wires docspack into the AI layer. Tasks 6 and 7 are blocked on other keelstack repos and are written so they can land later without touching earlier work.
 
-**Tech Stack:** As milestones 1–2, plus Rust stable (edition 2024), cargo-nextest, @tauri-apps/cli 2.12.2, @tauri-apps/api 2.12.3, docspack 1.5.0, `gh` CLI (timing script), later `@keelstack/splice` 0.1 and `keelstack/hoard@v1`.
+**Tech Stack:** As milestones 1–2, plus Rust stable (edition 2024), cargo-nextest, @tauri-apps/cli 2.12.2, @tauri-apps/api 2.12.3, docspack 1.5.0, `gh` CLI (timing script), later `@keelstackhq/splice` 0.1 and `keelstackhq/hoard@v1`.
 
 **Spec:** `docs/superpowers/specs/2026-10-14-hull-design.md` (§6.1 Cargo files, §6.6–§6.8, §8.1 step 6, §8.3, §8.4, §10, §11)
 
@@ -14,11 +14,11 @@
 
 - All milestone 1 and 2 Global Constraints apply.
 - Rust scripts always pass `-p <crate>`; never `--workspace` (it would pull in `src-tauri`, which needs webkit2gtk).
-- Root `Cargo.toml`: `resolver = "3"`, `members = ["crates/*", "apps/*/src-tauri"]`; rendered only when rust-tool or tauri-app is present.
+- Root `Cargo.toml`: `resolver = "3"`, `members` per piece (`crates/*` with rust-tool, `apps/*/src-tauri` with tauri-app; cargo rejects unmatched globs — changed 2026-10-15); rendered only when rust-tool or tauri-app is present.
 - Tauri builds run only in `desktop.yml` (scheduled + manual), never on the PR path.
 - docspack commands: `docspack sync`, `docspack index --repo`, `docspack ask "<q>" --json`. Never auto-edit `package.json` from scripts.
 - Budgets: generated repo job `ci` p50 ≤ 45 s (typical PR), ≤ 15 s docs-only; hull job `ci` ≤ 120 s warm, ≤ 20 s docs-only.
-- splice invocation (contract §9.14): `pnpm dlx @keelstack/splice@0.1 new <source> <dest> --piece <id>[:<name>]... --data <k>=<v>... --yes --json`.
+- splice invocation (contract §9.14): `pnpm dlx @keelstackhq/splice@0.1 new <source> <dest> --piece <id>[:<name>]... --data <k>=<v>... --yes --json`.
 
 ## Review Focus
 
@@ -34,7 +34,7 @@
 
 ```
 template/pieces/base/files/{Cargo.toml.jinja,rust-toolchain.toml.jinja}
-template/pieces/base/files/.github/workflows/{ci.yml.jinja (+rust steps),desktop.yml.jinja}
+template/pieces/base/files/.github/workflows/{ci.yml (plain, +rust steps behind runtime guards),desktop.yml.jinja}
 template/pieces/rust-tool/{piece.toml,files/{Cargo.toml.jinja,package.json.jinja,turbo.json.jinja,src/main.rs,CLAUDE.md}}
 template/pieces/tauri-app/{piece.toml,files/{package.json.jinja,src-tauri/**,CLAUDE.md}}
 template/pieces/docs/{piece.toml,files/{docs/packs.json,docs/agents/docs.md,scripts/docs-packs.mjs}}
@@ -51,14 +51,14 @@ tests/splice-parity.test.mjs  tests/splice-update.test.mjs   # Task 7 (blocked)
 
 **Files:**
 - Create: `template/pieces/rust-tool/**`, `template/pieces/base/files/Cargo.toml.jinja`, `template/pieces/base/files/rust-toolchain.toml.jinja`
-- Modify: `template/pieces/base/files/.github/workflows/ci.yml.jinja` (Rust steps, spec §8.1 step 6), `template/pieces/base/files/CLAUDE.md.jinja`, `scripts/combos.json` (`site` += `rust-tool:tool`), `.github/workflows/ci.yml` (Rust toolchain when a selected combo has rust-tool)
+- Modify: `template/pieces/base/files/.github/workflows/ci.yml` (plain; Rust steps behind runtime guards, spec §8.1 step 6), `scripts/dogfood.mjs` (`cargo generate-lockfile` for rust combos), `template/pieces/base/files/CLAUDE.md.jinja`, `scripts/combos.json` (`site` += `rust-tool:tool`), `.github/workflows/ci.yml` (Rust toolchain when a selected combo has rust-tool)
 - Test: `tests/rust-tool.test.mjs`, `tests/ci-workflow.test.mjs` (extend)
 
 **Interfaces:**
 - Consumes: `renderCombo`, `elifBranches`/`assertSameBranches`, `CI_TASKS`
-- Produces: crate `{{ name }}` with npm package `@{{ scope }}/{{ name }}`; generated step output `rust` (`'true'|'false'`); `tauri-app` (Task 2) relies on the root `Cargo.toml` members glob.
+- Produces: crate `{{ name }}` with npm package `@{{ scope }}/{{ name }}`; generated step output `rust` (`'true'|'false'`); `tauri-app` (Task 2) adds `"apps/*/src-tauri"` to the per-piece root `Cargo.toml` members.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("root Cargo.toml only with a Rust piece; branches identical", ...);
@@ -74,10 +74,10 @@ test("ci.yml has rust steps guarded by rust == 'true' only with rust-tool", ...)
 test("rust decision: affected packages with Cargo.toml → true", ...); // unit test of the inline script: extract it to template file .github/scripts/rust-affected.mjs (owned) and test that
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.1 (Cargo files), §6.6 and §8.1 step 6. The rust decision runs `.github/scripts/rust-affected.mjs` (owned, rendered only with rust-tool): reads `turbo query affected --packages` JSON from stdin and prints `rust=true|false` to `$GITHUB_OUTPUT`. Verify `$TURBO_ROOT$` in outputs with a real `turbo run build` twice (second run must be `FULL TURBO`).
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `node scripts/dogfood.mjs --combo site` (needs Rust + `cargo install cargo-nextest --locked` locally) — passes; the second run shows cache hits for the crate.
-- [ ] **Step 5: Commit** — `feat(rust-tool): Rust crates in a Cargo workspace, orchestrated by Turbo`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.1 (Cargo files), §6.6 and §8.1 step 6. The rust decision runs `.github/scripts/rust-affected.mjs` (owned, rendered only with rust-tool): reads `turbo query affected --packages` JSON from stdin and prints `rust=true|false` to `$GITHUB_OUTPUT`. Verify `$TURBO_ROOT$` in outputs with a real `turbo run build` twice (second run must be `FULL TURBO`).
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `node scripts/dogfood.mjs --combo site` (needs Rust + `cargo install cargo-nextest --locked` locally) — passes; the second run shows cache hits for the crate.
+- [x] **Step 5: Commit** — `feat(rust-tool): Rust crates in a Cargo workspace, orchestrated by Turbo`
 
 ---
 
@@ -92,11 +92,11 @@ test("rust decision: affected packages with Cargo.toml → true", ...); // unit 
 - Consumes: preact-app scripts `dev`/`build`, dev port 5173 (plan 02 Task 2); root `Cargo.toml` (Task 1)
 - Produces: scripts `tauri`, `build:desktop`, `format:check`; combo `desktop`.
 
-- [ ] **Step 1: Write failing tests:** manifest (`requires = ["base", "preact-app"]`, vars `name` default `desktop`, `frontend` default `web`); `tauri.conf.json` build commands and `frontendDist` per spec §6.7 with `frontend=admin`; icons copied byte-identical (sha256 equal to the template file); no `lint`/`test`/`build` scripts; `desktop.yml` present only with tauri-app, triggers `workflow_dispatch` + `schedule`, installs the four apt packages; `affectedCombos([...all files])` never returns `desktop`.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.7 and §8.3; hull's `desktop.yml` renders `desktop`, installs apt deps + Rust, runs the generated `pnpm turbo run build:desktop`.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.** If the machine has webkit2gtk, run `node scripts/dogfood.mjs --combo desktop` and then `pnpm turbo run build:desktop` in the rendered dir; otherwise record "desktop build verified only on GitHub" under Blocked (needs the repo to run `desktop.yml` once).
-- [ ] **Step 5: Commit** — `feat(tauri-app): Tauri v2 shell with scheduled desktop builds`
+- [x] **Step 1: Write failing tests:** manifest (`requires = ["base", "preact-app"]`, vars `name` default `desktop`, `frontend` default `web`); `tauri.conf.json` build commands and `frontendDist` per spec §6.7 with `frontend=admin`; icons copied byte-identical (sha256 equal to the template file); no `lint`/`test`/`build` scripts; `desktop.yml` present only with tauri-app, triggers `workflow_dispatch` + `schedule`, installs the four apt packages; `affectedCombos([...all files])` never returns `desktop`.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.7 and §8.3; hull's `desktop.yml` renders `desktop`, installs apt deps + Rust, runs the generated `pnpm turbo run build:desktop`.
+- [x] **Step 4: Run `pnpm test` — expect PASS.** If the machine has webkit2gtk, run `node scripts/dogfood.mjs --combo desktop` and then `pnpm turbo run build:desktop` in the rendered dir; otherwise record "desktop build verified only on GitHub" under Blocked (needs the repo to run `desktop.yml` once).
+- [x] **Step 5: Commit** — `feat(tauri-app): Tauri v2 shell with scheduled desktop builds`
 
 ---
 
@@ -110,7 +110,7 @@ test("rust decision: affected packages with Cargo.toml → true", ...); // unit 
 **Interfaces:**
 - Produces: `docs/packs.json` (spec §6.8 shape); in the generated repo, `docsPacksReport(packs, installed: Set<string>): { tool, package, state: "installed"|"missing"|"unpublished" }[]` exported from `scripts/docs-packs.mjs`.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("packs.json shape", ...);  // version 1; every pack has package + source ∈ {vendor, community}; community has build xor recipe
@@ -126,10 +126,10 @@ test("session-start skips docspack when not installed", ...);
 test("every recipe folder named in packs.json exists in community-packs/", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.8. `unpublished` is decided only with `--online` (`npm view <pkg> version`); offline the script reports `missing`. Build the vite-plus recipe locally once with `pnpm dlx docspack@1.5.0 build --from <vite-plus docs checkout>` and `docspack doctor`; publishing `@docspack-community/*` goes under Blocked (needs the npm scope and an owner).
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `--combo docs`; in the rendered dir `pnpm docs:sync` and `pnpm exec docspack ask "turbo affected" --json` return JSON (exit 0, 3 or 4 are all acceptable; paste which).
-- [ ] **Step 5: Commit** — `feat(docs): docspack piece with packs manifest and community recipes`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.8. `unpublished` is decided only with `--online` (`npm view <pkg> version`); offline the script reports `missing`. Build the vite-plus recipe locally once with `pnpm dlx docspack@1.5.0 build --from <vite-plus docs checkout>` and `docspack doctor`; publishing `@docspack-community/*` goes under Blocked (needs the npm scope and an owner).
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `--combo docs`; in the rendered dir `pnpm docs:sync` and `pnpm exec docspack ask "turbo affected" --json` return JSON (exit 0, 3 or 4 are all acceptable; paste which).
+- [x] **Step 5: Commit** — `feat(docs): docspack piece with packs manifest and community recipes`
 
 ---
 
@@ -143,7 +143,7 @@ test("every recipe folder named in packs.json exists in community-packs/", ...);
 **Interfaces:**
 - Produces: `jobSeconds(runJson, jobName = "ci"): number | null` (null unless conclusion is `success`); `summarize(seconds: number[]): { n, p50, p90 }`; CLI `node scripts/ci-timing.mjs --repo <owner/repo> [--limit 20] [--budget 45] [--job ci]` exits 1 when p50 > budget.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("job seconds from startedAt/completedAt", () => assert.equal(jobSeconds(fx("run-ok")), 38));
@@ -152,10 +152,10 @@ test("p50/p90", () => assert.deepEqual(summarize([10, 20, 30, 40, 50]), { n: 5, 
 test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** with `gh run list -R <repo> -w ci.yml -L <n> --json databaseId` and `gh run view <id> -R <repo> --json jobs`; `opts.gh` injectable for tests.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.** Real measurement needs hull on GitHub and a canary repo (`keelstack/hull-canary`, rendered from `web`): put both under Blocked with the commands to run (`node scripts/ci-timing.mjs --repo keelstack/hull --budget 120`, `--repo keelstack/hull-canary --budget 45`).
-- [ ] **Step 5: Commit** — `feat: CI timing check against the budget`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** with `gh run list -R <repo> -w ci.yml -L <n> --json databaseId` and `gh run view <id> -R <repo> --json jobs`; `opts.gh` injectable for tests.
+- [x] **Step 4: Run `pnpm test` — expect PASS.** Real measurement needs hull on GitHub and a canary repo (`keelstackhq/hull-canary`, rendered from `web`): put both under Blocked with the commands to run (`node scripts/ci-timing.mjs --repo keelstackhq/hull --budget 120`, `--repo keelstackhq/hull-canary --budget 45`).
+- [x] **Step 5: Commit** — `feat: CI timing check against the budget`
 
 ---
 
@@ -170,24 +170,24 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 - Consumes: `loadTemplate`, `overlaps`
 - Produces: `piecesDoc(t: Template): string` — one section per piece: id, description, multiple, target, requires, vars with defaults, files grouped by class.
 
-- [ ] **Step 1: Write failing tests:** `piecesDoc` output contains every piece id as a `## ` heading and every var default; `docs/pieces.md` on disk equals `piecesDoc(await loadTemplate("template"))` (fails when someone forgets to regenerate).
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement**, generate `docs/pieces.md`, and update `README.md`: quick start with the real commands as they exist now (dev renderer until splice ships), piece table, CI budget, AI layer, logging, known limits (`.astro` lint/fmt, Storybook peer range, preview URL caveats, observability pricing from 2026-12-01), and a short "Custom runners" note (spec §8.5: change `runs-on`; sticky disks replace the pnpm store cache).
-- [ ] **Step 4: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
-- [ ] **Step 5: Commit** — `docs: pieces reference and product README`
+- [x] **Step 1: Write failing tests:** `piecesDoc` output contains every piece id as a `## ` heading and every var default; `docs/pieces.md` on disk equals `piecesDoc(await loadTemplate("template"))` (fails when someone forgets to regenerate).
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement**, generate `docs/pieces.md`, and update `README.md`: quick start with the real commands as they exist now (dev renderer until splice ships), piece table, CI budget, AI layer, logging, known limits (`.astro` lint/fmt, Storybook peer range, preview URL caveats, observability pricing from 2026-12-01), and a short "Custom runners" note (spec §8.5: change `runs-on`; sticky disks replace the pnpm store cache).
+- [x] **Step 4: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
+- [x] **Step 5: Commit** — `docs: pieces reference and product README`
 
 ---
 
-### Task 6: Remote cache with hoard — BLOCKED until `keelstack/hoard@v1` is released
+### Task 6: Remote cache with hoard — BLOCKED until `keelstackhq/hoard@v1` is released
 
 **Files:**
-- Modify: `template/pieces/base/files/.github/workflows/ci.yml.jinja`, `.github/workflows/ci.yml`
+- Modify: `template/pieces/base/files/.github/workflows/ci.yml` (plain), `.github/workflows/ci.yml`
 - Test: `tests/ci-workflow.test.mjs` (extend)
 
 **Interfaces:**
-- Consumes: `keelstack/hoard@v1` (no inputs needed for the GitHub cache backend; it sets `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` for later steps — confirm from hoard's README at release).
+- Consumes: `keelstackhq/hoard@v1` (no inputs needed for the GitHub cache backend; it sets `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` for later steps — confirm from hoard's README at release).
 
-- [ ] **Step 1: Write failing tests:** the generated workflow has a step `uses: keelstack/hoard@v1` before `turbo run`, no `actions/cache` step on `.turbo`, and the hoard step is guarded by `skip` like the rest.
+- [ ] **Step 1: Write failing tests:** the generated workflow has a step `uses: keelstackhq/hoard@v1` before `turbo run`, no `actions/cache` step on `.turbo`, and the hoard step is guarded by `skip` like the rest.
 - [ ] **Step 2: Run `pnpm test` — expect FAIL.**
 - [ ] **Step 3: Replace** the `actions/cache` turbo step in both workflows; hull's dogfood passes `--cache-dir` only when hoard is absent.
 - [ ] **Step 4: Run `pnpm test` — expect PASS;** after merge, compare `ci-timing` p50 before/after and record both in PROGRESS.
@@ -195,7 +195,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 
 ---
 
-### Task 7: Render with splice and test updates — BLOCKED until `@keelstack/splice` 0.1 is released
+### Task 7: Render with splice and test updates — BLOCKED until `@keelstackhq/splice` 0.1 is released
 
 **Files:**
 - Modify: `scripts/dogfood.mjs` (`--renderer splice|dev`, default `splice`), `.github/workflows/ci.yml`, `template/pieces/base/files/.claude/skills/add-piece/SKILL.md` (real flags), spec §4.3.8 and §11
@@ -205,6 +205,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 **Interfaces:**
 - Consumes: splice CLI and `--json` output (contract §8); `renderNew` as the oracle.
 
+- Notes from the Milestone 3 review (2026-10-15): splice runs `[[post]]` hooks (`pnpm install`, `cargo generate-lockfile`/`cargo update --workspace`), so the parity test must compare trees before hooks or ignore lockfiles, `node_modules` and `target/`; dogfood must then drop its own `cargo generate-lockfile` step. The update test should also check that `add rust-tool:b` does not bump locked crates. Hull PRs touching only `template/pieces/tauri-app/**` select no combo; consider a non-scheduled desktop combo without `build:desktop`.
 - [ ] **Step 1: Align flags.** Read splice's README/`splice new --help`; update the assumed invocation everywhere (spec §4.3.8, this plan's Global Constraints, add-piece skill). Report any contract mismatch to the splice repo.
 - [ ] **Step 2: Write failing tests:**
 
@@ -224,7 +225,7 @@ test("update keeps seed, merges shared, guards owned", async () => {
 ```
 
 - [ ] **Step 3: Run with `SPLICE_BIN` set — expect FAIL** (dogfood still on the dev renderer).
-- [ ] **Step 4: Switch** dogfood and hull CI to `pnpm dlx @keelstack/splice@0.1 new …`; keep the dev renderer for the parity test.
+- [ ] **Step 4: Switch** dogfood and hull CI to `pnpm dlx @keelstackhq/splice@0.1 new …`; keep the dev renderer for the parity test.
 - [ ] **Step 5: Run `pnpm test` with `SPLICE_BIN` and `node scripts/dogfood.mjs --combo base --combo web --combo site --combo docs` — expect PASS.**
 - [ ] **Step 6: Commit** — `ci: render combos with splice and test template updates`
 

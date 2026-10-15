@@ -3,11 +3,11 @@
 An opinionated, AI-native monorepo template (pnpm, Turborepo, TypeScript 7, Vite+, Preact, Astro,
 cascivo, Storybook, docspack, Rust, Tauri, Hono on Cloudflare). It owns structure, stack, tool
 versions and config, never app logic. Consumers render it with `splice` from
-`gh:keelstack/hull//template`. Until splice v0.1 exists, `scripts/render.mjs` renders it.
+`gh:keelstackhq/hull//template`. Until splice v0.1 exists, `scripts/render.mjs` renders it.
 
 - Design: `docs/superpowers/specs/2026-10-14-hull-design.md` — the source of truth. Read only the
   sections your task touches; change the spec in the same commit when behaviour changes.
-- Contract: `docs/template-format.md` — shared with `keelstack/splice`, binding (incl. §9).
+- Contract: `docs/template-format.md` — shared with `keelstackhq/splice`, binding (incl. §9).
   Never edit it here alone; changes go to both repos in the same week.
 - Plans: `docs/superpowers/plans/` (01 base-renderer, 02 web-pieces, 03 native-docs-dogfood).
 - Progress: `docs/PROGRESS.md` — one line per finished task, plus Blocked and Status.
@@ -30,7 +30,7 @@ tests/                          node:test: renderer units + template invariants
 
 ```bash
 pnpm install
-pnpm test                                   # node --test tests/
+pnpm test                                   # node --test "tests/**/*.test.mjs"
 pnpm lint && pnpm format:check              # vp lint / vp fmt --check on scripts and tests
 node scripts/render.mjs new --template template --out /tmp/x --piece base --piece preact-app:web --json
 node scripts/dogfood.mjs --combo base       # render + install + lint/format/typecheck/test/build
@@ -48,6 +48,9 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
 - **No app logic in the template.** App source is `seed`; configs/workflows/AI layer are `owned`;
   `package.json`, `turbo.json`, `pnpm-workspace.yaml`, crate `Cargo.toml`, `tauri.conf.json`,
   `wrangler.jsonc` are `shared` with a `[merge]` strategy.
+- **Renderer rules** (spec §9): identifiers `[a-z_][a-z0-9_]*` (not `loop/self/range/namespace`), no
+  symlinks in the template, portable rendered path segments, no case-insensitive path collisions,
+  `[[post]].when` required.
 - **Each path in at most one ownership class.** No `{{` in paths under `files/`.
 - **Exact versions** in the template's pnpm catalog (spec §7). `vite` is overridden to
   `@voidzero-dev/vite-plus-core` at the same version as `vite-plus`; a combo's lockfile has one vite.
@@ -85,4 +88,5 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
 - oxlint does not lint `.astro` templates; oxfmt `.astro` support is experimental (off).
 - Tauri needs webkit2gtk to compile; its Rust builds only in `desktop.yml`. Rust scripts use `-p`.
 - docspack: `sync` (deps), `index --repo` (own docs), `ask "<q>" --json` (agents).
-- pnpm 12 blocks dependency build scripts unless listed (`onlyBuiltDependencies`; check the name).
+- pnpm 12 blocks dependency build scripts unless listed in `allowBuilds` (`onlyBuiltDependencies` is
+  ignored). `minimumReleaseAge` is strict: a pin younger than 3 days needs `minimumReleaseAgeExclude`.

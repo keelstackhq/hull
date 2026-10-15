@@ -1,0 +1,33 @@
+{
+  "name": "@{{ scope }}/{{ name }}",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "lint": "vp lint",
+    "format:check": "vp fmt --check",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run",
+    "preview": "vp preview",
+    "deploy:preview": "wrangler versions upload --preview-alias pr-$PR_NUMBER",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+{% if "ui-storybook" in pieces %}    "@{{ scope }}/ui": "workspace:*",
+{% endif %}    "@cascivo/react": "catalog:",
+    "@cascivo/themes": "catalog:",
+    "@preact/signals-react": "catalog:",
+    "preact": "catalog:"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "catalog:",
+    "happy-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

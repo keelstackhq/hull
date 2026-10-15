@@ -1,0 +1,19 @@
+id = "tauri-app"
+description = "Tauri v2 desktop shell around a preact-app instance; Rust builds only in the scheduled desktop workflow"
+multiple = true
+requires = ["base", "preact-app"]
+target = "apps/{{ name }}"
+
+[vars]
+name = { prompt = "desktop app name", default = "desktop", pattern = "^[a-z][a-z0-9-]*$" }
+frontend = { prompt = "preact-app instance to wrap", default = "web", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["src-tauri/build.rs", "src-tauri/icons/**", "src-tauri/.gitignore", "CLAUDE.md"]
+shared = ["package.json", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"]
+seed = ["src-tauri/src/**", "src-tauri/capabilities/**"]
+
+[merge]
+"package.json" = "json"
+"src-tauri/Cargo.toml" = "toml"
+"src-tauri/tauri.conf.json" = "json"

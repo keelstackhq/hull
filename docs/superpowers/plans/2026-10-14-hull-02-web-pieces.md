@@ -6,7 +6,7 @@
 
 **Architecture:** Each piece is a directory under `template/pieces/` with `target = "<dir>/{{ name }}"` (or `packages/ui`), configs owned, `package.json` shared (json), `wrangler.jsonc` shared (text), source seed. Root-level effects (preview workflow, CLAUDE.md lines) are `{% if %}` blocks in `base` files. One Vite: every Vite consumer resolves to `@voidzero-dev/vite-plus-core` through the base override, enforced by `check-single-vite`.
 
-**Tech Stack:** As milestone 1, plus generated-repo packages from spec §7: preact 10.29.8, @preact/preset-vite 2.10.6, @cascivo/react 1.9.0, @cascivo/themes 1.0.3, storybook / @storybook/preact-vite / @storybook/addon-docs 10.6.2, astro 7.3.8, @astrojs/preact 6.0.6, hono 4.13.13, wrangler 4.151.0, @cloudflare/workers-types 5.20261014.1, @sentry/cloudflare 11.7.0.
+**Tech Stack:** As milestone 1, plus generated-repo packages from spec §7: preact 10.29.8, @preact/preset-vite 2.10.6, @cascivo/react 1.9.0, @cascivo/themes 1.0.3, @preact/signals-react 3.12.0, react/react-dom 19.3.0 (dev-only), happy-dom 20.14.6 (added 2026-10-14 with user approval), storybook / @storybook/preact-vite / @storybook/addon-docs 10.6.2, astro 7.3.8, @astrojs/preact 6.0.6, hono 4.13.13, wrangler 4.151.0, @cloudflare/workers-types 5.20261014.1, @sentry/cloudflare 11.7.0.
 
 **Spec:** `docs/superpowers/specs/2026-10-14-hull-design.md` (§4, §6.2–§6.5, §7.2, §8.2, §10)
 
@@ -39,7 +39,7 @@ template/pieces/preact-app/{piece.toml,files/**}
 template/pieces/ui-storybook/{piece.toml,files/**}
 template/pieces/astro-site/{piece.toml,files/**}
 template/pieces/hono-worker/{piece.toml,files/**}  # files/src/hull/{logging,sentry}.ts owned
-template/pieces/base/files/.github/workflows/preview.yml.jinja
+template/pieces/base/files/.github/workflows/preview.yml
 template/pieces/base/files/CLAUDE.md.jinja         # + one line per piece kind
 scripts/combos.json                                # + web, site
 tests/fixtures/lockfiles/{single,duplicate}.yaml
@@ -57,7 +57,7 @@ tests/single-vite.test.mjs preact-app.test.mjs ui-storybook.test.mjs astro-site.
 **Interfaces:**
 - Produces: `checkSingleVite(lockText: string): { ok: boolean, coreVersions: string[], viteEntries: string[] }`; CLI `node scripts/check-single-vite.mjs <repoDir>` exits 1 with the offending keys.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("single core, no vite → ok", () => assert.deepEqual(checkSingleVite(fx("single")), { ok: true, coreVersions: ["1.1.0"], viteEntries: [] }));
@@ -66,10 +66,10 @@ test("two core versions → not ok", ...);
 test("peer-suffixed keys count once", ...);  // "@voidzero-dev/vite-plus-core@1.1.0(@types/node@24.0.0)"
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** by parsing `pnpm-lock.yaml` with `yaml` and reading the `packages:` keys (strip the `(...)` peer suffix). Fixtures: trimmed real lockfiles (generate `single.yaml` from a rendered base+preact-app install in Task 2 if easier, then trim).
-- [ ] **Step 4: Run `pnpm test` — expect PASS.**
-- [ ] **Step 5: Commit** — `feat: check that a lockfile resolves a single vite`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** by parsing `pnpm-lock.yaml` with `yaml` and reading the `packages:` keys (strip the `(...)` peer suffix). Fixtures: trimmed real lockfiles (generate `single.yaml` from a rendered base+preact-app install in Task 2 if easier, then trim).
+- [x] **Step 4: Run `pnpm test` — expect PASS.**
+- [x] **Step 5: Commit** — `feat: check that a lockfile resolves a single vite`
 
 ---
 
@@ -84,8 +84,8 @@ test("peer-suffixed keys count once", ...);  // "@voidzero-dev/vite-plus-core@1.
 - Consumes: `renderCombo`, `CI_TASKS`, `checkSingleVite`
 - Produces: package `@{{ scope }}/{{ name }}` with `dist/` output; `deploy:preview` script (used by Task 6); `tauri-app` (plan 03) relies on scripts `dev` and `build` and on `vite` dev port 5173.
 
-- [ ] **Step 1: Verify cascivo.** Run `npm view @cascivo/react peerDependencies` and read the cascivo docs (`pnpm dlx docspack ask` with `@cascivo/docspack`, or the cascivo README) to confirm the Preact path (prebuilt `@cascivo/react` via `preact/compat`, or the `cascivo` CLI). Record the decision in spec §6.2 in this task's commit. If the packages cannot be installed (private or broken), keep a plain Preact app, put "cascivo package access" under Blocked, and continue.
-- [ ] **Step 2: Write failing tests:**
+- [x] **Step 1: Verify cascivo.** Run `npm view @cascivo/react peerDependencies` and read the cascivo docs (`pnpm dlx docspack ask` with `@cascivo/docspack`, or the cascivo README) to confirm the Preact path (prebuilt `@cascivo/react` via `preact/compat`, or the `cascivo` CLI). Record the decision in spec §6.2 in this task's commit. If the packages cannot be installed (private or broken), keep a plain Preact app, put "cascivo package access" under Blocked, and continue.
+- [x] **Step 2: Write failing tests:**
 
 ```js
 test("piece manifest", ...);   // multiple, target "apps/{{ name }}", name default "web", requires ["base"]
@@ -100,10 +100,10 @@ test("wrangler.jsonc serves dist as an SPA with observability", ...);  // strip 
 test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 lines", ...);
 ```
 
-- [ ] **Step 3: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 4: Write the piece** per spec §6.2. Seed app: one component using a cascivo component and theme, one Vitest test rendering it.
-- [ ] **Step 5: Run `pnpm test` — expect PASS. Dogfood by hand:** render `base preact-app:web`, `pnpm install --no-frozen-lockfile`, `pnpm turbo run lint format:check typecheck test build`, `node scripts/check-single-vite.mjs <dir>` — all pass.
-- [ ] **Step 6: Commit** — `feat(preact-app): Preact app on Vite+ with cascivo`
+- [x] **Step 3: Run `pnpm test` — expect FAIL.**
+- [x] **Step 4: Write the piece** per spec §6.2. Seed app: one component using a cascivo component and theme, one Vitest test rendering it.
+- [x] **Step 5: Run `pnpm test` — expect PASS. Dogfood by hand:** render `base preact-app:web`, `pnpm install --no-frozen-lockfile`, `pnpm turbo run lint format:check typecheck test build`, `node scripts/check-single-vite.mjs <dir>` — all pass.
+- [x] **Step 6: Commit** — `feat(preact-app): Preact app on Vite+ with cascivo`
 
 ---
 
@@ -117,11 +117,11 @@ test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 l
 **Interfaces:**
 - Produces: package `@{{ scope }}/ui` built with `vp pack` (`dist/`), task `storybook:build` (outputs `storybook-static/**`, defined in base `turbo.json`).
 
-- [ ] **Step 1: Write failing tests:** manifest (`multiple = false`, `target = "packages/ui"`); classes (`.storybook/main.ts` owned, `.storybook/preview.ts` seed, stories seed); `main.ts` names framework `@storybook/preact-vite`; scripts include `storybook:build` and `test` is `vp test` (no Storybook browser tests); `build` is `vp pack`.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the piece** per spec §6.3.
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** with `base preact-app:web ui-storybook`: CI tasks pass, `check-single-vite` passes, and `pnpm --filter @hullci/ui storybook:build` succeeds once (off the PR path; proves the override works). Paste any `vite-plus` peer warning into PROGRESS.
-- [ ] **Step 5: Commit** — `feat(ui-storybook): Preact UI package with Storybook 10.6`
+- [x] **Step 1: Write failing tests:** manifest (`multiple = false`, `target = "packages/ui"`); classes (`.storybook/main.ts` owned, `.storybook/preview.ts` seed, stories seed); `main.ts` names framework `@storybook/preact-vite`; scripts include `storybook:build` and `test` is `vp test` (no Storybook browser tests); `build` is `vp pack`.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the piece** per spec §6.3.
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** with `base preact-app:web ui-storybook`: CI tasks pass, `check-single-vite` passes, and `pnpm --filter @hullci/ui storybook:build` succeeds once (off the PR path; proves the override works). Paste any `vite-plus` peer warning into PROGRESS.
+- [x] **Step 5: Commit** — `feat(ui-storybook): Preact UI package with Storybook 10.6`
 
 ---
 
@@ -135,11 +135,11 @@ test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 l
 **Interfaces:**
 - Produces: package `@{{ scope }}/{{ name }}` (`dist/` static output), `deploy:preview` script.
 
-- [ ] **Step 1: Write failing tests:** manifest (name default `site`); `build` is `astro build`, `typecheck` is `tsc --noEmit`, `format:check` excludes `.astro`; `astro.config.mjs` uses `@astrojs/preact` and `output: "static"`; the piece `CLAUDE.md` states that oxlint does not lint `.astro` templates and oxfmt `.astro` support is experimental.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the piece** per spec §6.4. Try `astro check` once with TypeScript 7.0.2; if it works, use it for `typecheck` and update spec §6.4; if not, keep `tsc --noEmit` and note the error in PROGRESS.
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base astro-site:site`: CI tasks pass, `check-single-vite` passes (Astro's own `vite ^8.3.1` resolves to the core alias).
-- [ ] **Step 5: Commit** — `feat(astro-site): Astro 7 static site sharing Vite+ core`
+- [x] **Step 1: Write failing tests:** manifest (name default `site`); `build` is `astro build`, `typecheck` is `tsc --noEmit`, `format:check` excludes `.astro`; `astro.config.mjs` uses `@astrojs/preact` and `output: "static"`; the piece `CLAUDE.md` states that oxlint does not lint `.astro` templates and oxfmt `.astro` support is experimental.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the piece** per spec §6.4. Try `astro check` once with TypeScript 7.0.2; if it works, use it for `typecheck` and update spec §6.4; if not, keep `tsc --noEmit` and note the error in PROGRESS.
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base astro-site:site`: CI tasks pass, `check-single-vite` passes (Astro's own `vite ^8.3.1` resolves to the core alias).
+- [x] **Step 5: Commit** — `feat(astro-site): Astro 7 static site sharing Vite+ core`
 
 ---
 
@@ -156,7 +156,7 @@ test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 l
   - `onErrorHandler(err: Error, c: Context): Response`
   - `withOptionalSentry<E extends { SENTRY_DSN?: string }>(app: Hono<{ Bindings: E }>): ExportedHandler<E>`
 
-- [ ] **Step 1: Write failing tests.** Template-level (`tests/hono-worker.test.mjs`): classes (`src/hull/*.ts` owned, `src/index.ts` seed, `wrangler.jsonc` shared text); wrangler config values from Global Constraints; scripts. Generated `src/hull/logging.test.ts` (Vitest, `app.request()`, spy on `console.log`):
+- [x] **Step 1: Write failing tests.** Template-level (`tests/hono-worker.test.mjs`): classes (`src/hull/*.ts` owned, `src/index.ts` seed, `wrangler.jsonc` shared text); wrangler config values from Global Constraints; scripts. Generated `src/hull/logging.test.ts` (Vitest, `app.request()`, spy on `console.log`):
 
 ```ts
 it("logs one JSON line per request", async () => {
@@ -177,38 +177,39 @@ it("echoes x-request-id", ...);
 it("withOptionalSentry returns the app unchanged when SENTRY_DSN is empty", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` (template-level) — expect FAIL.**
-- [ ] **Step 3: Write the piece** per spec §6.5. `src/index.ts` seed: `requestId()`, `jsonLogger()`, `onError(onErrorHandler)`, a `/` route, `export default withOptionalSentry(app)`. Test app for the logging tests is built inside the test file (routes `/hello`, `/boom`). The OTel/Axiom lines in `wrangler.jsonc` are comments marked "verify against https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/".
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base hono-worker:api`: CI tasks pass, including the generated logging tests; `pnpm --filter @hullci/api build` produces `dist/`.
-- [ ] **Step 5: Commit** — `feat(hono-worker): Hono worker with JSON request logs and optional Sentry`
+- [x] **Step 2: Run `pnpm test` (template-level) — expect FAIL.**
+- [x] **Step 3: Write the piece** per spec §6.5. `src/index.ts` seed: `requestId()`, `jsonLogger()`, `onError(onErrorHandler)`, a `/` route, `export default withOptionalSentry(app)`. Test app for the logging tests is built inside the test file (routes `/hello`, `/boom`). The OTel/Axiom lines in `wrangler.jsonc` are comments marked "verify against https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/".
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood by hand** `base hono-worker:api`: CI tasks pass, including the generated logging tests; `pnpm --filter @hullci/api build` produces `dist/`.
+- [x] **Step 5: Commit** — `feat(hono-worker): Hono worker with JSON request logs and optional Sentry`
 
 ---
 
 ### Task 6: Cloudflare PR preview workflow
 
 **Files:**
-- Create: `template/pieces/base/files/.github/workflows/preview.yml.jinja`
+- Create: `template/pieces/base/files/.github/workflows/preview.yml` (plain, owned; was `.jinja` — changed 2026-10-14 by user decision, contract cannot emit `${{`)
 - Test: `tests/preview.test.mjs`
 
 **Interfaces:**
-- Consumes: `deploy:preview` scripts (Tasks 2, 4, 5), `elifBranches` from `tests/invariants.mjs`
+- Consumes: `deploy:preview` scripts (Tasks 2, 4, 5)
 - Produces: generated `.github/workflows/preview.yml` (spec §8.2)
+- Deviation (user decision 2026-10-14): tests "absent for base only" and "elif branches are identical" become "base-only: every step after detection is guarded by the deploy output"; no same-branches chain.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
-test("absent for base only", ...);
-for (const p of ["preact-app", "astro-site", "hono-worker"]) test(`present with ${p}`, ...);
-test("elif branches are identical", () => assertSameBranches("template/pieces/base/files/.github/workflows/preview.yml.jinja"));
-test("runs deploy:preview --affected with PR_NUMBER and Cloudflare env", ...);
+test("base only: every step after detection is guarded by the deploy output", ...);
+for (const p of ["preact-app", "astro-site", "hono-worker"]) test(`apps/*/wrangler.jsonc matches with ${p}`, ...);
+test("runs deploy:preview --affected with PR_NUMBER and Cloudflare env, shell bash (pipefail)", ...);
+test("turbo passes PR_NUMBER and Cloudflare env through to deploy:preview", ...);
 test("deploy step is skipped without the secret", ...);   // step.if mentions CLOUDFLARE_API_TOKEN != ''
-test("pull_request only, concurrency per PR, contents: read + pull-requests: write", ...);
+test("pull_request only, concurrency per PR, contents: read", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the workflow** per spec §8.2, as an `if/elif` chain marked `{# same-branches #}`. Put the secret into job `env` so the step `if` can test `env.CLOUDFLARE_API_TOKEN != ''`. Preview URLs: grep wrangler output for `https://` and append to `$GITHUB_STEP_SUMMARY`.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.** A real preview run needs a Cloudflare account and token: put "Cloudflare preview smoke test" under Blocked with the exact secrets needed.
-- [ ] **Step 5: Commit** — `feat(base): Cloudflare PR previews for deployable pieces`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the workflow** per spec §8.2 as a plain owned file with a detection step (`apps/*/wrangler.jsonc`) guarding every later step. Put the secret into job `env` so the step `if` can test `env.CLOUDFLARE_API_TOKEN != ''`. Preview URLs: grep wrangler output for `*.workers.dev` URLs and append to `$GITHUB_STEP_SUMMARY`. `deploy:preview`/`deploy` in base `turbo.json` declare `passThroughEnv`.
+- [x] **Step 4: Run `pnpm test` — expect PASS.** A real preview run needs a Cloudflare account and token: put "Cloudflare preview smoke test" under Blocked with the exact secrets needed.
+- [x] **Step 5: Commit** — `feat(base): Cloudflare PR previews for deployable pieces`
 
 ---
 
@@ -222,12 +223,12 @@ test("pull_request only, concurrency per PR, contents: read + pull-requests: wri
 - Consumes: `dogfood`, `checkSingleVite`
 - Produces: final combo names `base`, `web`, `site` used by plan 03.
 
-- [ ] **Step 1: Write failing tests:** `affectedCombos(["template/pieces/hono-worker/files/x"])` → `["web"]`; `astro-site` → `["site"]`; every combo in `combos.json` renders without error (fast: render only); dogfood calls the single-vite check for `web` and `site` but not `base` (inject a fake runner).
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement.** Inject the command runner into `dogfood()` (`opts.run?: (cmd, args, cwd) => Promise<number>`) so tests do not spawn pnpm.
-- [ ] **Step 4: Measure:** `node scripts/dogfood.mjs --combo base --combo web --combo site` twice (cold, then warm with the same `--cache-dir`). Record both times per combo in PROGRESS. Keep sequential unless warm total > 180 s and a matrix would halve it (spec §10.2); if switching, update spec §10.2 in this commit.
-- [ ] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
-- [ ] **Step 6: Commit** — `ci: dogfood web and site combos`
+- [x] **Step 1: Write failing tests:** `affectedCombos(["template/pieces/hono-worker/files/x"])` → `["web"]`; `astro-site` → `["site"]`; every combo in `combos.json` renders without error (fast: render only); dogfood calls the single-vite check for `web` and `site` but not `base` (inject a fake runner).
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement.** Inject the command runner into `dogfood()` (`opts.run?: (cmd, args, cwd) => Promise<number>`) so tests do not spawn pnpm.
+- [x] **Step 4: Measure:** `node scripts/dogfood.mjs --combo base --combo web --combo site` twice (cold, then warm with the same `--cache-dir`). Record both times per combo in PROGRESS. Keep sequential unless warm total > 180 s and a matrix would halve it (spec §10.2); if switching, update spec §10.2 in this commit.
+- [x] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
+- [x] **Step 6: Commit** — `ci: dogfood web and site combos`
 
 ---
 
