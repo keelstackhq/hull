@@ -71,6 +71,17 @@ test("workspace catalog pins the cascivo Preact path", async () => {
   assert.deepEqual(ts.compilerOptions.paths.react, ["./node_modules/preact/compat"]);
 });
 
+test("preact-app depends on the UI package only when ui-storybook is present", async () => {
+  const withUi = await renderCombo(["base", "preact-app", "ui-storybook"], { scope: "acme" });
+  const pkg = JSON.parse(await read(withUi.dir, "apps/web/package.json"));
+  assert.equal(pkg.dependencies["@acme/ui"], "workspace:*");
+  assert.match(await read(withUi.dir, "apps/web/CLAUDE.md"), /@acme\/ui/);
+  const without = await renderCombo(["base", "preact-app"], { scope: "acme" });
+  const pkg2 = JSON.parse(await read(without.dir, "apps/web/package.json"));
+  assert.equal(pkg2.dependencies["@acme/ui"], undefined);
+  assert.ok(!/@acme\/ui/.test(await read(without.dir, "apps/web/CLAUDE.md")));
+});
+
 test("wrangler.jsonc serves dist as an SPA with observability", async () => {
   const { dir } = await renderCombo(["base", "preact-app:admin"]);
   const text = (await read(dir, "apps/admin/wrangler.jsonc"))

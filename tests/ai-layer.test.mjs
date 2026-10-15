@@ -46,6 +46,16 @@ function frontmatter(text) {
 
 const agentFm = async (dir, name) => frontmatter(await read(dir, `.claude/agents/${name}.md`));
 
+test("piece bullets sit under a Pieces heading and no blank lines between items", async () => {
+  const { dir } = await renderCombo(["base", "preact-app", "ui-storybook", "astro-site:site"]);
+  const text = await read(dir, "CLAUDE.md");
+  assert.match(
+    text,
+    /\n## Pieces\n\n- `apps\/\*` \(preact-app\)[^\n]*\n- `packages\/ui`[^\n]*\n- `apps\/\*` \(astro-site\)[^\n]*\n\n## /,
+  );
+  assert.ok(!/## Pieces/.test(await read((await renderCombo(["base"])).dir, "CLAUDE.md")));
+});
+
 test("CLAUDE.md ≤ 80 lines and imports project notes", async () => {
   for (const pieces of [["base"], ["base", "docs"]]) {
     const { dir } = pieces.includes("docs") ? await renderWithDocs() : await renderCombo(pieces);

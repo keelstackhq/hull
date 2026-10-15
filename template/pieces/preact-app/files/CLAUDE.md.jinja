@@ -8,4 +8,5 @@ Preact client app on Vite+, deployed as Cloudflare static assets (`wrangler.json
 - Import a theme once in `src/main.tsx` (`@cascivo/themes/light-dark.css`); component CSS is automatic.
 - Tests: `vp test run` with `happy-dom`; `vite.config.ts` inlines `@cascivo/*` so the alias applies.
 - `pnpm dev` serves on port 5173; `pnpm build` writes `dist/`.
-- Preview deploy: `pnpm deploy:preview` with `PR_NUMBER` set.
+{% if "ui-storybook" in pieces %}- Shared components: import from `@{{ scope }}/ui` (`workspace:*`, built by `vp pack`; turbo builds it first).
+{% endif %}- Preview deploy: `pnpm deploy:preview` with `PR_NUMBER` set.

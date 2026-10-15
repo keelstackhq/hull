@@ -84,6 +84,12 @@ test("turbo passes deploy env through for deploy tasks", async () => {
   }
 });
 
+test("deploy tasks depend on build (a CI checkout has no dist/)", async () => {
+  const turbo = JSON.parse(await readFile(join(base.dir, "turbo.json"), "utf8"));
+  for (const t of ["deploy:preview", "deploy"])
+    assert.deepEqual(turbo.tasks[t].dependsOn, ["build"]);
+});
+
 // Expand `apps/*/wrangler.jsonc` against a rendered dir.
 async function globWrangler(dir) {
   const out = [];

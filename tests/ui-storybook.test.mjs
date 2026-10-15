@@ -57,11 +57,18 @@ test("exports, files and peer dependencies", async () => {
   assert.equal(pkg.exports["."].default, "./dist/index.mjs");
   assert.equal(pkg.exports["."].types, "./dist/index.d.mts");
   assert.deepEqual(pkg.files, ["dist"]);
-  for (const k of ["preact", "@cascivo/react", "@cascivo/themes"]) {
+  for (const k of ["preact", "@cascivo/react", "@cascivo/themes", "@preact/signals-react"]) {
     assert.equal(pkg.peerDependencies[k], "catalog:", k);
     assert.equal(pkg.devDependencies[k], "catalog:", k);
     assert.ok(!(k in (pkg.dependencies ?? {})), k);
   }
+});
+
+test("vite.config.ts uses deps.neverBundle, not the deprecated external", async () => {
+  const { dir } = await renderCombo(["base", "ui-storybook"]);
+  const text = await read(dir, "packages/ui/vite.config.ts");
+  assert.match(text, /neverBundle/);
+  assert.ok(!/\bexternal\b/.test(text.replace(/\/\/.*$/gm, "")));
 });
 
 test("storybook:build is off the PR path and cached by turbo", async () => {

@@ -57,6 +57,7 @@ test("scripts, name and catalog deps", async () => {
   assert.equal(pkg.scripts.typecheck, "tsc --noEmit");
   assert.equal(pkg.scripts.dev, "wrangler dev");
   assert.equal(pkg.scripts.deploy, "wrangler deploy");
+  assert.equal(pkg.scripts.test, "vp test run");
   assert.equal(
     pkg.scripts["deploy:preview"],
     "wrangler versions upload --preview-alias pr-$PR_NUMBER",

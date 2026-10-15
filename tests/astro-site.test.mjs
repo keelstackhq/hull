@@ -42,9 +42,20 @@ test("scripts, name and catalog deps", async () => {
   assert.equal(pkg.scripts.dev, "astro dev");
   assert.ok(pkg.scripts["deploy:preview"]);
   assert.match(pkg.scripts["format:check"], /^vp fmt --check/);
-  assert.ok(pkg.scripts["format:check"].includes("'!**/*.astro'"));
+  assert.equal(pkg.scripts["format:check"], "vp fmt --check");
+  assert.equal(pkg.scripts.test, "vp test run");
   for (const v of Object.values({ ...pkg.dependencies, ...pkg.devDependencies }))
     assert.equal(v, "catalog:");
+});
+
+test("root vite.config.ts keeps package.json key order (scope-dependent sort position)", async () => {
+  const { dir } = await renderCombo(["base"]);
+  assert.match(await read(dir, "vite.config.ts"), /sortPackageJson: false/);
+});
+
+test("root vite.config.ts makes fmt skip .astro files", async () => {
+  const { dir } = await renderCombo(["base", "astro-site:site"]);
+  assert.match(await read(dir, "vite.config.ts"), /"\*\*\/\*\.astro"/);
 });
 
 test("astro.config.mjs uses the Preact integration and static output", async () => {

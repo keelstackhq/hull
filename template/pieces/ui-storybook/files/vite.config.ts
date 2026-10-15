@@ -8,7 +8,7 @@ export default defineConfig({
     dts: true,
     format: ["esm"],
     // The package ships source-level Preact components; consumers bring preact and cascivo.
-    external: [/^@cascivo\//, /^preact/, "react", "react-dom"],
+    deps: { neverBundle: [/^@cascivo\//, /^preact/, "react", "react-dom"] },
   },
   test: {
     environment: "happy-dom",

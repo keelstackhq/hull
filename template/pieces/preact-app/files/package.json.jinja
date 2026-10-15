@@ -15,7 +15,8 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@cascivo/react": "catalog:",
+{% if "ui-storybook" in pieces %}    "@{{ scope }}/ui": "workspace:*",
+{% endif %}    "@cascivo/react": "catalog:",
     "@cascivo/themes": "catalog:",
     "@preact/signals-react": "catalog:",
     "preact": "catalog:"

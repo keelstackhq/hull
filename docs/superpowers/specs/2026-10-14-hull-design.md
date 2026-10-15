@@ -167,18 +167,22 @@ Root files (class in brackets):
   `peerDependencyRules.allowedVersions: { "storybook>vite-plus": "1" }` (§7.2);
   `allowBuilds: { esbuild: true, workerd: true, sharp: true }` (pnpm 11 replaced
   `onlyBuiltDependencies`, which pnpm 12 silently ignores); `minimumReleaseAge: 4320` (minutes,
-  strict when set); `minimumReleaseAgeExclude` lists catalog pins younger than 3 days at render
-  time (turbo 2.11.8 today), each with a comment to drop it once the pin has aged. Checked against
-  pnpm 12.11.2 on 2026-10-14.
+  strict when set); `minimumReleaseAgeExclude` lists only exact `name@version` entries (pnpm 12
+  supports them) for pins, and their resolved transitive packages, younger than 3 days at render
+  time, so a rendered repo never bypasses the gate for later versions; each entry is dropped once
+  it has aged. `peerDependencyRules.allowedVersions.vite: "1"` accepts the override's vite-plus-core
+  for vitest/preset-vite/Storybook peers (`check-single-vite` still guards against a real second
+  vite). Checked against pnpm 12.11.2 on 2026-10-14/15.
 - `turbo.json` [shared, json]: tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
-  `deploy:preview` and `deploy` (no cache), `storybook:build` (outputs `storybook-static/**`),
+  `deploy:preview` and `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv` §8.2), `storybook:build` (outputs `storybook-static/**`),
   `build:desktop` (no cache). No `vp run` cache anywhere (Turbo caches, §7.1).
 - `tsconfig.base.json` [owned]: strict, `module: preserve`, `moduleResolution: bundler`,
   `jsx: react-jsx`, `jsxImportSource: preact`, `noEmit`, `verbatimModuleSyntax`, `isolatedModules`.
 - `vite.config.ts` [owned]: root Vite+ config holding the shared `lint` and `fmt` options
   (oxlint categories `correctness` + `suspicious` as errors; ignore `dist`, `.astro`,
-  `storybook-static`, `target`). Vite+ 1.1.0 does not apply nested configs for lint/fmt: `vp lint`
+  `storybook-static`, `target`, `**/*.astro`; `fmt.sortPackageJson: false`, because a piece's
+  `@<scope>/…` dependency would sort differently per scope). Vite+ 1.1.0 does not apply nested configs for lint/fmt: `vp lint`
   and `vp fmt` read the root config even when run from a package, so package `vite.config.ts`
   files hold only `pack`/`test` options. Root `vite.config.ts` and `tsconfig.base.json` are turbo
   `globalDependencies`, and a root `//#format:check` task checks root files (checked 2026-10-14).
@@ -204,7 +208,8 @@ Root files (class in brackets):
 `package.json.jinja` [shared, json] scripts: `dev` `vp dev`, `build` `vp build`, `lint` `vp lint`,
 `format:check` `vp fmt --check`, `typecheck` `tsc --noEmit`, `test` `vp test run`, `preview` `vp preview`,
 `deploy:preview` `wrangler versions upload --preview-alias pr-$PR_NUMBER`, `deploy` `wrangler deploy`.
-Dependencies: `preact`, cascivo (below); dev: `@preact/preset-vite`, `vite-plus`, `typescript`,
+Dependencies: `preact`, cascivo (below), and `@<scope>/ui` (`workspace:*`) when `ui-storybook` is
+present, so turbo sees the ui → app edge; dev: `@preact/preset-vite`, `vite-plus`, `typescript`,
 `wrangler`. `vite.config.ts` [owned] with `@preact/preset-vite`; `tsconfig.json` [owned] extends
 `../../tsconfig.base.json`; `wrangler.jsonc` [shared, text]: static assets from `./dist`,
 `not_found_handling: "single-page-application"`, `observability.enabled: true`;
@@ -238,8 +243,8 @@ Astro 7 static site with `@astrojs/preact`. Scripts: `dev` `astro dev`, `build` 
 `lint` `vp lint` (TS/TSX only — oxlint does not lint `.astro` templates), `format:check`
 `vp fmt --check` (`.astro` excluded; oxfmt's `.astro` support is experimental and needs
 `@astrojs/compiler-rs`, so it stays off in v1), `typecheck` `tsc --noEmit` (`astro check` needs the
-TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test
---passWithNoTests`, `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
+TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test run`
+(the same in every piece), `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
 `wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `CLAUDE.md` [owned].
 Astro runs through package scripts (`vp run` would add a second cache; not used).
 
@@ -342,7 +347,8 @@ files.
 
 - `CLAUDE.md.jinja` ≤ 80 rendered lines for every combo: what the repo is, commands (`pnpm check`,
   `pnpm run ci`; `pnpm ci` is pnpm's built-in clean install), rules (test first, verify before claiming, small files), the subagent routing table,
-  one line per present piece kind (`{% if "hono-worker" in pieces %}`), `@docs/agents/project.md`,
+  a `## Pieces` section (rendered only when a piece is present, via a `same-branches` chain) with one
+  bullet per present piece kind (`{% if "hono-worker" in pieces %}`), `@docs/agents/project.md`,
   and `@docs/agents/docs.md` when docs is present. Per-instance notes are `<target>/CLAUDE.md`
   (loaded on demand; §4.3.3). `AGENTS.md`: one line pointing to `CLAUDE.md`.
 - `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`):
@@ -507,7 +513,8 @@ pnpm store cache. No template option in v1.
 verify): `config:recommended`, `helpers:pinGitHubActionDigests`, `rangeStrategy: pin`,
 `minimumReleaseAge: "3 days"`, groups `vite-plus` (`vite-plus` + `@voidzero-dev/vite-plus-core`,
 which must move together), `storybook`, `astro`, `tauri`, `cloudflare` (wrangler + workers-types),
-`turbo`; automerge for minor/patch and digests with `platformAutomerge`; weekly
+`turbo`, `react` (react + react-dom), `cascivo` (`@cascivo/*`), `sentry` (`@sentry/*`), `preact`
+(preact + `@preact/*`); automerge for minor/patch and digests with `platformAutomerge`; weekly
 `lockFileMaintenance`. Open question: once `splice update` runs as a bot, template-managed catalog
 entries move to `ignoreDeps` so Renovate and the template do not both bump them.
 

@@ -126,6 +126,17 @@ test("renovate preset groups vite-plus with vite-plus-core", async () => {
   assert.deepEqual(p.lockFileMaintenance.schedule, ["before 5am on monday"]);
 });
 
+test("renovate preset groups react, cascivo, sentry and preact", async () => {
+  const p = JSON.parse(
+    await readFile(new URL("../renovate/default.json", import.meta.url), "utf8"),
+  );
+  const names = (g) => p.packageRules.find((r) => r.groupName === g)?.matchPackageNames;
+  assert.deepEqual(names("react"), ["react", "react-dom"]);
+  assert.deepEqual(names("cascivo"), ["@cascivo/**"]);
+  assert.deepEqual(names("sentry"), ["@sentry/**"]);
+  assert.deepEqual(names("preact"), ["preact", "@preact/**"]);
+});
+
 test("preset has a custom manager for the workflow turbo pin", async () => {
   const p = JSON.parse(
     await readFile(new URL("../renovate/default.json", import.meta.url), "utf8"),

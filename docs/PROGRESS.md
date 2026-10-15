@@ -21,6 +21,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · 02/5 · `feat(hono-worker): Hono worker with JSON request logs and optional Sentry` · 251/251 tests, lint+fmt clean; base+hono-worker:api → turbo 11/11 tasks (16 generated api tests), build writes dist/. Security: request line never reads query/headers/body; error line logs err.name + stack frames only; HTTPException passes through; Sentry scrubbed (query, headers, cookies, body, breadcrumbs, exception messages); leak/401/scrub tests proven red. `@cloudflare/workers-types`, `@sentry/*` in minimumReleaseAgeExclude.
 - 2026-10-14 · 02/6 · `feat(base): Cloudflare PR previews for deployable pieces` · 263/263 tests, lint+fmt clean; base+hono-worker:api → turbo 11/11; `turbo run deploy:preview --dry=json` resolves passThroughEnv PR_NUMBER/CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID. preview.yml is a plain owned file with a runtime detect step (user decision: contract cannot emit `${{`); deploy skipped without the secret; shell bash (pipefail).
 - 2026-10-15 · 02/7 · `ci: dogfood web and site combos` · 267/267 tests, lint+fmt clean; dogfood base/web/site cold 10.3/21.2/10.8 s (orchestrator run; implementer run 2.2/13.4/8.4 s), warm 0.8/2.0/1.7 s; single-vite ok for web and site. Decision: stay sequential (warm total ≈ 5 s ≪ 180 s, spec §10.2).
+- 2026-10-15 · Milestone 2 reviewed · `fix: milestone 2 review findings` · 274/274 tests, lint+fmt clean; dogfood base 2.2 s, web 11.4 s, site 4.9 s, single-vite ok. Fixed: deploy tasks dependsOn build (static previews were broken); preact-app depends on @scope/ui when present; release-age excludes are exact name@version only; Renovate groups react/cascivo/sentry/preact; `## Pieces` in CLAUDE.md; `vite` peer rule; `vp test run` everywhere; fmt.sortPackageJson false.
 
 ## Measurements
 
@@ -36,11 +37,10 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
 
-- Time-gated (no human needed): after 2026-10-17 drop `wrangler`, `miniflare`, `workerd`, `@cloudflare/workerd-*` (and after 2026-10-15 `storybook`, `@storybook/*`, `@sentry/*`; after 2026-10-17 `@cloudflare/workers-types`) from `minimumReleaseAgeExclude` (base `pnpm-workspace.yaml`) and the matching test assertion.
 
 - Contract gap (keelstack/splice + hull, same week): the subset cannot emit `${{ … }}` from a `.jinja` file. Action: agree a contract §4 addition (proposed `{% raw %}…{% endraw %}`) in both repos' `docs/template-format.md`. Until then `ci.yml` is a plain owned file; plan 02 Task 6 (`preview.yml`) and plan 03 (`desktop.yml`, Rust steps in `ci.yml`) must use runtime guards (`hashFiles(...)`) or wait for the addition.
 
-- Time-gated (no human needed): after 2026-10-16 drop `turbo`/`@turbo/*` from `minimumReleaseAgeExclude` in `template/pieces/base/files/pnpm-workspace.yaml` and the matching assertion in `tests/base.test.mjs` (turbo 2.11.8 published 2026-10-13).
+- Time-gated (no human needed): drop each exact `name@version` entry from `minimumReleaseAgeExclude` in base `pnpm-workspace.yaml` (and the matching assertion in `tests/base.test.mjs`) once it is 3 days old: turbo/@turbo/* after 2026-10-16, storybook/@storybook/* and @sentry/* after 2026-10-15 ~18:30Z, wrangler/miniflare/@cloudflare/workers-types after 2026-10-17. Exact versions mean old renders never bypass the gate for newer versions.
 
 <!-- Task, what is missing, exact action a human (or the upstream repo) must take. Known in advance:
 - plan 03 Task 6: keelstack/hoard@v1 not released.
