@@ -1,35 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { renderNew } from "../scripts/render.mjs";
 import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
-/**
- * The real `docs` piece lands in plan 03; until then render with a stub piece of that id so the
- * `"docs" in pieces` branches are exercised.
- */
-async function renderWithDocs() {
-  const root = await mkdtemp(join(tmpdir(), "hull-ai-"));
-  const template = join(root, "template");
-  await cp(REAL_TEMPLATE, template, { recursive: true });
-  if (!existsSync(join(template, "pieces/docs"))) {
-    await mkdir(join(template, "pieces/docs/files"), { recursive: true });
-    await writeFile(
-      join(template, "pieces/docs/piece.toml"),
-      'id = "docs"\ndescription = "stub"\n',
-    );
-    await writeFile(join(template, "pieces/docs/files/stub.txt"), "stub\n");
-  }
-  const out = join(root, "out");
-  await renderNew({ template, out, pieces: ["base", "docs"], vars: {} });
-  return { dir: out };
-}
-
 const AGENTS = ["explorer", "implementer", "reviewer", "ci-fixer"];
 
 /** Parse flat `key: value` frontmatter. */
@@ -58,7 +36,7 @@ test("piece bullets sit under a Pieces heading and no blank lines between items"
 
 test("CLAUDE.md ≤ 80 lines and imports project notes", async () => {
   for (const pieces of [["base"], ["base", "docs"]]) {
-    const { dir } = pieces.includes("docs") ? await renderWithDocs() : await renderCombo(pieces);
+    const { dir } = await renderCombo(pieces);
     const text = await read(dir, "CLAUDE.md");
     assert.ok(text.split("\n").length <= 80, `${pieces} has ${text.split("\n").length} lines`);
     assert.match(text, /^@docs\/agents\/project\.md$/m);
@@ -121,7 +99,7 @@ test("settings.json is valid and wires hooks", async () => {
 test("docs-lookup skill absent without docs piece", async () => {
   const without = await renderCombo(["base"]);
   assert.ok(!existsSync(join(without.dir, ".claude/skills/docs-lookup/SKILL.md")));
-  const withDocs = await renderWithDocs();
+  const withDocs = await renderCombo(["base", "docs"]);
   const fm = frontmatter(await read(withDocs.dir, ".claude/skills/docs-lookup/SKILL.md"));
   assert.equal(fm.name, "docs-lookup");
 });
@@ -185,7 +163,7 @@ test("statusline prints model, context and cost from stdin JSON", async () => {
 });
 
 test("skills have name and description frontmatter", async () => {
-  const { dir } = await renderWithDocs();
+  const { dir } = await renderCombo(["base", "docs"]);
   for (const s of ["verify", "add-piece", "docs-lookup"]) {
     const fm = frontmatter(await read(dir, `.claude/skills/${s}/SKILL.md`));
     assert.equal(fm.name, s);
@@ -209,7 +187,7 @@ test("no template file runs `pnpm ci` (pnpm's built-in clean install)", async ()
 });
 
 test("rendered CLAUDE.md has no consecutive blank lines", async () => {
-  for (const r of [await renderCombo(["base"]), await renderWithDocs()]) {
+  for (const r of [await renderCombo(["base"]), await renderCombo(["base", "docs"])]) {
     assert.ok(!/\n\n\n/.test(await read(r.dir, "CLAUDE.md")));
   }
 });

@@ -110,7 +110,7 @@ test("rust decision: affected packages with Cargo.toml → true", ...); // unit 
 **Interfaces:**
 - Produces: `docs/packs.json` (spec §6.8 shape); in the generated repo, `docsPacksReport(packs, installed: Set<string>): { tool, package, state: "installed"|"missing"|"unpublished" }[]` exported from `scripts/docs-packs.mjs`.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("packs.json shape", ...);  // version 1; every pack has package + source ∈ {vendor, community}; community has build xor recipe
@@ -126,10 +126,10 @@ test("session-start skips docspack when not installed", ...);
 test("every recipe folder named in packs.json exists in community-packs/", ...);
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.8. `unpublished` is decided only with `--online` (`npm view <pkg> version`); offline the script reports `missing`. Build the vite-plus recipe locally once with `pnpm dlx docspack@1.5.0 build --from <vite-plus docs checkout>` and `docspack doctor`; publishing `@docspack-community/*` goes under Blocked (needs the npm scope and an owner).
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `--combo docs`; in the rendered dir `pnpm docs:sync` and `pnpm exec docspack ask "turbo affected" --json` return JSON (exit 0, 3 or 4 are all acceptable; paste which).
-- [ ] **Step 5: Commit** — `feat(docs): docspack piece with packs manifest and community recipes`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.8. `unpublished` is decided only with `--online` (`npm view <pkg> version`); offline the script reports `missing`. Build the vite-plus recipe locally once with `pnpm dlx docspack@1.5.0 build --from <vite-plus docs checkout>` and `docspack doctor`; publishing `@docspack-community/*` goes under Blocked (needs the npm scope and an owner).
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `--combo docs`; in the rendered dir `pnpm docs:sync` and `pnpm exec docspack ask "turbo affected" --json` return JSON (exit 0, 3 or 4 are all acceptable; paste which).
+- [x] **Step 5: Commit** — `feat(docs): docspack piece with packs manifest and community recipes`
 
 ---
 
