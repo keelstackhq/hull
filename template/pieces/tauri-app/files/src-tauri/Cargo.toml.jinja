@@ -1,0 +1,15 @@
+[package]
+name = "{{ name }}"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.4", features = [] }

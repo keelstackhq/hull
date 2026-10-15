@@ -1,7 +1,7 @@
-{# same-branches #}{% if "rust-tool" in pieces %}[toolchain]
+{% if "rust-tool" in pieces %}[toolchain]
 channel = "stable"
 components = ["clippy", "rustfmt"]
 {% elif "tauri-app" in pieces %}[toolchain]
 channel = "stable"
-components = ["clippy", "rustfmt"]
+components = ["rustfmt"]
 {% endif %}

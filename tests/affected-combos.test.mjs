@@ -41,11 +41,11 @@ test("other template/ files select all", () =>
   assert.deepEqual(affectedCombos(["template/README.md"], combos), ["base", "web"]));
 
 const cli = fileURLToPath(new URL("../scripts/affected-combos.mjs", import.meta.url));
-const names = JSON.parse(
-  readFileSync(new URL("../scripts/combos.json", import.meta.url), "utf8"),
-).combos.map((c) => c.name);
+const names = JSON.parse(readFileSync(new URL("../scripts/combos.json", import.meta.url), "utf8"))
+  .combos.filter((c) => !c.scheduled)
+  .map((c) => c.name);
 
-test("CLI --all prints every combo", () => {
+test("CLI --all prints every non-scheduled combo", () => {
   const out = execFileSync("node", [cli, "--all"], { encoding: "utf8" });
   assert.deepEqual(JSON.parse(out), names);
 });
@@ -55,6 +55,19 @@ test("CLI with an unknown base warns and prints every combo", () => {
   assert.equal(r.status, 0);
   assert.deepEqual(JSON.parse(r.stdout), names);
   assert.match(r.stderr, /warning/);
+});
+
+test("scheduled combos are never selected, even for base or all-changing files", () => {
+  const withScheduled = [
+    ...combos,
+    { name: "heavy", pieces: ["base", "tauri-app"], scheduled: true },
+  ];
+  assert.deepEqual(affectedCombos(["template/pieces/tauri-app/files/x"], withScheduled), []);
+  assert.deepEqual(affectedCombos(["template/pieces/base/files/x"], withScheduled), [
+    "base",
+    "web",
+  ]);
+  assert.deepEqual(affectedCombos(["scripts/render.mjs"], withScheduled), ["base", "web"]);
 });
 
 test("real combos: hono-worker selects web, astro-site selects site", () => {
@@ -67,10 +80,10 @@ test("real combos: hono-worker selects web, astro-site selects site", () => {
   assert.deepEqual(affectedCombos(["template/pieces/ui-storybook/files/x"], real), ["web"]);
   assert.deepEqual(
     affectedCombos(["template/pieces/base/files/x"], real),
-    real.map((c) => c.name),
+    real.filter((c) => !c.scheduled).map((c) => c.name),
   );
   assert.deepEqual(
     affectedCombos(["scripts/check-single-vite.mjs"], real),
-    real.map((c) => c.name),
+    real.filter((c) => !c.scheduled).map((c) => c.name),
   );
 });

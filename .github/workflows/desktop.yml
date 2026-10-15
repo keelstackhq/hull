@@ -1,0 +1,40 @@
+name: desktop
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Render the desktop combo
+        run: |
+          args=$(node -e 'const { vars, combos } = JSON.parse(require("fs").readFileSync("scripts/combos.json", "utf8")); const c = combos.find((x) => x.name === "desktop"); process.stdout.write([...c.pieces.map((p) => "--piece " + p), ...Object.entries(vars).map(([k, v]) => "--data " + k + "=" + v)].join(" "))')
+          node scripts/render.mjs new --template template --out "$RUNNER_TEMP/desktop" $args
+      - name: Install Tauri system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install generated repo
+        working-directory: ${{ runner.temp }}/desktop
+        run: |
+          git init -q
+          pnpm install --no-frozen-lockfile
+      - name: Build desktop
+        working-directory: ${{ runner.temp }}/desktop
+        run: pnpm turbo run build:desktop

@@ -29,7 +29,6 @@ test("piece manifest", async () => {
 test("root Cargo.toml only with a Rust piece; branches identical", async () => {
   const root = join(REAL_TEMPLATE, "pieces/base/files");
   assertSameBranches(join(root, "Cargo.toml.jinja"));
-  assertSameBranches(join(root, "rust-toolchain.toml.jinja"));
   const without = await renderCombo(["base"]);
   for (const f of ["Cargo.toml", "rust-toolchain.toml", ".github/scripts/rust-affected.mjs"]) {
     assert.ok(!piece(without).includes(f), f);

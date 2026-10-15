@@ -24,7 +24,7 @@
     },
     { "groupName": "storybook", "matchPackageNames": ["storybook", "@storybook/**"] },
     { "groupName": "astro", "matchPackageNames": ["astro", "@astrojs/**"] },
-    { "groupName": "tauri", "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build"] },
+    { "groupName": "tauri", "matchManagers": ["npm", "cargo"], "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build"] },
     { "groupName": "cloudflare", "matchPackageNames": ["wrangler", "@cloudflare/workers-types"] },
     { "groupName": "react", "matchPackageNames": ["react", "react-dom"] },
     { "groupName": "cascivo", "matchPackageNames": ["@cascivo/**"] },

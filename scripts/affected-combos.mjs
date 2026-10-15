@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-/** @typedef {{ name: string, pieces: string[] }} Combo */
+/** @typedef {{ name: string, pieces: string[], scheduled?: boolean }} Combo */
 
 const ALL_EXACT = new Set([
   "template/splice.toml",
@@ -20,13 +20,14 @@ const ALL_EXACT = new Set([
 ]);
 
 /**
- * Which combos a diff touches (spec §10.2).
+ * Which combos a diff touches (spec §10.2). `scheduled` combos (heavy, e.g. the Tauri build) are
+ * never selected: they run in their own workflow.
  * @param {string[]} changed repo-relative paths
  * @param {Combo[]} combos
  * @returns {string[]} combo names
  */
 export function affectedCombos(changed, combos) {
-  const all = combos.map((c) => c.name);
+  const all = combos.filter((c) => !c.scheduled).map((c) => c.name);
   const hit = new Set();
   for (const f of changed) {
     if (ALL_EXACT.has(f) || f.startsWith("scripts/lib/") || f.startsWith(".github/workflows/"))
@@ -35,7 +36,7 @@ export function affectedCombos(changed, combos) {
     if (m) {
       if (m[1] === "base") return all;
       for (const c of combos) {
-        if (c.pieces.some((p) => p.split(":")[0] === m[1])) hit.add(c.name);
+        if (!c.scheduled && c.pieces.some((p) => p.split(":")[0] === m[1])) hit.add(c.name);
       }
     } else if (f.startsWith("template/")) {
       return all;
@@ -53,7 +54,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exit(2);
   }
   const { combos } = JSON.parse(readFileSync(new URL("./combos.json", import.meta.url), "utf8"));
-  const everything = combos.map((c) => c.name);
+  const everything = combos.filter((c) => !c.scheduled).map((c) => c.name);
   let list = everything;
   if (!values.all) {
     try {

@@ -92,11 +92,11 @@ test("rust decision: affected packages with Cargo.toml → true", ...); // unit 
 - Consumes: preact-app scripts `dev`/`build`, dev port 5173 (plan 02 Task 2); root `Cargo.toml` (Task 1)
 - Produces: scripts `tauri`, `build:desktop`, `format:check`; combo `desktop`.
 
-- [ ] **Step 1: Write failing tests:** manifest (`requires = ["base", "preact-app"]`, vars `name` default `desktop`, `frontend` default `web`); `tauri.conf.json` build commands and `frontendDist` per spec §6.7 with `frontend=admin`; icons copied byte-identical (sha256 equal to the template file); no `lint`/`test`/`build` scripts; `desktop.yml` present only with tauri-app, triggers `workflow_dispatch` + `schedule`, installs the four apt packages; `affectedCombos([...all files])` never returns `desktop`.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.7 and §8.3; hull's `desktop.yml` renders `desktop`, installs apt deps + Rust, runs the generated `pnpm turbo run build:desktop`.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.** If the machine has webkit2gtk, run `node scripts/dogfood.mjs --combo desktop` and then `pnpm turbo run build:desktop` in the rendered dir; otherwise record "desktop build verified only on GitHub" under Blocked (needs the repo to run `desktop.yml` once).
-- [ ] **Step 5: Commit** — `feat(tauri-app): Tauri v2 shell with scheduled desktop builds`
+- [x] **Step 1: Write failing tests:** manifest (`requires = ["base", "preact-app"]`, vars `name` default `desktop`, `frontend` default `web`); `tauri.conf.json` build commands and `frontendDist` per spec §6.7 with `frontend=admin`; icons copied byte-identical (sha256 equal to the template file); no `lint`/`test`/`build` scripts; `desktop.yml` present only with tauri-app, triggers `workflow_dispatch` + `schedule`, installs the four apt packages; `affectedCombos([...all files])` never returns `desktop`.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.7 and §8.3; hull's `desktop.yml` renders `desktop`, installs apt deps + Rust, runs the generated `pnpm turbo run build:desktop`.
+- [x] **Step 4: Run `pnpm test` — expect PASS.** If the machine has webkit2gtk, run `node scripts/dogfood.mjs --combo desktop` and then `pnpm turbo run build:desktop` in the rendered dir; otherwise record "desktop build verified only on GitHub" under Blocked (needs the repo to run `desktop.yml` once).
+- [x] **Step 5: Commit** — `feat(tauri-app): Tauri v2 shell with scheduled desktop builds`
 
 ---
 

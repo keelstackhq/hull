@@ -23,6 +23,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-15 · 02/7 · `ci: dogfood web and site combos` · 267/267 tests, lint+fmt clean; dogfood base/web/site cold 10.3/21.2/10.8 s (orchestrator run; implementer run 2.2/13.4/8.4 s), warm 0.8/2.0/1.7 s; single-vite ok for web and site. Decision: stay sequential (warm total ≈ 5 s ≪ 180 s, spec §10.2).
 - 2026-10-15 · Milestone 2 reviewed · `fix: milestone 2 review findings` · 274/274 tests, lint+fmt clean; dogfood base 2.2 s, web 11.4 s, site 4.9 s, single-vite ok. Fixed: deploy tasks dependsOn build (static previews were broken); preact-app depends on @scope/ui when present; release-age excludes are exact name@version only; Renovate groups react/cascivo/sentry/preact; `## Pieces` in CLAUDE.md; `vite` peer rule; `vp test run` everywhere; fmt.sortPackageJson false.
 - 2026-10-15 · 03/1 · `feat(rust-tool): Rust crates in a Cargo workspace, orchestrated by Turbo` · 287/287 tests, lint+fmt clean; dogfood base 2.0 s, web 11.0 s, site (now with rust-tool:tool) 6.8 s cold → 2.3 s warm, 16/16 cached incl. crate tasks. Two instances (rust-tool:a/b) share one workspace, cached outputs restore both binaries. Rust CI steps behind runtime guard (plain ci.yml); root Cargo.toml members per piece (cargo rejects unmatched globs). cargo-nextest 0.9.148 installed locally.
+- 2026-10-15 · 03/2 · `feat(tauri-app): Tauri v2 shell with scheduled desktop builds` · 300/300 tests, lint+fmt clean; dogfood desktop 6.7 s (JS tasks + cargo fmt, single-vite ok), site 6.9 s. desktop.yml.jinja needs no `${{` so it renders only with tauri-app; `desktop` combo is scheduled-only (never on the PR path). tauri 2.12.4 / tauri-build 2.7.3 pinned; bundle deb only. Tauri compile not run here (no webkit2gtk-4.1).
 
 ## Measurements
 
@@ -33,6 +34,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-15 · dogfood base+web+site · cold turbo / warm turbo · base 10.3/0.8 s, web 21.2/2.0 s, site 10.8/1.7 s (render+install+CI tasks+single-vite) · cloud container, warm pnpm store
 
 ## Blocked
+
+- Desktop build verified only on GitHub: this container has no webkit2gtk-4.1. Action: once hull is on GitHub, run `.github/workflows/desktop.yml` via workflow_dispatch and confirm `pnpm turbo run build:desktop` produces a `.deb` for the `desktop` combo.
 
 - Cloudflare preview smoke test (needs account): in a repo rendered from the `web` combo, add repo secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts:Edit + Account Settings:Read) and `CLOUDFLARE_ACCOUNT_ID`, open a PR, and check that `preview.yml` uploads `pr-<n>` versions and lists the `*.workers.dev` URLs in the job summary.
 
