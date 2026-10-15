@@ -60,12 +60,12 @@ milestone. Keep going until all tasks are done or only blocked ones remain, then
 
 ## C. What you will need to provide (expected blockers)
 
-- The GitHub repo `keelstack/hull` (push target, hull's own CI, the scheduled `desktop.yml` run).
-- `@keelstack/splice` 0.1 on npm (plan 03 Task 7) — built in parallel in `keelstack/splice`.
-- `keelstack/hoard@v1` released (plan 03 Task 6).
+- The GitHub repo `keelstackhq/hull` (push target, hull's own CI, the scheduled `desktop.yml` run).
+- `@keelstackhq/splice` 0.1 on npm (plan 03 Task 7) — built in parallel in `keelstackhq/splice`.
+- `keelstackhq/hoard@v1` released (plan 03 Task 6).
 - A Cloudflare account with secrets `CLOUDFLARE_API_TOKEN` (Workers edit) and
   `CLOUDFLARE_ACCOUNT_ID` on a test repo, for one PR-preview smoke test (plan 02 Task 6).
 - Confirmation of the cascivo packages for Preact and access to them if not public (plan 02 Task 2).
-- A canary repo `keelstack/hull-canary` rendered from the `web` combo, for CI timing (plan 03 Task 4).
+- A canary repo `keelstackhq/hull-canary` rendered from the `web` combo, for CI timing (plan 03 Task 4).
 - The npm scope `@docspack-community` (or another owner) to publish community docspacks (plan 03 Task 3).
 - Approval and the `v0.1.0` tag push (plan 03 Task 8).

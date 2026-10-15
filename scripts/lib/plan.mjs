@@ -1,7 +1,8 @@
 import { readdir } from "node:fs/promises";
-import { join, posix } from "node:path";
+import { join } from "node:path";
 import { TemplateError, UsageError } from "./errors.mjs";
 import { classify, outputPath } from "./ownership.mjs";
+import { pathProblem, segmentProblem } from "./segment.mjs";
 import { renderString } from "./render-file.mjs";
 import { checkSubset } from "./subset.mjs";
 
@@ -50,11 +51,11 @@ export function resolveRequest(t, req) {
     if (list.length > 0 && !piece.multiple) {
       throw new UsageError(`piece "${id}" can only be added once`);
     }
-    const name = piece.multiple
-      ? (explicit ?? req.vars[`${id}.name`] ?? piece.vars.name?.default ?? id)
-      : id;
-    if (name === "" || /[/\\]|\.\./.test(name)) {
-      throw new UsageError(`invalid instance name ${JSON.stringify(name)} for piece "${id}"`);
+    const userName = explicit ?? req.vars[`${id}.name`];
+    const name = piece.multiple ? (userName ?? piece.vars.name?.default ?? id) : id;
+    if (segmentProblem(name)) {
+      const msg = `invalid instance name ${JSON.stringify(name)} for piece "${id}"`;
+      throw new (userName === undefined && piece.multiple ? TemplateError : UsageError)(msg);
     }
     if (list.some((x) => x.name === name)) {
       throw new UsageError(`piece "${id}" already has an instance named "${name}"`);
@@ -116,6 +117,11 @@ async function walk(dir, prefix = "") {
   const out = [];
   for (const e of entries) {
     const rel = prefix ? `${prefix}/${e.name}` : e.name;
+    if (e.isSymbolicLink()) {
+      throw new TemplateError(
+        `${join(dir, e.name)} is a symlink; symlinks are not allowed in a template`,
+      );
+    }
     if (e.isDirectory()) out.push(...(await walk(join(dir, e.name), rel)));
     else out.push(rel);
   }
@@ -135,8 +141,14 @@ export async function buildPlan(t, instances, opts) {
     };
     const target =
       inst.piece.target === undefined
-        ? ""
+        ? null
         : renderChecked(inst.piece.target, context, `piece ${inst.piece.id}: piece.toml target`);
+    const targetProblem = target === null ? null : pathProblem(target);
+    if (targetProblem) {
+      throw new TemplateError(
+        `piece ${inst.piece.id}: target ${JSON.stringify(target)}: ${targetProblem}`,
+      );
+    }
     const rels = (await walk(inst.piece.filesDir)).sort();
     for (const rel of rels) {
       const rendered = renderChecked(
@@ -144,7 +156,13 @@ export async function buildPlan(t, instances, opts) {
         context,
         `piece ${inst.piece.id}: path ${rel}`,
       );
-      const path = target ? posix.join(target, rendered) : rendered;
+      const path = target ? `${target}/${rendered}` : rendered;
+      const problem = pathProblem(path);
+      if (problem) {
+        throw new TemplateError(
+          `piece ${inst.piece.id}: output path ${JSON.stringify(path)}: ${problem}`,
+        );
+      }
       const label = `${inst.piece.id}:${inst.name}`;
       if (owners.has(path)) {
         throw new TemplateError(`${path} is written by both ${owners.get(path)} and ${label}`);
@@ -159,6 +177,27 @@ export async function buildPlan(t, instances, opts) {
       });
     }
   }
+  // Case-insensitive collisions, including directory prefixes (file "A" vs "a/x").
+  const folded = new Map(); // lowercase path -> { path, dir }
+  const note = (path, dir) => {
+    const key = path.toLowerCase();
+    const prev = folded.get(key);
+    if (prev && prev.path !== path) {
+      throw new TemplateError(
+        `case-insensitive path collision: ${JSON.stringify(prev.path)} and ${JSON.stringify(path)}`,
+      );
+    }
+    if (prev && prev.dir !== dir) {
+      throw new TemplateError(`${path} is both a file and a directory`);
+    }
+    folded.set(key, { path, dir });
+  };
+  for (const e of plan) {
+    for (let i = e.path.indexOf("/"); i !== -1; i = e.path.indexOf("/", i + 1)) {
+      note(e.path.slice(0, i), true);
+    }
+  }
+  for (const e of plan) note(e.path, false);
   const all = new Set(plan.map((e) => e.path));
   for (const e of plan) {
     for (let i = e.path.indexOf("/"); i !== -1; i = e.path.indexOf("/", i + 1)) {

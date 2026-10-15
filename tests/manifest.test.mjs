@@ -102,10 +102,10 @@ for (const name of [
   "in",
   "is",
 ]) {
-  test(`reserved var name "${name}" → TemplateError`, () =>
+  test(`reserved or invalid var name "${name}" → TemplateError`, () =>
     rejectsWith(
       TemplateError,
-      /reserved/,
+      /reserved|identifier/,
       mutate("splice.toml", (s) => `${s}\n[vars.${name}]\nprompt = "x"\ndefault = "y"\n`),
     ));
 }

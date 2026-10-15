@@ -1,7 +1,8 @@
-import { readFile, readdir } from "node:fs/promises";
+import { lstat, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "smol-toml";
 import { TemplateError } from "./errors.mjs";
+import { IDENT_RE, RESERVED_IDENTS, segmentProblem } from "./segment.mjs";
 
 const MERGE = ["json", "yaml", "toml", "text"];
 const WHEN = ["new", "add", "update"];
@@ -38,19 +39,7 @@ function stringArray(v, where) {
   return v;
 }
 
-const RESERVED_VARS = new Set([
-  "pieces",
-  "piece",
-  "template",
-  "true",
-  "false",
-  "none",
-  "not",
-  "and",
-  "or",
-  "in",
-  "is",
-]);
+const RESERVED_VARS = new Set(["pieces", "piece", "template", ...RESERVED_IDENTS]);
 
 function loadVars(raw, where) {
   if (raw === undefined) return {};
@@ -58,10 +47,15 @@ function loadVars(raw, where) {
   const vars = {};
   for (const [name, spec] of Object.entries(raw)) {
     const w = `${where}: var "${name}"`;
-    if (RESERVED_VARS.has(name.toLowerCase())) throw new TemplateError(`${w} is a reserved name`);
+    if (!IDENT_RE.test(name)) {
+      throw new TemplateError(`${w} is not a valid identifier (ASCII [a-z_][a-z0-9_]*)`);
+    }
+    if (RESERVED_VARS.has(name)) throw new TemplateError(`${w} is a reserved name`);
     if (!isObject(spec)) throw new TemplateError(`${w} must be a table`);
     checkKeys(spec, VAR_KEYS, w);
-    if (typeof spec.prompt !== "string") throw new TemplateError(`${w} needs a string "prompt"`);
+    if (spec.prompt !== undefined && typeof spec.prompt !== "string") {
+      throw new TemplateError(`${w} "prompt" must be a string`);
+    }
     if (spec.default !== undefined && typeof spec.default !== "string") {
       throw new TemplateError(`${w} "default" must be a string`);
     }
@@ -80,12 +74,27 @@ function loadVars(raw, where) {
         throw new TemplateError(`${w} default does not match its pattern`);
       }
     }
-    vars[name] = { ...spec };
+    vars[name] = { ...spec, prompt: spec.prompt ?? name };
   }
   return vars;
 }
 
+async function assertNotSymlink(path, what) {
+  let st;
+  try {
+    st = await lstat(path);
+  } catch (e) {
+    if (e.code === "ENOENT") return;
+    throw e;
+  }
+  if (st.isSymbolicLink())
+    throw new TemplateError(
+      `${what} is a symlink (${path}); symlinks are not allowed in a template`,
+    );
+}
+
 async function readToml(path) {
+  await assertNotSymlink(path, "file");
   let text;
   try {
     text = await readFile(path, "utf8");
@@ -101,13 +110,18 @@ async function readToml(path) {
 
 async function loadPiece(dir, dirName) {
   const where = `piece ${dirName}`;
+  const idProblem = segmentProblem(dirName);
+  if (idProblem) throw new TemplateError(`${where}: id ${idProblem}`);
+  await assertNotSymlink(dir, `piece directory ${dirName}`);
+  await assertNotSymlink(join(dir, "files"), `files/ of piece ${dirName}`);
   const raw = await readToml(join(dir, "piece.toml"));
   checkKeys(raw, PIECE_KEYS, where);
   if (raw.id !== dirName) {
     throw new TemplateError(`${where}: id "${raw.id}" does not match its directory "${dirName}"`);
   }
-  if (typeof raw.description !== "string")
-    throw new TemplateError(`${where}: needs a string "description"`);
+  if (raw.description !== undefined && typeof raw.description !== "string") {
+    throw new TemplateError(`${where}: "description" must be a string`);
+  }
   if (raw.multiple !== undefined && typeof raw.multiple !== "boolean") {
     throw new TemplateError(`${where}: "multiple" must be a boolean`);
   }
@@ -143,7 +157,8 @@ async function loadPiece(dir, dirName) {
       checkKeys(p, POST_KEYS, `${where} [[post]]`);
       if (typeof p.run !== "string")
         throw new TemplateError(`${where}: [[post]] needs a string "run"`);
-      const when = p.when === undefined ? [...WHEN] : stringArray(p.when, `${where} post.when`);
+      if (p.when === undefined) throw new TemplateError(`${where}: [[post]] needs "when"`);
+      const when = stringArray(p.when, `${where} post.when`);
       for (const w of when) {
         if (!WHEN.includes(w))
           throw new TemplateError(`${where}: post when "${w}" is not one of ${WHEN.join("|")}`);
@@ -155,7 +170,7 @@ async function loadPiece(dir, dirName) {
     id: raw.id,
     dir,
     filesDir: join(dir, "files"),
-    description: raw.description,
+    description: raw.description ?? "",
     multiple: raw.multiple ?? false,
     requires: raw.requires === undefined ? [] : stringArray(raw.requires, `${where} requires`),
     ...(raw.target === undefined ? {} : { target: raw.target }),
@@ -181,11 +196,27 @@ export async function loadTemplate(dir) {
 
   const pieces = new Map();
   const piecesDir = join(dir, "pieces");
+  await assertNotSymlink(piecesDir, "pieces/");
+  await assertNotSymlink(join(dir, "migrations"), "migrations/");
+  try {
+    for (const f of await readdir(join(dir, "migrations"), { recursive: true })) {
+      await assertNotSymlink(join(dir, "migrations", f), `migration ${f}`);
+    }
+  } catch (e) {
+    if (e instanceof TemplateError) throw e;
+    if (e.code !== "ENOENT" && e.code !== "ENOTDIR") throw e;
+  }
   let entries;
   try {
     entries = await readdir(piecesDir, { withFileTypes: true });
   } catch {
     throw new TemplateError(`template has no pieces/ directory at ${piecesDir}`);
+  }
+  for (const e of entries) {
+    if (e.isSymbolicLink())
+      throw new TemplateError(
+        `pieces/${e.name} is a symlink; symlinks are not allowed in a template`,
+      );
   }
   for (const e of entries
     .filter((x) => x.isDirectory())

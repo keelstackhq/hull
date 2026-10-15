@@ -1,10 +1,10 @@
 # hull — design
 
-Date: 2026-10-14 · Status: approved for build · Org `keelstack`, repo `keelstack/hull`
+Date: 2026-10-14 · Status: approved for build · Org `keelstackhq`, repo `keelstackhq/hull`
 
 hull is an opinionated, AI-native monorepo template. It owns structure, stack, tool versions and
-config, never app logic. Consumers render it with `splice` (`keelstack/splice`, Rust) from
-`gh:keelstack/hull//template`. Public product, private use first.
+config, never app logic. Consumers render it with `splice` (`keelstackhq/splice`, Rust) from
+`gh:keelstackhq/hull//template`. Public product, private use first.
 
 This document is the source of truth. The template layout follows the shared contract
 `docs/template-format.md` (format 1) exactly; where the contract is silent, §4.3 says what hull does.
@@ -12,7 +12,7 @@ This document is the source of truth. The template layout follows the shared con
 ## 1. Goals and non-goals
 
 Goals:
-1. Bootstrap a repo by choosing pieces: `splice new gh:keelstack/hull//template my-repo`.
+1. Bootstrap a repo by choosing pieces: `splice new gh:keelstackhq/hull//template my-repo`.
 2. Keep generated repos current: owned files are replaced, shared files merged, seed files never touched.
 3. CI in seconds: ≤ 45 s for a typical PR, ≤ 15 s for a docs-only PR, on GitHub's own runners.
 4. AI-native for Claude Code first: lean CLAUDE.md, subagents with fixed models, skills, loops, hooks.
@@ -23,7 +23,7 @@ visual tests on the PR path, React (Preact only), Cloudflare Pages, our own remo
 
 ## 2. Names, versions, distribution
 
-- Template source: `gh:keelstack/hull//template`. A template version is a git tag `v<semver>` on hull.
+- Template source: `gh:keelstackhq/hull//template`. A template version is a git tag `v<semver>` on hull.
 - `template/splice.toml`: `format = 1`, `name = "hull"`, `min_splice = "0.1.0"`, `base = "base"`.
 - First release `v0.1.0` after milestone 3. Breaking template changes bump the minor until 1.0 and
   ship a migration (`template/migrations/<semver>.toml`) when files move or disappear.
@@ -72,6 +72,10 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
   `lower`/`upper`. The dev renderer and the invariant tests both enforce this.
 - Final newline kept exactly as in the source; no auto-escaping (§9.4). All vars are strings.
 - `pieces` = unique ids in add order; a `multiple = false` piece has `name` = its `id` (§9.5).
+- Dev-renderer rules (agreed with splice, contract change pending): identifiers are ASCII `[a-z_][a-z0-9_]*` and
+  never `loop/self/range/namespace` or the reserved words; no symlinks anywhere in a template; every
+  rendered path segment is portable (no Windows-reserved names, `.git`, trailing dot/space, `/ \\ :`,
+  control chars) and paths must not collide ignoring case; `[[post]].when` is required.
 - Every path under `files/` matches the ownership globs of at most one class, so "first match
   wins" never decides anything (invariant test). Files matching no glob are `owned` by contract;
   hull lists every class explicitly anyway, except owned files may rely on the default.
@@ -121,7 +125,7 @@ The items below are the gaps as hull first found them.
    subset, which has no `{% raw %}` and no string-literal output. Workflows without piece
    conditions are plain files (`ci.yml`). Piece-dependent workflows need a contract addition
    (proposed: `{% raw %}…{% endraw %}` in §4) or a runtime guard instead of a template condition.
-   Raised with keelstack/splice (Blocked in `docs/PROGRESS.md`).
+   Raised with keelstackhq/splice (Blocked in `docs/PROGRESS.md`).
 
 ## 5. Template variables
 
@@ -191,7 +195,7 @@ Root files (class in brackets):
 - `.node-version` [owned] `24`; `.gitignore` [owned] (node_modules, dist, .turbo, .astro,
   .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
-- `renovate.json` [owned]: `{"extends": ["github>keelstack/hull//renovate/default"]}` (§8.6).
+- `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
 - `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
   `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
   `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
@@ -344,7 +348,7 @@ blocks in base files (`docspack` devDependency, SessionStart sync, `docs-lookup`
     "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
     "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
     "cloudflare": { "package": "@docspack-community/cloudflare", "source": "community", "build": "cloudflare" },
-    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "gh:keelstack/hull//community-packs/vite-plus" }
+    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "gh:keelstackhq/hull//community-packs/vite-plus" }
   }
 }
 ```
@@ -377,7 +381,7 @@ files.
   `"model": "opusplan"` in settings is the main-session default (Opus plans, Sonnet executes).
 - `.claude/skills/verify/SKILL.md`: run `pnpm turbo run lint format:check typecheck test --affected
   --output-logs=errors-only`, report ≤ 10 lines (pass/fail per task, first error per failure).
-- `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstack/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
+- `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstackhq/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
   read the JSON `changes`, run `[[post]]`-equivalent install, then `verify`.
 - `.claude/skills/docs-lookup/SKILL.md` (only with docs): `pnpm exec docspack ask "<q>" --json`
   before any web search; web search only on exit 3/4.
@@ -473,7 +477,7 @@ upstream.
      `node-version-file: .node-version`, `cache: pnpm`.
   4. `pnpm install --frozen-lockfile --prefer-offline`.
   5. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
-     restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstack/hoard@v1` once released.
+     restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstackhq/hoard@v1` once released.
   6. Rust (present in the plain `ci.yml`, guarded at runtime by
      `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
@@ -525,7 +529,7 @@ pnpm store cache. No template option in v1.
 
 ### 8.6 Renovate
 
-`renovate/default.json` in hull (preset `github>keelstack/hull//renovate/default`, syntax to
+`renovate/default.json` in hull (preset `github>keelstackhq/hull//renovate/default`, syntax to
 verify): `config:recommended`, `helpers:pinGitHubActionDigests`, `rangeStrategy: pin`,
 `minimumReleaseAge: "3 days"`, groups `vite-plus` (`vite-plus` + `@voidzero-dev/vite-plus-core`,
 which must move together), `storybook`, `astro`, `tauri`, `cloudflare` (wrangler + workers-types),
@@ -615,14 +619,14 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 ## 11. Switching to splice and hoard (blocked)
 
 - **splice v0.1** (blocked until released): hull CI renders with
-  `pnpm dlx @keelstack/splice@0.1 new ./template <dir> ... --yes --json`; the dev renderer stays as
+  `pnpm dlx @keelstackhq/splice@0.1 new ./template <dir> ... --yes --json`; the dev renderer stays as
   an oracle: a test renders every combo with both and diffs the trees (excluding `.splice/`).
   Update test: render the `web` combo from the previous hull tag, commit, apply scripted user edits
   (edit a seed file, add a dependency to `apps/web/package.json`, edit an owned file), run
   `splice update` to the working tree's template: seed unchanged, the user's dependency kept, the
   owned edit reported by `check` and replaced only with `--force`, `splice check` exit 0 at the end.
 - **hoard v1** (blocked until released): the `actions/cache` turbo step becomes
-  `uses: keelstack/hoard@v1` in the generated `ci.yml` and in hull's CI.
+  `uses: keelstackhq/hoard@v1` in the generated `ci.yml` and in hull's CI.
 
 ## 12. Testing
 

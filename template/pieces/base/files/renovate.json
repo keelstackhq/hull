@@ -1,4 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>keelstack/hull//renovate/default"]
+  "extends": ["github>keelstackhq/hull//renovate/default"]
 }

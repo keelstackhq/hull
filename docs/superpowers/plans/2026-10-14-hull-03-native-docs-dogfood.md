@@ -6,7 +6,7 @@
 
 **Architecture:** Rust crates live in a root virtual Cargo workspace rendered by `base` when a Rust piece is present; each crate has a thin `package.json` whose scripts call cargo for that crate only, so Turbo orchestrates and caches Rust like JS. Tauri compiles only in a scheduled workflow. The docs piece wires docspack into the AI layer. Tasks 6 and 7 are blocked on other keelstack repos and are written so they can land later without touching earlier work.
 
-**Tech Stack:** As milestones 1–2, plus Rust stable (edition 2024), cargo-nextest, @tauri-apps/cli 2.12.2, @tauri-apps/api 2.12.3, docspack 1.5.0, `gh` CLI (timing script), later `@keelstack/splice` 0.1 and `keelstack/hoard@v1`.
+**Tech Stack:** As milestones 1–2, plus Rust stable (edition 2024), cargo-nextest, @tauri-apps/cli 2.12.2, @tauri-apps/api 2.12.3, docspack 1.5.0, `gh` CLI (timing script), later `@keelstackhq/splice` 0.1 and `keelstackhq/hoard@v1`.
 
 **Spec:** `docs/superpowers/specs/2026-10-14-hull-design.md` (§6.1 Cargo files, §6.6–§6.8, §8.1 step 6, §8.3, §8.4, §10, §11)
 
@@ -18,7 +18,7 @@
 - Tauri builds run only in `desktop.yml` (scheduled + manual), never on the PR path.
 - docspack commands: `docspack sync`, `docspack index --repo`, `docspack ask "<q>" --json`. Never auto-edit `package.json` from scripts.
 - Budgets: generated repo job `ci` p50 ≤ 45 s (typical PR), ≤ 15 s docs-only; hull job `ci` ≤ 120 s warm, ≤ 20 s docs-only.
-- splice invocation (contract §9.14): `pnpm dlx @keelstack/splice@0.1 new <source> <dest> --piece <id>[:<name>]... --data <k>=<v>... --yes --json`.
+- splice invocation (contract §9.14): `pnpm dlx @keelstackhq/splice@0.1 new <source> <dest> --piece <id>[:<name>]... --data <k>=<v>... --yes --json`.
 
 ## Review Focus
 
@@ -154,7 +154,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 
 - [x] **Step 2: Run `pnpm test` — expect FAIL.**
 - [x] **Step 3: Implement** with `gh run list -R <repo> -w ci.yml -L <n> --json databaseId` and `gh run view <id> -R <repo> --json jobs`; `opts.gh` injectable for tests.
-- [x] **Step 4: Run `pnpm test` — expect PASS.** Real measurement needs hull on GitHub and a canary repo (`keelstack/hull-canary`, rendered from `web`): put both under Blocked with the commands to run (`node scripts/ci-timing.mjs --repo keelstack/hull --budget 120`, `--repo keelstack/hull-canary --budget 45`).
+- [x] **Step 4: Run `pnpm test` — expect PASS.** Real measurement needs hull on GitHub and a canary repo (`keelstackhq/hull-canary`, rendered from `web`): put both under Blocked with the commands to run (`node scripts/ci-timing.mjs --repo keelstackhq/hull --budget 120`, `--repo keelstackhq/hull-canary --budget 45`).
 - [x] **Step 5: Commit** — `feat: CI timing check against the budget`
 
 ---
@@ -178,16 +178,16 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 
 ---
 
-### Task 6: Remote cache with hoard — BLOCKED until `keelstack/hoard@v1` is released
+### Task 6: Remote cache with hoard — BLOCKED until `keelstackhq/hoard@v1` is released
 
 **Files:**
 - Modify: `template/pieces/base/files/.github/workflows/ci.yml` (plain), `.github/workflows/ci.yml`
 - Test: `tests/ci-workflow.test.mjs` (extend)
 
 **Interfaces:**
-- Consumes: `keelstack/hoard@v1` (no inputs needed for the GitHub cache backend; it sets `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` for later steps — confirm from hoard's README at release).
+- Consumes: `keelstackhq/hoard@v1` (no inputs needed for the GitHub cache backend; it sets `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` for later steps — confirm from hoard's README at release).
 
-- [ ] **Step 1: Write failing tests:** the generated workflow has a step `uses: keelstack/hoard@v1` before `turbo run`, no `actions/cache` step on `.turbo`, and the hoard step is guarded by `skip` like the rest.
+- [ ] **Step 1: Write failing tests:** the generated workflow has a step `uses: keelstackhq/hoard@v1` before `turbo run`, no `actions/cache` step on `.turbo`, and the hoard step is guarded by `skip` like the rest.
 - [ ] **Step 2: Run `pnpm test` — expect FAIL.**
 - [ ] **Step 3: Replace** the `actions/cache` turbo step in both workflows; hull's dogfood passes `--cache-dir` only when hoard is absent.
 - [ ] **Step 4: Run `pnpm test` — expect PASS;** after merge, compare `ci-timing` p50 before/after and record both in PROGRESS.
@@ -195,7 +195,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 
 ---
 
-### Task 7: Render with splice and test updates — BLOCKED until `@keelstack/splice` 0.1 is released
+### Task 7: Render with splice and test updates — BLOCKED until `@keelstackhq/splice` 0.1 is released
 
 **Files:**
 - Modify: `scripts/dogfood.mjs` (`--renderer splice|dev`, default `splice`), `.github/workflows/ci.yml`, `template/pieces/base/files/.claude/skills/add-piece/SKILL.md` (real flags), spec §4.3.8 and §11
@@ -225,7 +225,7 @@ test("update keeps seed, merges shared, guards owned", async () => {
 ```
 
 - [ ] **Step 3: Run with `SPLICE_BIN` set — expect FAIL** (dogfood still on the dev renderer).
-- [ ] **Step 4: Switch** dogfood and hull CI to `pnpm dlx @keelstack/splice@0.1 new …`; keep the dev renderer for the parity test.
+- [ ] **Step 4: Switch** dogfood and hull CI to `pnpm dlx @keelstackhq/splice@0.1 new …`; keep the dev renderer for the parity test.
 - [ ] **Step 5: Run `pnpm test` with `SPLICE_BIN` and `node scripts/dogfood.mjs --combo base --combo web --combo site --combo docs` — expect PASS.**
 - [ ] **Step 6: Commit** — `ci: render combos with splice and test template updates`
 

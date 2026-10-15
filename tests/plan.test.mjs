@@ -135,7 +135,7 @@ await cp(FIXTURE, noPattern, { recursive: true });
   await writeFile(pt, (await readFile(pt, "utf8")).replace(/^\[vars\]\nname = .*\n/m, ""));
 }
 const tNoPattern = await loadTemplate(noPattern);
-for (const bad of ["", "a/b", "a\\b", "..", "a..b"]) {
+for (const bad of ["", "a/b", "a\\b", "..", "con"]) {
   test(`unsafe instance name ${JSON.stringify(bad)} → UsageError`, () =>
     assert.throws(
       () => resolveRequest(tNoPattern, { pieces: [`app:${bad}`], vars: {} }),

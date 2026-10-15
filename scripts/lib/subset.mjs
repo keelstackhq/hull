@@ -1,29 +1,19 @@
+import { IDENT_SRC, RESERVED_IDENTS, segmentProblem } from "./segment.mjs";
+
 // Checks a .jinja source against the portable template subset (contract §4, §9).
 
 const TAG_RE = /\{\{([\s\S]*?)\}\}|\{%([\s\S]*?)%\}|\{#([\s\S]*?)#\}/g;
-const IDENT = "[A-Za-z_][A-Za-z0-9_]*";
+const IDENT = IDENT_SRC;
 const OUTPUT_RE = new RegExp(`^(${IDENT}(?:\\.${IDENT})*)(?:\\s*\\|\\s*(lower|upper))?$`);
 const FILTER_RE = new RegExp(`^${IDENT}(?:\\.${IDENT})*\\s*\\|\\s*(${IDENT})\\b`);
 const NAME_RE = new RegExp(`^${IDENT}(?:\\.${IDENT})*$`);
-const PIECE_IN_RE = /^"[A-Za-z0-9_-]+"\s+in\s+pieces$/;
+const PIECE_IN_RE = /^"([^"]+)"\s+in\s+pieces$/;
 const FOR_RE = new RegExp(`^for\\s+(${IDENT})\\s+in\\s+(\\S+)$`);
 const DOTTED = new Set(["piece.id", "piece.name", "template.name", "template.version"]);
 
 /** @typedef {{ file: string, line: number, tag: string, reason: string }} Violation */
 
-const KEYWORDS = new Set([
-  "true",
-  "false",
-  "none",
-  "True",
-  "False",
-  "None",
-  "not",
-  "and",
-  "or",
-  "in",
-  "is",
-]);
+const KEYWORDS = new Set(RESERVED_IDENTS);
 const BARE_RESERVED = new Set(["pieces", "piece", "template"]);
 
 /** Returns the reason a variable reference is invalid, or null. */
@@ -51,7 +41,11 @@ function checkOutput(expr) {
 }
 
 function checkCondition(expr) {
-  if (PIECE_IN_RE.test(expr)) return null;
+  const pin = PIECE_IN_RE.exec(expr);
+  if (pin) {
+    const p = segmentProblem(pin[1]);
+    return p ? `piece id ${JSON.stringify(pin[1])} ${p}` : null;
+  }
   if (!NAME_RE.test(expr)) {
     return 'expression not allowed in condition (only var or "piece-id" in pieces)';
   }

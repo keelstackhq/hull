@@ -3,11 +3,11 @@
 An opinionated, AI-native monorepo template (pnpm, Turborepo, TypeScript 7, Vite+, Preact, Astro,
 cascivo, Storybook, docspack, Rust, Tauri, Hono on Cloudflare). It owns structure, stack, tool
 versions and config, never app logic. Consumers render it with `splice` from
-`gh:keelstack/hull//template`. Until splice v0.1 exists, `scripts/render.mjs` renders it.
+`gh:keelstackhq/hull//template`. Until splice v0.1 exists, `scripts/render.mjs` renders it.
 
 - Design: `docs/superpowers/specs/2026-10-14-hull-design.md` — the source of truth. Read only the
   sections your task touches; change the spec in the same commit when behaviour changes.
-- Contract: `docs/template-format.md` — shared with `keelstack/splice`, binding (incl. §9).
+- Contract: `docs/template-format.md` — shared with `keelstackhq/splice`, binding (incl. §9).
   Never edit it here alone; changes go to both repos in the same week.
 - Plans: `docs/superpowers/plans/` (01 base-renderer, 02 web-pieces, 03 native-docs-dogfood).
 - Progress: `docs/PROGRESS.md` — one line per finished task, plus Blocked and Status.
@@ -46,6 +46,9 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
   `| upper`, `if/elif/else` on `var` or `"id" in pieces`, `for p in pieces`, comments. No
   `not/and/or`, comparisons, `set`, `{%-`, macros, includes, other filters, `{% if pieces %}`.
 - **No app logic in the template.** App source is `seed`; configs/workflows/AI layer are `owned`;
+- **Renderer rules** (spec §9): identifiers `[a-z_][a-z0-9_]*` (not `loop/self/range/namespace`), no
+  symlinks in the template, portable rendered path segments, no case-insensitive path collisions,
+  `[[post]].when` required.
   `package.json`, `turbo.json`, `pnpm-workspace.yaml`, crate `Cargo.toml`, `tauri.conf.json`,
   `wrangler.jsonc` are `shared` with a `[merge]` strategy.
 - **Each path in at most one ownership class.** No `{{` in paths under `files/`.

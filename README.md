@@ -2,14 +2,14 @@
 
 An opinionated, AI-native monorepo template. Pick the pieces you need; hull owns the structure,
 stack, tool versions and config, and keeps them current. Your app code stays yours. Part of
-[keelstack](https://github.com/keelstack): tools for bootstrapping projects.
+[keelstack](https://github.com/keelstackhq): tools for bootstrapping projects.
 
 > Status: pre-0.1, no release tag yet. Design: `docs/superpowers/specs/2026-10-14-hull-design.md`;
 > per-piece reference: `docs/pieces.md`.
 
 ## Quick start
 
-`@keelstack/splice` is not released yet, so today you render with hull's dev renderer
+`@keelstackhq/splice` is not released yet, so today you render with hull's dev renderer
 (needs Node 24 and pnpm 12; run `pnpm install` once in a hull checkout):
 
 ```bash
@@ -27,7 +27,7 @@ node scripts/dogfood.mjs --combo web --combo site
 ```
 
 When splice 0.1 is out, the equivalent is
-`pnpm dlx @keelstack/splice new gh:keelstack/hull//template my-repo --piece ...` (flags unconfirmed),
+`pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template my-repo --piece ...` (flags unconfirmed),
 later `splice add`, `splice update` (owned files replaced, shared files merged, your source never
 touched) and `splice check` in CI.
 
@@ -50,7 +50,7 @@ One job plus a `ci-ok` check, on `pull_request` and `merge_group`. Turbo runs on
 and exits early when nothing relevant changed. Target: 45 s or less for a typical PR, 15 s or less
 for docs-only, on GitHub's own runners. These are targets: the reference canary repo is not set up
 yet, so no CI p50 has been measured. Heavy work (Tauri, Storybook build) stays off the PR path.
-`keelstack/hoard@v1` as a shared remote cache is planned, not yet released.
+`keelstackhq/hoard@v1` as a shared remote cache is planned, not yet released.
 
 ### Custom runners
 
