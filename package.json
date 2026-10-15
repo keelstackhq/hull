@@ -7,7 +7,8 @@
     "test": "node --test \"tests/**/*.test.mjs\"",
     "lint": "vp lint scripts tests",
     "format:check": "vp fmt --check scripts tests",
-    "render": "node scripts/render.mjs"
+    "render": "node scripts/render.mjs",
+    "docs:pieces": "node scripts/pieces-doc.mjs > docs/pieces.md"
   },
   "dependencies": {
     "nunjucks": "3.2.4",

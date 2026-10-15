@@ -631,10 +631,13 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 
 ## 13. Unverified / to check during the build
 
-cascivo package choice for Preact (§6.2); Vite+ shared lint/fmt config mechanism; pnpm 12 setting
-names; `$TURBO_ROOT$` in outputs; Renovate preset path syntax; Claude Code plugin settings shape and
-statusline input fields; `astro check` with TypeScript 7; Cloudflare OTel destination syntax;
-splice CLI flags (§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm
-manager bumps the `overrides.vite` `npm:@voidzero-dev/vite-plus-core@x` alias together with
-`vite-plus` (needs a live Renovate run); whether `preview.yml`/`desktop.yml` use runtime guards or
-wait for a `{% raw %}` contract addition (§4.3 item 8).
+Still open: Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
+(§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm manager bumps the
+`overrides.vite` `npm:@voidzero-dev/vite-plus-core@x` alias together with `vite-plus` (needs a live
+Renovate run); whether the empty `vars.SENTRY_DSN` is overridden by `wrangler secret put` on deploy
+(needs an account); the Tauri desktop build (needs webkit2gtk, runs in `desktop.yml`).
+
+Verified during the build (removed from this list): Vite+ shared lint/fmt config mechanism; pnpm 12
+setting names; `$TURBO_ROOT$` in outputs; Claude Code settings and statusline shape; cascivo for
+Preact (`@cascivo/react` via `preact/compat`); `astro check` does not work with TypeScript 7
+(astro-site uses `tsc --noEmit`); `preview.yml`/`desktop.yml` use runtime guards, not `{% raw %}`.

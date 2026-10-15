@@ -170,11 +170,11 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 - Consumes: `loadTemplate`, `overlaps`
 - Produces: `piecesDoc(t: Template): string` — one section per piece: id, description, multiple, target, requires, vars with defaults, files grouped by class.
 
-- [ ] **Step 1: Write failing tests:** `piecesDoc` output contains every piece id as a `## ` heading and every var default; `docs/pieces.md` on disk equals `piecesDoc(await loadTemplate("template"))` (fails when someone forgets to regenerate).
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement**, generate `docs/pieces.md`, and update `README.md`: quick start with the real commands as they exist now (dev renderer until splice ships), piece table, CI budget, AI layer, logging, known limits (`.astro` lint/fmt, Storybook peer range, preview URL caveats, observability pricing from 2026-12-01), and a short "Custom runners" note (spec §8.5: change `runs-on`; sticky disks replace the pnpm store cache).
-- [ ] **Step 4: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
-- [ ] **Step 5: Commit** — `docs: pieces reference and product README`
+- [x] **Step 1: Write failing tests:** `piecesDoc` output contains every piece id as a `## ` heading and every var default; `docs/pieces.md` on disk equals `piecesDoc(await loadTemplate("template"))` (fails when someone forgets to regenerate).
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement**, generate `docs/pieces.md`, and update `README.md`: quick start with the real commands as they exist now (dev renderer until splice ships), piece table, CI budget, AI layer, logging, known limits (`.astro` lint/fmt, Storybook peer range, preview URL caveats, observability pricing from 2026-12-01), and a short "Custom runners" note (spec §8.5: change `runs-on`; sticky disks replace the pnpm store cache).
+- [x] **Step 4: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
+- [x] **Step 5: Commit** — `docs: pieces reference and product README`
 
 ---
 
