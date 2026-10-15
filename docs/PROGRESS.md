@@ -36,6 +36,9 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-14 · base · warm pnpm store, cold turbo cache · install 0.35 s, `turbo run lint format:check typecheck test build` 2.08 s (6 tasks) · cloud container, Node 24.21
 - 2026-10-14 · dogfood base · cold turbo / warm turbo · 3.4 s / 0.9 s (render+install+5 CI tasks) · cloud container
 - 2026-10-15 · dogfood base+web+site · cold turbo / warm turbo · base 10.3/0.8 s, web 21.2/2.0 s, site 10.8/1.7 s (render+install+CI tasks+single-vite) · cloud container, warm pnpm store
+- 2026-10-15 · dogfood all PR combos after Milestone 3 fixes · cold turbo · base 1.8 s, web 11.6 s, site (incl. rust-tool) 7.9 s, docs 2.0 s · cloud container, warm pnpm store
+- 2026-10-15 · site warm rerun · 2.3 s, 16/16 tasks cached incl. the crate · cloud container
+- 2026-10-15 · one repo with all 8 pieces · `turbo run lint format:check typecheck test build` 32/32 tasks in 18 s cold, no Tauri compile · cloud container
 
 ## Blocked
 
@@ -61,4 +64,58 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Status
 
-<!-- Written when the build loop stops. -->
+Written 2026-10-15 when the build loop stopped. Plans 01 and 02 are fully checked. Plan 03 Tasks 1–5
+are checked; Tasks 6–8 are Blocked (hoard and splice are unreleased; the release needs a human).
+Milestones 1, 2 and 3 are reviewed (lines above). 325 tests pass, lint and format are clean.
+
+**What works**
+
+- Dev renderer `scripts/render.mjs new` renders `template/` per the contract (format 1, §9): strict
+  manifest loading, template-subset check (undefined variables are errors), ownership classes,
+  staged writes (no partial output), `--json` output, exit codes 0/2/3.
+- Eight pieces: `base` (pnpm 12 workspace, exact catalog, turbo, Vite+, one-job CI with an affected
+  early exit, Renovate preset, Claude Code layer), `preact-app` (cascivo via `preact/compat`),
+  `ui-storybook`, `astro-site`, `hono-worker` (JSON request logs that never contain query strings,
+  headers, bodies or error messages; scrubbed optional Sentry), `rust-tool`, `tauri-app` (compiled
+  only by the scheduled `desktop.yml`), `docs` (docspack).
+- One Vite per repo (`check-single-vite`), template invariants (one class per path, subset,
+  same-branches chains), CI-task parity between the generated workflow, the `ci` script and dogfood.
+- Hull's own CI: lint, format, tests, then dogfood of the combos a diff touches.
+
+**How to try it**
+
+```bash
+export PATH=/path/to/node24/bin:$PATH          # Node 24, pnpm 12.11.2
+pnpm install
+pnpm test && pnpm lint && pnpm format:check
+node scripts/render.mjs new --template template --out /tmp/x --piece base --piece preact-app:web --data scope=acme --json
+cd /tmp/x && git init -q && pnpm install --no-frozen-lockfile && pnpm run ci
+node scripts/dogfood.mjs --combo base --combo web --combo site --combo docs   # needs Rust + cargo-nextest for site
+node scripts/affected-combos.mjs --base HEAD~1
+node scripts/ci-timing.mjs --repo <owner/repo> --budget 45                    # needs gh and a repo on GitHub
+```
+
+**Measured vs budgets**
+
+| What | Budget | Measured | Where |
+|---|---|---|---|
+| Generated repo job `ci`, typical PR | ≤ 45 s p50 | not measured (no GitHub repo); local turbo CI tasks 2–12 s cold, ≤ 2 s warm | Measurements |
+| Generated repo, docs-only PR | ≤ 15 s | not measured; early exit verified in a scratch repo (CLAUDE.md-only commit → skip) | 01 review fix |
+| Hull job `ci`, one piece changed, warm | ≤ 120 s | not measured on GitHub; all 4 PR combos dogfood in ~23 s cold, ~5 s warm locally | Measurements |
+| Hull, docs-only PR | ≤ 20 s | not measured; docs/tests select no combo | 01/9 |
+
+All timings are from this cloud container, not GitHub runners; they are not evidence for the GitHub budgets.
+
+**Blocked — needs you or an upstream repo** (full actions in the Blocked section above)
+
+1. Put hull on GitHub (`keelstack/hull`), let CI run, then measure: `node scripts/ci-timing.mjs --repo keelstack/hull --budget 120`; create `keelstack/hull-canary` from the `web` combo and run it with `--budget 45`.
+2. Run `desktop.yml` once via workflow_dispatch to verify the Tauri `.deb` build (no webkit2gtk here).
+3. Cloudflare account: preview smoke test (secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) and the `vars.SENTRY_DSN` vs `wrangler secret put` check.
+4. Contract: agree a `{% raw %}` (or equivalent) addition with keelstack/splice so piece-dependent workflows can be `.jinja`.
+5. npm scope `@docspack-community` + owner to publish the community doc packs.
+6. keelstack/hoard v1 release (plan 03 Task 6) and @keelstack/splice 0.1 release (plan 03 Task 7).
+7. Release v0.1.0 (plan 03 Task 8): merge to `main`, changelog, `git tag v0.1.0 && git push origin v0.1.0`.
+8. Time-gated, no human needed: drop exact-version `minimumReleaseAgeExclude` entries as they pass 3 days (turbo after 2026-10-16, storybook/sentry after 2026-10-15 ~18:30Z, wrangler/miniflare/workers-types after 2026-10-17).
+
+Environment note: this container shipped Node 22 / pnpm 10; the build used Node 24.21 (nvm) and pnpm 12.11.2.
+A stray `/plan.bak` (a subagent backup written because `TMPDIR` is `/`) sits outside the repo; delete it if you like.
