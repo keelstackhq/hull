@@ -25,6 +25,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-15 · 03/1 · `feat(rust-tool): Rust crates in a Cargo workspace, orchestrated by Turbo` · 287/287 tests, lint+fmt clean; dogfood base 2.0 s, web 11.0 s, site (now with rust-tool:tool) 6.8 s cold → 2.3 s warm, 16/16 cached incl. crate tasks. Two instances (rust-tool:a/b) share one workspace, cached outputs restore both binaries. Rust CI steps behind runtime guard (plain ci.yml); root Cargo.toml members per piece (cargo rejects unmatched globs). cargo-nextest 0.9.148 installed locally.
 - 2026-10-15 · 03/2 · `feat(tauri-app): Tauri v2 shell with scheduled desktop builds` · 300/300 tests, lint+fmt clean; dogfood desktop 6.7 s (JS tasks + cargo fmt, single-vite ok), site 6.9 s. desktop.yml.jinja needs no `${{` so it renders only with tauri-app; `desktop` combo is scheduled-only (never on the PR path). tauri 2.12.4 / tauri-build 2.7.3 pinned; bundle deb only. Tauri compile not run here (no webkit2gtk-4.1).
 - 2026-10-15 · 03/3 · `feat(docs): docspack piece with packs manifest and community recipes` · 309/309 tests, lint+fmt clean; dogfood docs 1.8 s, base/web/site still ok. In the rendered docs repo: `pnpm docs:sync` exit 0 (repo-docs 18 chunks, repo-code 9 chunks); `docspack ask "turbo affected" --json` exit 4 (valid JSON, no hits); `pnpm docs:packs` exit 0, 4 packs missing with `pnpm add -D` hints. vite-plus recipe built locally (224 chunks, ~68.5k tokens), `docspack doctor` ok. docspack 1.5.0 CLI matches spec §6.8.
+- 2026-10-15 · 03/4 · `feat: CI timing check against the budget` · 321/321 tests, lint+fmt clean; dogfood base ok. `scripts/ci-timing.mjs` (gh via execFile, nearest-rank p50/p90, cancelled/skipped jobs ignored, exit 1 over budget, 2 on usage/gh errors); hull CI writes its job duration to the step summary; generated README has "Measure CI time". Not run against GitHub (no repo).
 
 ## Measurements
 
@@ -35,6 +36,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-15 · dogfood base+web+site · cold turbo / warm turbo · base 10.3/0.8 s, web 21.2/2.0 s, site 10.8/1.7 s (render+install+CI tasks+single-vite) · cloud container, warm pnpm store
 
 ## Blocked
+
+- Real CI timings (needs hull on GitHub + canary repo): push hull to `keelstack/hull` and run `node scripts/ci-timing.mjs --repo keelstack/hull --budget 120` after ~20 PR runs; create `keelstack/hull-canary` from the `web` combo (`node scripts/render.mjs new --template template --out hull-canary --piece base --piece preact-app:web --piece ui-storybook --piece hono-worker:api --data scope=<scope>`), open ~20 PRs, run `node scripts/ci-timing.mjs --repo keelstack/hull-canary --budget 45`.
 
 - Publish `@docspack-community/*` (needs npm scope + owner): create the `@docspack-community` npm scope with an owner, then for each recipe in `community-packs/` (vite-plus; hono and cloudflare listed in `docs/packs.json` once their recipes exist) run the README's `pnpm dlx docspack@1.5.0 build --from <docs dir> --name @docspack-community/<tool> --pkg-version <ver>` and `npm publish` the output. Until then `pnpm docs:packs --online` reports them as unpublished.
 

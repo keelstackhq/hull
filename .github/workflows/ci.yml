@@ -20,6 +20,8 @@ jobs:
     env:
       BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
     steps:
+      - name: Start timer
+        run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -75,6 +77,10 @@ jobs:
       - name: Dogfood combos
         if: steps.combos.outputs.args != ''
         run: node scripts/dogfood.mjs ${{ steps.combos.outputs.args }} --root "$RUNNER_TEMP/combos" --cache-dir "$RUNNER_TEMP/turbo-cache"
+      - name: Job duration
+        if: always()
+        continue-on-error: true
+        run: echo "ci job: $(( $(date +%s) - ${CI_START:-$(date +%s)} ))s (hull budget: 120s warm with one piece changed, 20s docs-only)" >> "$GITHUB_STEP_SUMMARY"
 
   ci-ok:
     needs: [ci]

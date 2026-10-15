@@ -143,7 +143,7 @@ test("every recipe folder named in packs.json exists in community-packs/", ...);
 **Interfaces:**
 - Produces: `jobSeconds(runJson, jobName = "ci"): number | null` (null unless conclusion is `success`); `summarize(seconds: number[]): { n, p50, p90 }`; CLI `node scripts/ci-timing.mjs --repo <owner/repo> [--limit 20] [--budget 45] [--job ci]` exits 1 when p50 > budget.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("job seconds from startedAt/completedAt", () => assert.equal(jobSeconds(fx("run-ok")), 38));
@@ -152,10 +152,10 @@ test("p50/p90", () => assert.deepEqual(summarize([10, 20, 30, 40, 50]), { n: 5, 
 test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement** with `gh run list -R <repo> -w ci.yml -L <n> --json databaseId` and `gh run view <id> -R <repo> --json jobs`; `opts.gh` injectable for tests.
-- [ ] **Step 4: Run `pnpm test` — expect PASS.** Real measurement needs hull on GitHub and a canary repo (`keelstack/hull-canary`, rendered from `web`): put both under Blocked with the commands to run (`node scripts/ci-timing.mjs --repo keelstack/hull --budget 120`, `--repo keelstack/hull-canary --budget 45`).
-- [ ] **Step 5: Commit** — `feat: CI timing check against the budget`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement** with `gh run list -R <repo> -w ci.yml -L <n> --json databaseId` and `gh run view <id> -R <repo> --json jobs`; `opts.gh` injectable for tests.
+- [x] **Step 4: Run `pnpm test` — expect PASS.** Real measurement needs hull on GitHub and a canary repo (`keelstack/hull-canary`, rendered from `web`): put both under Blocked with the commands to run (`node scripts/ci-timing.mjs --repo keelstack/hull --budget 120`, `--repo keelstack/hull-canary --budget 45`).
+- [x] **Step 5: Commit** — `feat: CI timing check against the budget`
 
 ---
 
