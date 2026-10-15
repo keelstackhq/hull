@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dogfood } from "../scripts/dogfood.mjs";
 
@@ -14,4 +15,47 @@ test("a render failure fails that combo without throwing", async () => {
   });
   assert.equal(results.length, 2);
   assert.ok(results.every((r) => r.ok === false));
+});
+
+test("every combo in combos.json renders", async (t) => {
+  const { renderNew } = await import("../scripts/render.mjs");
+  const { readFile } = await import("node:fs/promises");
+  const { vars, combos } = JSON.parse(
+    await readFile(new URL("../scripts/combos.json", import.meta.url), "utf8"),
+  );
+  const root = await mkdtemp(join(tmpdir(), "hull-render-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const c of combos) {
+    await renderNew({
+      template: fileURLToPath(new URL("../template", import.meta.url)),
+      out: join(root, c.name),
+      pieces: c.pieces,
+      vars,
+    });
+    await access(join(root, c.name, "package.json"));
+  }
+});
+
+test("single-vite check runs for web and site, not base; failure fails the combo", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const run = async (cmd, args, cwd) => {
+    calls.push({ cmd, args, cwd });
+    return 0;
+  };
+  const results = await dogfood({ combos: ["base", "web", "site"], root, run });
+  assert.ok(results.every((r) => r.ok));
+  const checked = (n) =>
+    calls.some(
+      (c) => c.args.some((a) => a.endsWith("check-single-vite.mjs")) && c.cwd === join(root, n),
+    );
+  assert.equal(checked("base"), false);
+  assert.equal(checked("web"), true);
+  assert.equal(checked("site"), true);
+
+  const failing = async (cmd, args) =>
+    args.some((a) => a.endsWith("check-single-vite.mjs")) ? 1 : 0;
+  const r = await dogfood({ combos: ["web"], root, run: failing });
+  assert.equal(r[0].ok, false);
 });

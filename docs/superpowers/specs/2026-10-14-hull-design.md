@@ -574,6 +574,8 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
 
 Sequential in one job is the default. Plan 02 measures it; a matrix is adopted only if the
 measured sequential time exceeds 3 minutes warm and a matrix would cut it by more than half.
+Measured 2026-10-15 (cloud container, warm pnpm store): base+web+site cold 24–42 s, warm 4.5–6.8 s,
+so hull CI stays sequential. `scripts/check-single-vite.mjs` changes also select all combos.
 Budget for hull's own PR CI: ≤ 120 s warm when one piece changes, ≤ 20 s docs-only.
 
 ### 10.3 `desktop.yml` (hull)

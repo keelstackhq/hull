@@ -56,3 +56,21 @@ test("CLI with an unknown base warns and prints every combo", () => {
   assert.deepEqual(JSON.parse(r.stdout), names);
   assert.match(r.stderr, /warning/);
 });
+
+test("real combos: hono-worker selects web, astro-site selects site", () => {
+  const real = JSON.parse(
+    readFileSync(fileURLToPath(new URL("../scripts/combos.json", import.meta.url)), "utf8"),
+  ).combos;
+  assert.deepEqual(affectedCombos(["template/pieces/hono-worker/files/x"], real), ["web"]);
+  assert.deepEqual(affectedCombos(["template/pieces/astro-site/files/x"], real), ["site"]);
+  assert.deepEqual(affectedCombos(["template/pieces/preact-app/files/x"], real), ["web"]);
+  assert.deepEqual(affectedCombos(["template/pieces/ui-storybook/files/x"], real), ["web"]);
+  assert.deepEqual(
+    affectedCombos(["template/pieces/base/files/x"], real),
+    real.map((c) => c.name),
+  );
+  assert.deepEqual(
+    affectedCombos(["scripts/check-single-vite.mjs"], real),
+    real.map((c) => c.name),
+  );
+});

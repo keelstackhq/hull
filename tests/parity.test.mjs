@@ -23,3 +23,14 @@ test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", async 
   const [cmd, ...args] = [...ciCommand(), "--cache-dir=/c"];
   assert.ok(comboSteps("/c").some(([c, a]) => c === cmd && a.join(" ") === args.join(" ")));
 });
+
+test("comboSteps adds the single-vite step only for Vite pieces", () => {
+  const steps = comboSteps("/c", ["base", "preact-app:web"], "/d");
+  const [cmd, ...args] = ciCommand();
+  assert.ok(steps.some(([c, a]) => c === cmd && a.slice(0, -1).join(" ") === args.join(" ")));
+  assert.ok(
+    steps.some(([c, a]) => c === "node" && a[0].endsWith("check-single-vite.mjs") && a[1] === "/d"),
+  );
+  const base = comboSteps("/c", ["base"], "/d");
+  assert.ok(!base.some(([, a]) => a.some((x) => x.endsWith("check-single-vite.mjs"))));
+});

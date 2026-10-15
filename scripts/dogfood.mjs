@@ -14,14 +14,21 @@ const COMBOS = new URL("./combos.json", import.meta.url);
 /** The CI command every rendered combo runs (parity with generated CI). */
 export const ciCommand = () => ["pnpm", "turbo", "run", ...CI_TASKS];
 
-/** Steps run in each rendered combo. Hook: plan 02 adds `check-single-vite` for Vite combos. */
-export function comboSteps(cacheDir) {
+const CHECK_SINGLE_VITE = fileURLToPath(new URL("./check-single-vite.mjs", import.meta.url));
+const VITE_PIECES = new Set(["preact-app", "ui-storybook", "astro-site"]);
+
+/** Steps run in each rendered combo; `check-single-vite` for combos with Vite pieces. */
+export function comboSteps(cacheDir, pieces = [], dir = ".") {
   const [cmd, ...args] = ciCommand();
-  return [
+  const steps = [
     ["git", ["init", "-q"]],
     ["pnpm", ["install", "--no-frozen-lockfile", "--prefer-offline"]],
     [cmd, [...args, `--cache-dir=${cacheDir}`]],
   ];
+  if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
+    steps.push(["node", [CHECK_SINGLE_VITE, dir]]);
+  }
+  return steps;
 }
 
 function run(prefix, cmd, args, cwd) {
@@ -48,7 +55,7 @@ function run(prefix, cmd, args, cwd) {
 }
 
 /**
- * @param {{ combos: string[], root?: string, cacheDir?: string, template?: string }} opts
+ * @param {{ combos: string[], root?: string, cacheDir?: string, template?: string, run?: (cmd: string, args: string[], cwd: string) => Promise<number> }} opts
  * @returns {Promise<{ name: string, ok: boolean, seconds: number }[]>}
  */
 export async function dogfood(opts) {
@@ -56,6 +63,7 @@ export async function dogfood(opts) {
   const root = resolve(opts.root ?? join(tmpdir(), "hull-dogfood"));
   const cacheDir = resolve(opts.cacheDir ?? join(root, ".turbo-cache"));
   const results = [];
+  const exec = opts.run ?? ((cmd, args, cwd) => run(cwd.split(/[\\/]/).pop(), cmd, args, cwd));
   for (const name of opts.combos) {
     const combo = combos.find((c) => c.name === name);
     const start = Date.now();
@@ -78,8 +86,8 @@ export async function dogfood(opts) {
         process.stderr.write(`[${name}] ${e.message ?? String(e)}\n`);
       }
       if (ok) {
-        for (const [cmd, args] of comboSteps(cacheDir)) {
-          if ((await run(name, cmd, args, dir)) !== 0) {
+        for (const [cmd, args] of comboSteps(cacheDir, combo.pieces, dir)) {
+          if ((await exec(cmd, args, dir)) !== 0) {
             ok = false;
             break;
           }

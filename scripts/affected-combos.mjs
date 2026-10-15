@@ -11,6 +11,7 @@ const ALL_EXACT = new Set([
   "template/splice.toml",
   "scripts/render.mjs",
   "scripts/dogfood.mjs",
+  "scripts/check-single-vite.mjs",
   "scripts/combos.json",
   "package.json",
   "pnpm-lock.yaml",

@@ -1,4 +1,11 @@
 {
   "vars": { "scope": "hullci" },
-  "combos": [{ "name": "base", "pieces": ["base"] }]
+  "combos": [
+    { "name": "base", "pieces": ["base"] },
+    {
+      "name": "web",
+      "pieces": ["base", "preact-app:web", "ui-storybook", "hono-worker:api"]
+    },
+    { "name": "site", "pieces": ["base", "astro-site:site"] }
+  ]
 }

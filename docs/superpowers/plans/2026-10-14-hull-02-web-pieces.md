@@ -223,12 +223,12 @@ test("pull_request only, concurrency per PR, contents: read", ...);
 - Consumes: `dogfood`, `checkSingleVite`
 - Produces: final combo names `base`, `web`, `site` used by plan 03.
 
-- [ ] **Step 1: Write failing tests:** `affectedCombos(["template/pieces/hono-worker/files/x"])` → `["web"]`; `astro-site` → `["site"]`; every combo in `combos.json` renders without error (fast: render only); dogfood calls the single-vite check for `web` and `site` but not `base` (inject a fake runner).
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Implement.** Inject the command runner into `dogfood()` (`opts.run?: (cmd, args, cwd) => Promise<number>`) so tests do not spawn pnpm.
-- [ ] **Step 4: Measure:** `node scripts/dogfood.mjs --combo base --combo web --combo site` twice (cold, then warm with the same `--cache-dir`). Record both times per combo in PROGRESS. Keep sequential unless warm total > 180 s and a matrix would halve it (spec §10.2); if switching, update spec §10.2 in this commit.
-- [ ] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
-- [ ] **Step 6: Commit** — `ci: dogfood web and site combos`
+- [x] **Step 1: Write failing tests:** `affectedCombos(["template/pieces/hono-worker/files/x"])` → `["web"]`; `astro-site` → `["site"]`; every combo in `combos.json` renders without error (fast: render only); dogfood calls the single-vite check for `web` and `site` but not `base` (inject a fake runner).
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Implement.** Inject the command runner into `dogfood()` (`opts.run?: (cmd, args, cwd) => Promise<number>`) so tests do not spawn pnpm.
+- [x] **Step 4: Measure:** `node scripts/dogfood.mjs --combo base --combo web --combo site` twice (cold, then warm with the same `--cache-dir`). Record both times per combo in PROGRESS. Keep sequential unless warm total > 180 s and a matrix would halve it (spec §10.2); if switching, update spec §10.2 in this commit.
+- [x] **Step 5: Run `pnpm test && pnpm lint && pnpm format:check` — expect PASS.**
+- [x] **Step 6: Commit** — `ci: dogfood web and site combos`
 
 ---
 
