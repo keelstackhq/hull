@@ -195,7 +195,8 @@ Root files (class in brackets):
   `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
   piece conditions; see §4.3 item 8.
 - `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-tool or tauri-app:
-  `resolver = "3"`, `members = ["crates/*", "apps/*/src-tauri"]`, `[workspace.lints]`,
+  `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-tool, `"apps/*/src-tauri"` only
+  with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
   `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition, `stable`
   with `clippy`, `rustfmt`.
 - `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
@@ -292,9 +293,11 @@ lower `head_sampling_rate`.
 `src/main.rs` [seed] with one unit test, `package.json.jinja` [shared, json] whose scripts call
 cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `cargo clippy -p {{ name }} --all-targets -- -D warnings`, `format:check` `cargo fmt -p {{ name }} --check`,
-`test` `cargo nextest run -p {{ name }}`. `turbo.json` [owned] extends `//`: build outputs
+`typecheck` `cargo check -p {{ name }} --all-targets` (CI_TASKS needs it), `test` `cargo nextest run -p {{ name }}`. `turbo.json` [owned] extends `//`: build outputs
 `$TURBO_ROOT$/target/release/{{ name }}`, inputs `src/**`, `Cargo.toml`, `$TURBO_ROOT$/Cargo.lock`
-(verify the `$TURBO_ROOT$` syntax). `[[post]]` `cargo generate-lockfile` on `new`/`add`.
+(`$TURBO_ROOT$` verified with turbo 2.11.8 on 2026-10-15: a cached build restores the binary). `[[post]]`
+`cargo generate-lockfile` on `new`/`add`; dogfood runs the same command, because the dev renderer
+does not run `[[post]]`.
 `CLAUDE.md` [owned].
 
 ### 6.7 `tauri-app`
@@ -461,7 +464,8 @@ upstream.
   4. `pnpm install --frozen-lockfile --prefer-offline`.
   5. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
      restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstack/hoard@v1` once released.
-  6. Rust (present in the plain `ci.yml`, guarded at runtime by `hashFiles('Cargo.toml') != ''`,
+  6. Rust (present in the plain `ci.yml`, guarded at runtime by
+     `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
      `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,

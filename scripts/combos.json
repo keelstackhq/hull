@@ -6,6 +6,6 @@
       "name": "web",
       "pieces": ["base", "preact-app:web", "ui-storybook", "hono-worker:api"]
     },
-    { "name": "site", "pieces": ["base", "astro-site:site"] }
+    { "name": "site", "pieces": ["base", "astro-site:site", "rust-tool:tool"] }
   ]
 }

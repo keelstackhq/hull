@@ -34,3 +34,13 @@ test("comboSteps adds the single-vite step only for Vite pieces", () => {
   const base = comboSteps("/c", ["base"], "/d");
   assert.ok(!base.some(([, a]) => a.some((x) => x.endsWith("check-single-vite.mjs"))));
 });
+
+test("comboSteps runs the rust-tool post hook (cargo generate-lockfile) before turbo", () => {
+  const steps = comboSteps("/c", ["base", "rust-tool:tool"], "/d").map(([c, a]) =>
+    [c, ...a].join(" "),
+  );
+  const lock = steps.indexOf("cargo generate-lockfile");
+  assert.ok(lock > steps.findIndex((s) => s.startsWith("pnpm install")));
+  assert.ok(lock < steps.findIndex((s) => s.startsWith("pnpm turbo run")));
+  assert.ok(!comboSteps("/c", ["base"], "/d").some(([c]) => c === "cargo"));
+});

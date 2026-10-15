@@ -55,6 +55,30 @@ jobs:
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             turbo-${{ runner.os }}-
+      - name: Rust affected?
+        id: rust
+        if: steps.affected.outputs.skip != 'true' && hashFiles('.github/scripts/rust-affected.mjs') != ''
+        run: |
+          set +e
+          pnpm turbo query affected --packages > "$RUNNER_TEMP/rust.json"
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            node .github/scripts/rust-affected.mjs < "$RUNNER_TEMP/rust.json" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::turbo query affected --packages failed (exit $code); running Rust steps"
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
+      - uses: taiki-e/install-action@v2
+        if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
+        with:
+          tool: cargo-nextest
       - name: Run affected tasks
         if: steps.affected.outputs.skip != 'true'
         run: pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only

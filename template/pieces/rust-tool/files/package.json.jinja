@@ -1,0 +1,12 @@
+{
+  "name": "@{{ scope }}/{{ name }}",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release -p {{ name }}",
+    "lint": "cargo clippy -p {{ name }} --all-targets -- -D warnings",
+    "format:check": "cargo fmt -p {{ name }} --check",
+    "typecheck": "cargo check -p {{ name }} --all-targets",
+    "test": "cargo nextest run -p {{ name }}"
+  }
+}

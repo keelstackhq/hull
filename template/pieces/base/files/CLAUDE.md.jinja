@@ -44,14 +44,18 @@ Keep subagent reports short. Skills: `verify`, `add-piece`{% if "docs" in pieces
 ## Pieces
 {% elif "hono-worker" in pieces %}
 ## Pieces
+{% elif "rust-tool" in pieces %}
+## Pieces
 {% endif %}{% if "preact-app" in pieces %}
 - `apps/*` (preact-app): Preact apps on Vite+ with cascivo; see `apps/<name>/CLAUDE.md`.{% endif %}{% if "ui-storybook" in pieces %}
 - `packages/ui` (ui-storybook): Preact components with Storybook; see `packages/ui/CLAUDE.md`.{% endif %}{% if "astro-site" in pieces %}
 - `apps/*` (astro-site): Astro static sites with Preact islands; see `apps/<name>/CLAUDE.md`.{% endif %}{% if "hono-worker" in pieces %}
-- `apps/*` (hono-worker): Hono workers with JSON request logs; see `apps/<name>/CLAUDE.md`.{% endif %}{# same-branches #}{% if "preact-app" in pieces %}
+- `apps/*` (hono-worker): Hono workers with JSON request logs; see `apps/<name>/CLAUDE.md`.{% endif %}{% if "rust-tool" in pieces %}
+- `crates/*` (rust-tool): Rust crates in a Cargo workspace; scripts use `-p <crate>`, never `--workspace`; see `crates/<name>/CLAUDE.md`.{% endif %}{# same-branches #}{% if "preact-app" in pieces %}
 {% elif "ui-storybook" in pieces %}
 {% elif "astro-site" in pieces %}
 {% elif "hono-worker" in pieces %}
+{% elif "rust-tool" in pieces %}
 {% endif %}{% if "docs" in pieces %}
 ## Docs
 

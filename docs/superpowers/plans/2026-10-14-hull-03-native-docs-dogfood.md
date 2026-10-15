@@ -14,7 +14,7 @@
 
 - All milestone 1 and 2 Global Constraints apply.
 - Rust scripts always pass `-p <crate>`; never `--workspace` (it would pull in `src-tauri`, which needs webkit2gtk).
-- Root `Cargo.toml`: `resolver = "3"`, `members = ["crates/*", "apps/*/src-tauri"]`; rendered only when rust-tool or tauri-app is present.
+- Root `Cargo.toml`: `resolver = "3"`, `members` per piece (`crates/*` with rust-tool, `apps/*/src-tauri` with tauri-app; cargo rejects unmatched globs — changed 2026-10-15); rendered only when rust-tool or tauri-app is present.
 - Tauri builds run only in `desktop.yml` (scheduled + manual), never on the PR path.
 - docspack commands: `docspack sync`, `docspack index --repo`, `docspack ask "<q>" --json`. Never auto-edit `package.json` from scripts.
 - Budgets: generated repo job `ci` p50 ≤ 45 s (typical PR), ≤ 15 s docs-only; hull job `ci` ≤ 120 s warm, ≤ 20 s docs-only.
@@ -34,7 +34,7 @@
 
 ```
 template/pieces/base/files/{Cargo.toml.jinja,rust-toolchain.toml.jinja}
-template/pieces/base/files/.github/workflows/{ci.yml.jinja (+rust steps),desktop.yml.jinja}
+template/pieces/base/files/.github/workflows/{ci.yml (plain, +rust steps behind runtime guards),desktop.yml.jinja}
 template/pieces/rust-tool/{piece.toml,files/{Cargo.toml.jinja,package.json.jinja,turbo.json.jinja,src/main.rs,CLAUDE.md}}
 template/pieces/tauri-app/{piece.toml,files/{package.json.jinja,src-tauri/**,CLAUDE.md}}
 template/pieces/docs/{piece.toml,files/{docs/packs.json,docs/agents/docs.md,scripts/docs-packs.mjs}}
@@ -51,14 +51,14 @@ tests/splice-parity.test.mjs  tests/splice-update.test.mjs   # Task 7 (blocked)
 
 **Files:**
 - Create: `template/pieces/rust-tool/**`, `template/pieces/base/files/Cargo.toml.jinja`, `template/pieces/base/files/rust-toolchain.toml.jinja`
-- Modify: `template/pieces/base/files/.github/workflows/ci.yml.jinja` (Rust steps, spec §8.1 step 6), `template/pieces/base/files/CLAUDE.md.jinja`, `scripts/combos.json` (`site` += `rust-tool:tool`), `.github/workflows/ci.yml` (Rust toolchain when a selected combo has rust-tool)
+- Modify: `template/pieces/base/files/.github/workflows/ci.yml` (plain; Rust steps behind runtime guards, spec §8.1 step 6), `scripts/dogfood.mjs` (`cargo generate-lockfile` for rust combos), `template/pieces/base/files/CLAUDE.md.jinja`, `scripts/combos.json` (`site` += `rust-tool:tool`), `.github/workflows/ci.yml` (Rust toolchain when a selected combo has rust-tool)
 - Test: `tests/rust-tool.test.mjs`, `tests/ci-workflow.test.mjs` (extend)
 
 **Interfaces:**
 - Consumes: `renderCombo`, `elifBranches`/`assertSameBranches`, `CI_TASKS`
-- Produces: crate `{{ name }}` with npm package `@{{ scope }}/{{ name }}`; generated step output `rust` (`'true'|'false'`); `tauri-app` (Task 2) relies on the root `Cargo.toml` members glob.
+- Produces: crate `{{ name }}` with npm package `@{{ scope }}/{{ name }}`; generated step output `rust` (`'true'|'false'`); `tauri-app` (Task 2) adds `"apps/*/src-tauri"` to the per-piece root `Cargo.toml` members.
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
 
 ```js
 test("root Cargo.toml only with a Rust piece; branches identical", ...);
@@ -74,10 +74,10 @@ test("ci.yml has rust steps guarded by rust == 'true' only with rust-tool", ...)
 test("rust decision: affected packages with Cargo.toml → true", ...); // unit test of the inline script: extract it to template file .github/scripts/rust-affected.mjs (owned) and test that
 ```
 
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Write the files** per spec §6.1 (Cargo files), §6.6 and §8.1 step 6. The rust decision runs `.github/scripts/rust-affected.mjs` (owned, rendered only with rust-tool): reads `turbo query affected --packages` JSON from stdin and prints `rust=true|false` to `$GITHUB_OUTPUT`. Verify `$TURBO_ROOT$` in outputs with a real `turbo run build` twice (second run must be `FULL TURBO`).
-- [ ] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `node scripts/dogfood.mjs --combo site` (needs Rust + `cargo install cargo-nextest --locked` locally) — passes; the second run shows cache hits for the crate.
-- [ ] **Step 5: Commit** — `feat(rust-tool): Rust crates in a Cargo workspace, orchestrated by Turbo`
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Write the files** per spec §6.1 (Cargo files), §6.6 and §8.1 step 6. The rust decision runs `.github/scripts/rust-affected.mjs` (owned, rendered only with rust-tool): reads `turbo query affected --packages` JSON from stdin and prints `rust=true|false` to `$GITHUB_OUTPUT`. Verify `$TURBO_ROOT$` in outputs with a real `turbo run build` twice (second run must be `FULL TURBO`).
+- [x] **Step 4: Run `pnpm test` — expect PASS. Dogfood** `node scripts/dogfood.mjs --combo site` (needs Rust + `cargo install cargo-nextest --locked` locally) — passes; the second run shows cache hits for the crate.
+- [x] **Step 5: Commit** — `feat(rust-tool): Rust crates in a Cargo workspace, orchestrated by Turbo`
 
 ---
 
@@ -181,7 +181,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 ### Task 6: Remote cache with hoard — BLOCKED until `keelstack/hoard@v1` is released
 
 **Files:**
-- Modify: `template/pieces/base/files/.github/workflows/ci.yml.jinja`, `.github/workflows/ci.yml`
+- Modify: `template/pieces/base/files/.github/workflows/ci.yml` (plain), `.github/workflows/ci.yml`
 - Test: `tests/ci-workflow.test.mjs` (extend)
 
 **Interfaces:**

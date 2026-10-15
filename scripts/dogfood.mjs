@@ -23,6 +23,11 @@ export function comboSteps(cacheDir, pieces = [], dir = ".") {
   const steps = [
     ["git", ["init", "-q"]],
     ["pnpm", ["install", "--no-frozen-lockfile", "--prefer-offline"]],
+    // the rust-tool [[post]] hook, which the dev renderer does not run; keeps Cargo.lock (a turbo
+    // input) stable, so a second run hits the cache
+    ...(pieces.some((p) => p.split(":")[0] === "rust-tool")
+      ? [["cargo", ["generate-lockfile"]]]
+      : []),
     [cmd, [...args, `--cache-dir=${cacheDir}`]],
   ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {

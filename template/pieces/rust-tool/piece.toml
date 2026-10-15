@@ -1,0 +1,21 @@
+id = "rust-tool"
+description = "A Rust crate in a Cargo workspace, orchestrated by Turborepo (clippy, rustfmt, nextest)"
+multiple = true
+requires = ["base"]
+target = "crates/{{ name }}"
+
+[vars]
+name = { prompt = "crate name", default = "tool", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["turbo.json", "CLAUDE.md"]
+shared = ["Cargo.toml", "package.json"]
+seed = ["src/main.rs"]
+
+[merge]
+"Cargo.toml" = "toml"
+"package.json" = "json"
+
+[[post]]
+run = "cargo generate-lockfile"
+when = ["new", "add"]

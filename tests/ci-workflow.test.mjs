@@ -96,8 +96,14 @@ test("turbo run uses CI_TASKS and --affected", () => {
   assert.equal(last.run, `pnpm turbo run ${tasks} --affected --output-logs=errors-only`);
 });
 
-test("no rust steps without rust-tool", () => {
-  assert.ok(!/rust|cargo/i.test(raw));
+test("rust steps in the plain ci.yml are skipped when rust-affected.mjs is absent", () => {
+  const decision = steps.find((s) => s.id === "rust");
+  assert.match(decision.if, /hashFiles\('\.github\/scripts\/rust-affected\.mjs'\) != ''/);
+  assert.ok(
+    !result.changes.some(
+      (x) => x.path === ".github/scripts/rust-affected.mjs" && x.action !== "skip",
+    ),
+  );
 });
 
 test("renovate.json extends the hull preset", async () => {
