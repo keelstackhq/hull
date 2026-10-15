@@ -80,7 +80,8 @@ jobs:
       - name: Job duration
         if: always()
         continue-on-error: true
-        run: echo "ci job: $(( $(date +%s) - ${CI_START:-$(date +%s)} ))s (hull budget: 120s warm with one piece changed, 20s docs-only)" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "ci job: $(( $(date +%s) - ${CI_START:-$(date +%s)} ))s (hull budget: 120s warm with one piece changed, 20s docs-only)" >> "$GITHUB_STEP_SUMMARY"
 
   ci-ok:
     needs: [ci]

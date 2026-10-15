@@ -46,11 +46,11 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
   `| upper`, `if/elif/else` on `var` or `"id" in pieces`, `for p in pieces`, comments. No
   `not/and/or`, comparisons, `set`, `{%-`, macros, includes, other filters, `{% if pieces %}`.
 - **No app logic in the template.** App source is `seed`; configs/workflows/AI layer are `owned`;
+  `package.json`, `turbo.json`, `pnpm-workspace.yaml`, crate `Cargo.toml`, `tauri.conf.json`,
+  `wrangler.jsonc` are `shared` with a `[merge]` strategy.
 - **Renderer rules** (spec §9): identifiers `[a-z_][a-z0-9_]*` (not `loop/self/range/namespace`), no
   symlinks in the template, portable rendered path segments, no case-insensitive path collisions,
   `[[post]].when` required.
-  `package.json`, `turbo.json`, `pnpm-workspace.yaml`, crate `Cargo.toml`, `tauri.conf.json`,
-  `wrangler.jsonc` are `shared` with a `[merge]` strategy.
 - **Each path in at most one ownership class.** No `{{` in paths under `files/`.
 - **Exact versions** in the template's pnpm catalog (spec §7). `vite` is overridden to
   `@voidzero-dev/vite-plus-core` at the same version as `vite-plus`; a combo's lockfile has one vite.
