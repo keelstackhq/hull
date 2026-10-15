@@ -40,6 +40,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-15 · dogfood base+web+site · cold turbo / warm turbo · base 10.3/0.8 s, web 21.2/2.0 s, site 10.8/1.7 s (render+install+CI tasks+single-vite) · cloud container, warm pnpm store
 - 2026-10-15 · dogfood all PR combos after Milestone 3 fixes · cold turbo · base 1.8 s, web 11.6 s, site (incl. rust-tool) 7.9 s, docs 2.0 s · cloud container, warm pnpm store
 - 2026-10-15 · site warm rerun · 2.3 s, 16/16 tasks cached incl. the crate · cloud container
+- 2026-10-15 · hull CI on GitHub (run 38752514194, PR #1, first valid run) · cold caches, all 4 PR combos dogfooded (diff vs root commit) · job `ci` 86 s (14:33:53→14:35:19 UTC), `ci-ok` green · ubuntu-latest. Within the 120 s hull budget even cold; warm one-piece and docs-only runs not yet measured.
 - 2026-10-15 · one repo with all 8 pieces · `turbo run lint format:check typecheck test build` 32/32 tasks in 18 s cold, no Tauri compile · cloud container
 
 ## Blocked
@@ -105,7 +106,7 @@ node scripts/ci-timing.mjs --repo <owner/repo> --budget 45                    # 
 |---|---|---|---|
 | Generated repo job `ci`, typical PR | ≤ 45 s p50 | not measured (no GitHub repo); local turbo CI tasks 2–12 s cold, ≤ 2 s warm | Measurements |
 | Generated repo, docs-only PR | ≤ 15 s | not measured; early exit verified in a scratch repo (CLAUDE.md-only commit → skip) | 01 review fix |
-| Hull job `ci`, one piece changed, warm | ≤ 120 s | not measured on GitHub; all 4 PR combos dogfood in ~23 s cold, ~5 s warm locally | Measurements |
+| Hull job `ci`, one piece changed, warm | ≤ 120 s | first GitHub run: 86 s cold with all 4 combos (2026-10-15); warm one-piece not yet measured | Measurements |
 | Hull, docs-only PR | ≤ 20 s | not measured; docs/tests select no combo | 01/9 |
 
 All timings are from this cloud container, not GitHub runners; they are not evidence for the GitHub budgets.
