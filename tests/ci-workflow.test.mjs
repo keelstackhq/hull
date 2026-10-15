@@ -71,7 +71,7 @@ test("early exit uses turbo query affected with CI_TASKS and affected.mjs", asyn
 
 test("every step after the affected check is guarded by skip", () => {
   assert.ok(affectedIdx >= 0);
-  for (const s of steps.slice(affectedIdx + 1)) {
+  for (const s of steps.slice(affectedIdx + 1).filter((x) => x.name !== "Job duration")) {
     assert.match(s.if, /steps\.affected\.outputs\.skip != 'true'/, s.name ?? s.run);
   }
 });
@@ -92,7 +92,7 @@ test("turbo cache restores by prefix", () => {
 });
 
 test("turbo run uses CI_TASKS and --affected", () => {
-  const last = steps.at(-1);
+  const last = steps.at(-2);
   assert.equal(last.run, `pnpm turbo run ${tasks} --affected --output-logs=errors-only`);
 });
 
@@ -271,4 +271,18 @@ test("affected.mjs: ci.yml, scripts, .node-version, .npmrc each force a run", as
     }).trim();
     assert.equal(out, "skip=false", rel);
   }
+});
+
+test("Job duration step: always, non-fatal, budget in summary, no ${{ }}", () => {
+  const start = steps[0];
+  assert.match(start.run ?? "", /CI_START=\$\(date \+%s\)" >> "\$GITHUB_ENV"/);
+  const last = steps.at(-1);
+  assert.equal(last.name, "Job duration");
+  assert.equal(last.if, "always()");
+  assert.equal(last["continue-on-error"], true);
+  assert.match(last.run, /\$\{CI_START:-\$\(date \+%s\)\}/);
+  assert.match(last.run, /GITHUB_STEP_SUMMARY/);
+  assert.match(last.run, /45 s/);
+  assert.match(last.run, /15 s/);
+  assert.ok(!last.run.includes("${{") && !start.run.includes("${{"));
 });

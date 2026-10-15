@@ -50,6 +50,17 @@ test("CLI exits 0 within budget and ignores cancelled/skipped runs", async () =>
   assert.match(r.out, /p50=38/);
 });
 
+test("gh run list is limited to pull_request runs", async () => {
+  const seen = [];
+  const gh = async (args) => {
+    seen.push(args);
+    return args[1] === "list" ? "[]" : "{}";
+  };
+  await run(["--repo", "o/r"], { gh });
+  const list = seen.find((a) => a[1] === "list");
+  assert.equal(list[list.indexOf("-e") + 1], "pull_request");
+});
+
 test("CLI with no usable runs exits 1", async () => {
   const gh = fakeGh({
     101: "run-cancelled",

@@ -79,6 +79,8 @@ export async function run(argv, opts = {}) {
         values.repo,
         "-w",
         "ci.yml",
+        "-e",
+        "pull_request",
         "-L",
         String(limit),
         "--json",

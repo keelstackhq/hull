@@ -1,6 +1,13 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["vite.config.ts", "tsconfig.base.json"],
+  "$schema": "https://turbo.build/schema.json",{% if "rust-tool" in pieces %}
+  "globalDependencies": [
+    "vite.config.ts",
+    "tsconfig.base.json",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml"
+  ],{% else %}
+  "globalDependencies": ["vite.config.ts", "tsconfig.base.json"],{% endif %}
   "tasks": {
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
     "lint": {},

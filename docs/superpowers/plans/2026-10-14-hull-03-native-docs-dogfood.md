@@ -205,6 +205,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 **Interfaces:**
 - Consumes: splice CLI and `--json` output (contract §8); `renderNew` as the oracle.
 
+- Notes from the Milestone 3 review (2026-10-15): splice runs `[[post]]` hooks (`pnpm install`, `cargo generate-lockfile`/`cargo update --workspace`), so the parity test must compare trees before hooks or ignore lockfiles, `node_modules` and `target/`; dogfood must then drop its own `cargo generate-lockfile` step. The update test should also check that `add rust-tool:b` does not bump locked crates. Hull PRs touching only `template/pieces/tauri-app/**` select no combo; consider a non-scheduled desktop combo without `build:desktop`.
 - [ ] **Step 1: Align flags.** Read splice's README/`splice new --help`; update the assumed invocation everywhere (spec §4.3.8, this plan's Global Constraints, add-piece skill). Report any contract mismatch to the splice repo.
 - [ ] **Step 2: Write failing tests:**
 

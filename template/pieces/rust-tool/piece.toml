@@ -18,4 +18,8 @@ seed = ["src/main.rs"]
 
 [[post]]
 run = "cargo generate-lockfile"
-when = ["new", "add"]
+when = ["new"]
+
+[[post]]
+run = "cargo update --workspace"
+when = ["add"]

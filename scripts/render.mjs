@@ -34,6 +34,22 @@ async function assertEmptyOut(out) {
   }
 }
 
+/** Warn when instances of different pieces share a name (they collapse to one package name). */
+function nameClashes(instances) {
+  const byName = new Map();
+  for (const { piece, name } of instances) {
+    if (!piece.multiple) continue;
+    if (!byName.has(name)) byName.set(name, new Set());
+    byName.get(name).add(piece.id);
+  }
+  return [...byName]
+    .filter(([, ids]) => ids.size > 1)
+    .map(
+      ([name, ids]) =>
+        `warning: instance name "${name}" is used by ${[...ids].join(" and ")}; their packages share one name, rename one`,
+    );
+}
+
 /**
  * @param {{ template: string, out: string, pieces: string[], vars: Record<string,string>, templateVersion?: string }} opts
  * @returns {Promise<Result>}
@@ -102,7 +118,7 @@ export async function renderNew(opts) {
     if (createdParent) await rm(createdParent, { recursive: true, force: true });
     throw e;
   }
-  return { ok: true, command: "new", changes, messages: [] };
+  return { ok: true, command: "new", changes, messages: nameClashes(instances) };
 }
 
 function parseData(items) {

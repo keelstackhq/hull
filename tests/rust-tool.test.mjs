@@ -22,7 +22,10 @@ test("piece manifest", async () => {
   assert.deepEqual(p.requires, ["base"]);
   assert.deepEqual(
     p.post.map((x) => [x.run, x.when]),
-    [["cargo generate-lockfile", ["new", "add"]]],
+    [
+      ["cargo generate-lockfile", ["new"]],
+      ["cargo update --workspace", ["add"]],
+    ],
   );
 });
 
@@ -122,8 +125,8 @@ test("rust steps are guarded by the decision step, which only runs when rust-aff
   assert.equal(rustSteps[2].with.tool, "cargo-nextest");
   const idx = (s) => steps.indexOf(s);
   assert.ok(idx(decision) < idx(rustSteps[0]));
-  assert.ok(idx(rustSteps.at(-1)) < steps.length - 1);
-  assert.match(steps.at(-1).run, /^pnpm turbo run /);
+  assert.ok(idx(rustSteps.at(-1)) < steps.length - 2);
+  assert.match(steps.at(-2).run, /^pnpm turbo run /);
   assert.equal(byPath(result)[".github/scripts/rust-affected.mjs"], "owned");
   // the decision script is owned and rendered only with rust-tool (plain ci.yml is shared by all combos)
   const base = await renderCombo(["base"]);
@@ -185,4 +188,15 @@ test("base CLAUDE.md lists rust-tool and stays within 80 lines", async () => {
 test("site combo includes rust-tool", async () => {
   const combos = JSON.parse(await readFile(new URL("../scripts/combos.json", import.meta.url)));
   assert.ok(combos.combos.find((c) => c.name === "site").pieces.includes("rust-tool:tool"));
+});
+
+test("root Cargo files are turbo globalDependencies only with a Rust piece", async () => {
+  const root = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"];
+  const rust = JSON.parse(
+    await read((await renderCombo(["base", "rust-tool:tool"])).dir, "turbo.json"),
+  );
+  for (const f of root) assert.ok(rust.globalDependencies.includes(f), f);
+  const plain = JSON.parse(await read((await renderCombo(["base"])).dir, "turbo.json"));
+  for (const f of root) assert.ok(!plain.globalDependencies.includes(f), f);
+  assert.ok(plain.globalDependencies.includes("vite.config.ts"));
 });

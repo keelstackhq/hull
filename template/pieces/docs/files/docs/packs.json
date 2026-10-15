@@ -11,7 +11,7 @@
     "vite-plus": {
       "package": "@docspack-community/vite-plus",
       "source": "community",
-      "recipe": "community-packs/vite-plus"
+      "recipe": "gh:keelstack/hull//community-packs/vite-plus"
     }
   }
 }

@@ -173,7 +173,9 @@ Root files (class in brackets):
   it has aged. `peerDependencyRules.allowedVersions.vite: "1"` accepts the override's vite-plus-core
   for vitest/preset-vite/Storybook peers (`check-single-vite` still guards against a real second
   vite). Checked against pnpm 12.11.2 on 2026-10-14/15.
-- `turbo.json` [shared, json]: tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
+- `turbo.json.jinja` [shared, json]: `globalDependencies` = root `vite.config.ts`, `tsconfig.base.json`, plus
+  `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` when rust-tool is present (otherwise turbo maps
+  root Cargo changes only to `//` and `--affected` would skip the crates); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
   `deploy:preview` and `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv` §8.2), `storybook:build` (outputs `storybook-static/**`),
   `build:desktop` (no cache). No `vp run` cache anywhere (Turbo caches, §7.1).
@@ -296,7 +298,8 @@ cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `typecheck` `cargo check -p {{ name }} --all-targets` (CI_TASKS needs it), `test` `cargo nextest run -p {{ name }}`. `turbo.json` [owned] extends `//`: build outputs
 `$TURBO_ROOT$/target/release/{{ name }}`, inputs `src/**`, `Cargo.toml`, `$TURBO_ROOT$/Cargo.lock`
 (`$TURBO_ROOT$` verified with turbo 2.11.8 on 2026-10-15: a cached build restores the binary). `[[post]]`
-`cargo generate-lockfile` on `new`/`add`; dogfood runs the same command, because the dev renderer
+`cargo generate-lockfile` on `new` and `cargo update --workspace` on `add` (adds the new member
+without bumping locked crates); dogfood runs the same command, because the dev renderer
 does not run `[[post]]`.
 `CLAUDE.md` [owned].
 
@@ -341,7 +344,7 @@ blocks in base files (`docspack` devDependency, SessionStart sync, `docs-lookup`
     "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
     "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
     "cloudflare": { "package": "@docspack-community/cloudflare", "source": "community", "build": "cloudflare" },
-    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "community-packs/vite-plus" }
+    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "gh:keelstack/hull//community-packs/vite-plus" }
   }
 }
 ```
@@ -478,6 +481,8 @@ upstream.
      `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,
      `Swatinem/rust-cache`, `taiki-e/install-action` (`cargo-nextest`), all `if: rust == 'true'`.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
+  8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
+     step summary, timed from a first `Start timer` step.
 - Job `ci-ok`: `needs: [ci]`, `if: always()`, fails unless `needs.ci.result == 'success'`. It is
   the only required check.
 - Actions are pinned by tag in the template; Renovate pins digests (§8.6).

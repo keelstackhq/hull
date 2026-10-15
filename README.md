@@ -79,11 +79,11 @@ example Axiom) is configured in the Cloudflare dashboard; the syntax is unverifi
 - Cloudflare preview URLs are public unless Access protects them, and do not work with Durable Objects.
 - Workers Logs free tier drops to 0.5 GB/day from 2026-12-01; lower `observability.head_sampling_rate`
   in `wrangler.jsonc` to stay under it.
-- The template contract cannot emit GitHub's `${{ }}` from a `.jinja` file, so `ci.yml`,
-  `preview.yml` and `desktop.yml` are plain workflows with runtime guards (`hashFiles(...)`, a
-  detect step) instead of being conditional on the chosen pieces.
+- The template contract cannot emit GitHub's `${{ }}` from a `.jinja` file, so `ci.yml` and
+  `preview.yml` are plain workflows with runtime guards (`hashFiles(...)`, a detect step) instead of
+  being conditional on the chosen pieces. `desktop.yml` is a `.jinja` rendered only with `tauri-app`.
+- Instance names are not checked across pieces: `rust-tool:web` and `preact-app:web` both become
+  `@scope/web`. `scripts/render.mjs` warns in `messages`; rename one.
 - Not verified yet: the Tauri desktop build (needs GitHub's runner), the Cloudflare preview deploy
   (needs an account), Renovate's handling of the `vite` override alias, and whether the empty
   `vars.SENTRY_DSN` in `wrangler.jsonc` overrides a `wrangler secret put SENTRY_DSN` value on deploy.
-
-License: MIT.

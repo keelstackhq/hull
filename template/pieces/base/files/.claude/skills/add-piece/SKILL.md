@@ -8,4 +8,6 @@ description: Add a template piece (preact-app, ui-storybook, astro-site, hono-wo
 3. Run the install the piece declares: `pnpm install --no-frozen-lockfile`.
 4. Run the `verify` skill and report its result.
 
+Use a `--name` no other piece instance has (rust-tool and preact-app both named `web` collide).
+
 Do not resolve conflicts by overwriting local edits; list them and ask.

@@ -330,3 +330,22 @@ test("--json internal error message has no stack", async () => {
   assert.match(m, /^internal error: /);
   assert.ok(!m.includes("\n    at "));
 });
+
+test("warns when instances of different pieces share a name; exit stays 0", async () => {
+  const REAL = fileURLToPath(new URL("../template", import.meta.url));
+  const out = join(await tmp(), "o");
+  const clash = await renderNew({
+    template: REAL,
+    out,
+    pieces: ["base", "rust-tool:web", "preact-app:web"],
+  });
+  assert.equal(clash.ok, true);
+  assert.equal(clash.messages.length, 1);
+  assert.match(clash.messages[0], /web.*rust-tool.*preact-app|web.*preact-app.*rust-tool/);
+  const fine = await renderNew({
+    template: REAL,
+    out: join(await tmp(), "o"),
+    pieces: ["base", "rust-tool:tool", "preact-app:web"],
+  });
+  assert.deepEqual(fine.messages, []);
+});

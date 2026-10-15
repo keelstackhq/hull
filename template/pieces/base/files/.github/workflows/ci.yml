@@ -21,6 +21,8 @@ jobs:
       TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
       TURBO_SCM_HEAD: ${{ github.sha }}
     steps:
+      - name: Start timer
+        run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -82,6 +84,12 @@ jobs:
       - name: Run affected tasks
         if: steps.affected.outputs.skip != 'true'
         run: pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only
+      - name: Job duration
+        if: always()
+        continue-on-error: true
+        run: |
+          secs=$(( $(date +%s) - ${CI_START:-$(date +%s)} ))
+          echo "ci job: ${secs} s (budget: 45 s typical PR, 15 s docs-only)" >> "$GITHUB_STEP_SUMMARY"
 
   ci-ok:
     needs: [ci]

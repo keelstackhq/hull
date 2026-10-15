@@ -140,8 +140,10 @@ test("every recipe folder named in packs.json exists in community-packs/", async
   const root = join(REAL_TEMPLATE, "..", "community-packs");
   for (const [tool, p] of Object.entries(doc.packs)) {
     if (p.recipe) {
-      assert.ok(existsSync(join(REAL_TEMPLATE, "..", p.recipe, "README.md")), tool);
-      assert.ok(p.recipe.startsWith("community-packs/"), tool);
+      const prefix = "gh:keelstack/hull//community-packs/";
+      assert.ok(p.recipe.startsWith(prefix), `${tool}: ${p.recipe}`);
+      const folder = p.recipe.slice("gh:keelstack/hull//".length);
+      assert.ok(existsSync(join(REAL_TEMPLATE, "..", folder, "README.md")), tool);
     }
   }
   assert.ok(existsSync(join(root, "README.md")));
