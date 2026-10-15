@@ -48,16 +48,15 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
 
-
 - Contract gap (keelstack/splice + hull, same week): the subset cannot emit `${{ … }}` from a `.jinja` file. Action: agree a contract §4 addition (proposed `{% raw %}…{% endraw %}`) in both repos' `docs/template-format.md`. Until then `ci.yml` is a plain owned file; plan 02 Task 6 (`preview.yml`) and plan 03 (`desktop.yml`, Rust steps in `ci.yml`) must use runtime guards (`hashFiles(...)`) or wait for the addition.
 
 - Time-gated (no human needed): drop each exact `name@version` entry from `minimumReleaseAgeExclude` in base `pnpm-workspace.yaml` (and the matching assertion in `tests/base.test.mjs`) once it is 3 days old: turbo/@turbo/* after 2026-10-16, storybook/@storybook/* and @sentry/* after 2026-10-15 ~18:30Z, wrangler/miniflare/@cloudflare/workers-types after 2026-10-17. Exact versions mean old renders never bypass the gate for newer versions.
 
-<!-- Task, what is missing, exact action a human (or the upstream repo) must take. Known in advance:
-- plan 03 Task 6: keelstack/hoard@v1 not released.
-- plan 03 Task 7: @keelstack/splice 0.1 not released (CLI flags unknown).
-- plan 03 Task 8: tag v0.1.0 needs human approval.
--->
+- Plan 03 Task 6 (hoard remote cache): `keelstack/hoard@v1` is not released (repo not publicly reachable on 2026-10-15). Action (keelstack/hoard owners): publish `v1` with a README documenting the GitHub-cache backend and the env it sets (`TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`); then rerun plan 03 Task 6.
+
+- Plan 03 Task 7 (render with splice + update test): `@keelstack/splice` 0.1 is not on npm (E404 on 2026-10-15). Action (keelstack/splice owners): publish 0.1 with `splice new|add|update|check --json` per contract §9.14; then rerun plan 03 Task 7 with `SPLICE_BIN` set.
+
+- Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
 ## Status
 
