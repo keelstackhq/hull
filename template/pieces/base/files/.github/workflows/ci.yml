@@ -29,9 +29,13 @@ jobs:
           filter: blob:none
       - name: Anything affected?
         id: affected
+        env:
+          TURBO_VERSION: 2.11.8
         run: |
           set +e
-          npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build > "$RUNNER_TEMP/affected.json"
+          curl -fsSL "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz" \
+            | tar -xz -C "$RUNNER_TEMP" --strip-components=2 turbo-linux-x64/bin/turbo
+          "$RUNNER_TEMP/turbo" query affected --tasks lint format:check typecheck test build > "$RUNNER_TEMP/affected.json"
           code=$?
           set -e
           if [ "$code" -eq 0 ]; then

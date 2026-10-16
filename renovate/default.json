@@ -12,7 +12,7 @@
     {
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
-      "matchStrings": ["turbo@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "matchStrings": ["TURBO_VERSION: (?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "turbo",
       "datasourceTemplate": "npm"
     }
