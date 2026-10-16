@@ -62,11 +62,21 @@ test("early exit uses turbo query affected with CI_TASKS and affected.mjs", asyn
   const s = steps[affectedIdx];
   assert.ok(affectedIdx > steps.indexOf(step("actions/checkout")));
   const ws = YAML.parse(await read(dir, "pnpm-workspace.yaml"));
-  assert.ok(s.run.includes(`turbo@${ws.catalog.turbo} query affected --tasks ${tasks} >`));
+  assert.equal(String(s.env.TURBO_VERSION), ws.catalog.turbo);
+  assert.ok(s.run.includes(`query affected --tasks ${tasks} >`));
   assert.ok(!s.run.includes("--exit-code"));
   assert.match(s.run, /node \.github\/scripts\/affected\.mjs/);
   assert.match(s.run, /skip=false/);
   assert.match(s.run, /::warning::/);
+});
+
+test("early exit downloads the turbo binary without npx", () => {
+  const s = steps[affectedIdx];
+  assert.ok(!s.run.includes("npx"));
+  assert.ok(
+    s.run.includes("https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz"),
+  );
+  assert.match(s.run, /"\$RUNNER_TEMP\/turbo" query affected/);
 });
 
 test("every step after the affected check is guarded by skip", () => {
@@ -151,7 +161,7 @@ test("preset has a custom manager for the workflow turbo pin", async () => {
   assert.equal(m.customType, "regex");
   assert.equal(m.datasourceTemplate, "npm");
   assert.deepEqual(m.managerFilePatterns, ["/^\\.github/workflows/.*\\.ya?ml$/"]);
-  const line = "npx -y turbo@2.11.8 query affected";
+  const line = "          TURBO_VERSION: 2.11.8";
   assert.equal(new RegExp(m.matchStrings[0]).exec(line).groups.currentValue, "2.11.8");
   const rule = p.packageRules.find((r) => r.groupName === "turbo");
   assert.ok(rule.matchPackageNames.includes("turbo"));

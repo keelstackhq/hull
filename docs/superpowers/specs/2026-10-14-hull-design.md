@@ -467,8 +467,10 @@ upstream.
 - Job `ci`, `ubuntu-latest`, `timeout-minutes: 15`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
   the PR base sha, `merge_group.base_sha`, or `github.event.before`:
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
-  2. Early exit: `npx -y turbo@2.11.8 query affected --tasks lint format:check typecheck test build`
-     writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
+  2. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
+     `TURBO_VERSION` (= the catalog pin, tracked by the Renovate preset) from the npm registry with
+     `curl` (~1 s; `npx` took ~5-7 s), then `turbo query affected --tasks lint format:check
+     typecheck test build` writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
      package `//` unless `git diff BASE...HEAD` touches a root trigger (root package/workspace/lock/
      turbo/tsconfig/vite config, `.node-version`, `.npmrc`, anything under `.github/`), and sets
      `skip=true` when nothing remains. A turbo error, bad JSON or an unknown base → run everything.
