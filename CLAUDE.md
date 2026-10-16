@@ -90,3 +90,11 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
 - docspack: `sync` (deps), `index --repo` (own docs), `ask "<q>" --json` (agents).
 - pnpm 12 blocks dependency build scripts unless listed in `allowBuilds` (`onlyBuiltDependencies` is
   ignored). `minimumReleaseAge` is strict: a pin younger than 3 days needs `minimumReleaseAgeExclude`.
+
+## Org decisions
+
+Cross-repo decisions from keelstackhq/decisions; follow them. To change one, open a PR there.
+The hook refreshes this snapshot; commit an update alone as `chore: sync org decisions`.
+Hull's template does not ship them: generated repos belong to people outside the org.
+
+@docs/agents/org-decisions.md
