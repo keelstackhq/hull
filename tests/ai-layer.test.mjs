@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, readFile, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -144,6 +144,23 @@ test("session-start exits 0 even when pnpm is missing", async () => {
   });
   assert.equal(r.status, 0);
   assert.equal(r.stdout.trim().split("\n").length, 1);
+});
+
+test("session-start runs repo-local hooks in session-start.d and survives their failure", async () => {
+  const { dir } = await renderCombo(["base"]);
+  const d = join(dir, ".claude/hooks/session-start.d");
+  await mkdir(d, { recursive: true });
+  await writeFile(join(d, "a-ok.sh"), 'echo "local: ran"\n: > "$CLAUDE_PROJECT_DIR/ran-a"\n');
+  await writeFile(join(d, "b-fails.sh"), "exit 7\n");
+  const r = spawnSync("/bin/bash", [join(dir, ".claude/hooks/session-start.sh")], {
+    cwd: dir,
+    env: { PATH: "/nonexistent", CLAUDE_PROJECT_DIR: dir },
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0);
+  assert.ok(existsSync(join(dir, "ran-a")));
+  assert.match(r.stdout, /local: ran/);
+  assert.match(r.stdout, /session-start: /);
 });
 
 test("statusline prints model, context and cost from stdin JSON", async () => {

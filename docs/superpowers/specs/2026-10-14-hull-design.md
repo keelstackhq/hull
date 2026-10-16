@@ -388,8 +388,10 @@ files.
 - `.claude/loop.md`: default `/loop` prompt — run `verify`; fix the first failure; repeat until
   green; then stop and summarise in ≤ 5 lines.
 - `.claude/hooks/session-start.sh`: `pnpm install --prefer-offline` (quiet), then
-  `pnpm exec docspack sync` and `docspack index --repo` if docspack is installed. Exits 0 on any
-  failure (never blocks a session), prints one line.
+  `pnpm exec docspack sync` and `docspack index --repo` if docspack is installed, then runs every
+  `.claude/hooks/session-start.d/*.sh` (repo-local, not owned by the template; a failing one is
+  reported and ignored), so a repo can add session-start work without editing owned files. Exits 0
+  on any failure (never blocks a session), prints one status line plus whatever local hooks print.
 - `.claude/hooks/stop-checks.sh` (opt-in): does nothing unless `HULL_STOP_CHECKS=1`; then runs
   `pnpm turbo run lint typecheck test --affected` and on failure exits 2 with the first error on
   stderr, which blocks stopping. Enable by setting the env var in `.claude/settings.local.json`.
