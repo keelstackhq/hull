@@ -108,3 +108,21 @@ test("entries live in the seed pack.entries.ts; vite.config.ts imports them", as
   assert.match(agents, /`pack\.entries\.ts`/);
   assert.match(agents, /`repository`/);
 });
+
+test("repository var pattern: https://github.com/<owner>/<repo> only, no .git, quotes or backslashes", async () => {
+  const p = (await loadTemplate(REAL_TEMPLATE)).pieces.get("ts-lib");
+  const re = new RegExp(p.vars.repository.pattern);
+  for (const ok of ["", "https://github.com/acme/lib", "https://github.com/a.b_c-d/e.f-g_h"])
+    assert.equal(re.test(ok), true, ok);
+  for (const bad of [
+    "https://github.com/acme/lib.git/",
+    'https://github.com/acme/li"b',
+    "https://github.com/acme/li\\b",
+    "https://github.com/acme/lib/extra",
+    "http://github.com/acme/lib",
+    "https://github.com/acme",
+    "https://github.com/acme/lib x",
+  ])
+    assert.equal(re.test(bad), false, bad);
+  await assert.rejects(renderCombo(PIECES, { "ts-lib.repository": 'https://github.com/a/b"c' }));
+});

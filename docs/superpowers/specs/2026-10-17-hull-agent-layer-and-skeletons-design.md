@@ -199,7 +199,8 @@ are unchanged. A failure fails `ci` with the fix command.
 Common to all three: `multiple = true`, `requires = ["base"]`, piece var `name`
 (`^[a-z][a-z0-9-]*$`), per-instance `AGENTS.md` [owned] + `CLAUDE.md` [seed] (D3), and a
 `"hull": { "release": "<piece-id>" }` field in the instance `package.json` that `release-plan.mjs`
-reads (§4.4). Every task the CI runs exists as a package script.
+reads (§4.4). Every task the CI runs exists as a package script, except npm-cli `build` (nothing to
+build; staging runs in `release.yml`).
 
 ### 4.1 `rust-cli` (target `crates/{{ name }}`, default name `cli`)
 
@@ -240,17 +241,22 @@ missing.
 
 | Path (under target) | Class | Content |
 |---|---|---|
-| `package.json.jinja` | shared json | name `@{{ scope }}/{{ name }}`, version `0.0.0`, `type: module`, `bin: { "{{ crate }}": "bin/launcher.js" }`, `files: ["bin"]`, `publishConfig: { access: "public", provenance: true }`, `hull.release = "npm-cli"`; no `optionalDependencies` (D13); devDependency `"@{{ scope }}/{{ crate }}-crate": "workspace:*"` so turbo `--affected` runs this package's tests when the crate changes; scripts `lint`, `format:check`, `typecheck` (`tsc --noEmit`, `checkJs`), `test` (`vp test run`) |
-| `turbo.json` | owned | extends `//`; `test.dependsOn: []` (no release build of the crate for a unit test) |
+| `package.json.jinja` | shared json | name `@{{ scope }}/{{ name }}`, version `0.0.0`, `type: module`, `bin: { "{{ crate }}": "bin/launcher.js" }`, `files: ["bin"]`, `publishConfig: { access: "public", provenance: true }`, `hull.release = "npm-cli"`; no `optionalDependencies` (D13); devDependency `"@{{ scope }}/{{ crate }}-crate": "workspace:*"` so turbo `--affected` runs this package's tests when the crate changes; scripts `lint`, `format:check`, `typecheck` (`node --check` on the five JS files, see below), `test` (`vp test run`) |
+| `turbo.json` | owned | extends `//`; `test.dependsOn: []` and `typecheck.dependsOn: []` (no build of the crate for a unit test or a typecheck, so a launcher-only PR never runs cargo) |
 | `tsconfig.json` | owned | extends base, `allowJs`, `checkJs`, includes `bin`, `scripts`, `test` |
 | `vite.config.ts` | owned | test options only |
-| `bin/launcher.js` | owned | plain JS, `// @ts-check`, no `.jinja`: binary name = the `bin` key pointing at itself; platform package = `${name}-${process.platform}-${process.arch}`; resolve via `createRequire(import.meta.url).resolve(pkg + "/package.json")`; `<BIN>_BINARY` env override for local dev; `spawnSync` with inherited stdio, forwards exit code, re-raises the child's signal; unsupported platform or missing package → one stderr line naming the platform and `cargo install` fallback, exit 3. No postinstall, no download, no network |
+| `bin/launcher.js` | owned | plain JS, `// @ts-check`, no `.jinja`: binary name = the `bin` key pointing at itself; platform package = `${name}-${process.platform}-${process.arch}`; resolve via `createRequire(import.meta.url).resolve(pkg + "/package.json")`; `<BIN>_BINARY` env override for local dev (`<BIN>` = `bin.toUpperCase().replaceAll("-", "_")`, so `my-cli` gives `MY_CLI_BINARY`); `spawnSync` with inherited stdio, forwards exit code, re-raises the child's signal; unsupported platform or missing package → one stderr line naming the platform and `cargo install` fallback, exit 3. No postinstall, no download, no network |
 | `scripts/stage.mjs` | owned | release-time only: `--artifacts <dir>` (`<target>/<bin>[.exe]`) → `dist-npm/`: one package per platform (`os`, `cpu`, `bin/<bin>[.exe]`, `files`, `license` copied, `repository.url` from `GITHUB_REPOSITORY`), and the launcher package with exact-version `optionalDependencies` for all five. Fails unless the launcher version equals the crate `Cargo.toml` version and every artifact exists |
 | `test/launcher.test.js` | owned | fake platform package in a temp `node_modules` with a tiny executable script: exit-code forwarding, stdio, env override, unsupported-platform message |
 | `test/stage.test.js` | owned | staged package.json set: names, `os`/`cpu`, exact versions, no `scripts`, `repository`; missing artifact fails |
 | `test/version-sync.test.js` | owned | `package.json` version == `../../crates/<bin>/Cargo.toml` version; message names both files |
 | `README.md` | seed | install/usage stub (npm page) |
 | `AGENTS.md` / `CLAUDE.md` | owned / seed | how the launcher resolves binaries; "never add postinstall"; bump both versions together |
+
+`typecheck`: `tsc --noEmit` with `checkJs` passes under TypeScript 7 (verified 2026-10-17, §9 item 8), but
+only with `@types/node`, which the catalog does not pin and the plan did not list; the script is therefore
+`node --check` on `bin/launcher.js`, `scripts/stage.mjs` and the three tests until that dependency is
+approved. The `tsconfig.json` stays for editors.
 
 Platforms (as splice §12): `linux-x64`/`linux-arm64` (static musl, so no `libc` field),
 `darwin-x64`, `darwin-arm64`, `win32-x64` (`x86_64-pc-windows-msvc`).

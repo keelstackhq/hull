@@ -1,0 +1,17 @@
+id = "npm-cli"
+description = "npm launcher and per-platform packages that ship a rust-cli binary, staged at release time"
+multiple = true
+requires = ["base"]
+target = "packages/{{ name }}"
+
+[vars]
+name = { prompt = "npm package name", default = "cli", pattern = "^[a-z][a-z0-9-]*$" }
+crate = { prompt = "rust-cli instance (crate and binary name) this package ships", default = "cli", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["turbo.json", "tsconfig.json", "vite.config.ts", "bin/**", "scripts/**", "test/**", "AGENTS.md"]
+shared = ["package.json"]
+seed = ["README.md", "CLAUDE.md"]
+
+[merge]
+"package.json" = "json"

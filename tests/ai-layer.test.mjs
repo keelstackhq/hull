@@ -366,3 +366,31 @@ test("verify skill runs the index check first and says pnpm run ci does not", as
   assert.match(text, /`pnpm run ci` does not run this check \(it is not a turbo task\); CI does/);
   assert.ok(text.indexOf("agents-index.mjs --check") < text.indexOf("pnpm turbo run"));
 });
+
+test("all pieces together: AGENTS.md + CLAUDE.md <= 80 lines, index <= 8192 bytes", async () => {
+  const { dir } = await renderCombo(
+    [
+      "base",
+      "preact-app:web",
+      "ui-storybook",
+      "astro-site:site",
+      "hono-worker:api",
+      "rust-tool:tool",
+      "tauri-app:desktop",
+      "docs",
+      "ts-lib:lib",
+      "rust-cli:cli",
+      "npm-cli:npm",
+    ],
+    { ...comboVars, "npm-cli.crate": "cli" },
+  );
+  const { agents, claude } = await agentsText(dir);
+  assert.ok(
+    lineCount(agents) + lineCount(claude) <= 80,
+    `${lineCount(agents)}+${lineCount(claude)}`,
+  );
+  const { buildIndex } = await import(
+    join(REAL_TEMPLATE, "pieces/base/files/scripts/agents-index.mjs")
+  );
+  assert.ok(Buffer.byteLength(buildIndex(dir)) <= 8192);
+});

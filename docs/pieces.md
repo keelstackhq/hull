@@ -146,6 +146,42 @@ Merge strategies:
 - `package.json`: json
 - `wrangler.jsonc`: text
 
+## npm-cli
+
+npm launcher and per-platform packages that ship a rust-cli binary, staged at release time
+
+- Multiple instances: yes
+- Target: `packages/{{ name }}`
+- Requires: `base`
+
+Variables:
+
+- `name`: npm package name; default `cli`; pattern `^[a-z][a-z0-9-]*$`
+- `crate`: rust-cli instance (crate and binary name) this package ships; default `cli`; pattern `^[a-z][a-z0-9-]*$`
+
+Files (owned):
+
+- `turbo.json`
+- `tsconfig.json`
+- `vite.config.ts`
+- `bin/**`
+- `scripts/**`
+- `test/**`
+- `AGENTS.md`
+
+Files (shared):
+
+- `package.json`
+
+Files (seed):
+
+- `README.md`
+- `CLAUDE.md`
+
+Merge strategies:
+
+- `package.json`: json
+
 ## preact-app
 
 Preact client app built with Vite+, cascivo components, deployed to Cloudflare static assets
@@ -295,7 +331,7 @@ Publishable ESM TypeScript library with publint and attw checks
 Variables:
 
 - `name`: library name; default `lib`; pattern `^[a-z][a-z0-9-]*$`
-- `repository`: GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional); default ``; pattern `^(https://github\.com/[^/ ]+/[^/ ]+)?$`
+- `repository`: GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional); default ``; pattern `^(https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?$`
 
 Files (owned):
 

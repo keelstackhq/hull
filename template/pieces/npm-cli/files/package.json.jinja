@@ -1,0 +1,28 @@
+{
+  "name": "@{{ scope }}/{{ name }}",
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "{{ crate }}": "bin/launcher.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "hull": {
+    "release": "npm-cli"
+  },
+  "scripts": {
+    "lint": "vp lint",
+    "format:check": "vp fmt --check",
+    "typecheck": "node --check bin/launcher.js && node --check scripts/stage.mjs && node --check test/launcher.test.js && node --check test/stage.test.js && node --check test/version-sync.test.js",
+    "test": "vp test run"
+  },
+  "devDependencies": {
+    "@{{ scope }}/{{ crate }}-crate": "workspace:*",
+    "vite-plus": "catalog:"
+  }
+}

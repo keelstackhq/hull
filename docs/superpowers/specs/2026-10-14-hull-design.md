@@ -138,7 +138,8 @@ scope = { prompt = "npm scope without @", default = "acme", pattern = "^[a-z0-9-
 ```
 
 Piece variables: `name` for every multiple piece (pattern `^[a-z][a-z0-9-]*$`), plus `frontend`
-for `tauri-app` (§6.7). No other variables in v1; Cloudflare account, Sentry DSN and Axiom are
+for `tauri-app` (§6.7), `crate` for `npm-cli` (§6.11, the rust-cli instance it ships) and the optional
+`repository` for `ts-lib` (§6.12). No other variables in v1; Cloudflare account, Sentry DSN and Axiom are
 repo secrets or wrangler vars, not template vars.
 
 ## 6. Pieces
@@ -154,6 +155,7 @@ repo secrets or wrangler vars, not template vars.
 | `rust-cli` | yes | `crates/{{ name }}` | base | `cli` |
 | `tauri-app` | yes | `apps/{{ name }}` | base, preact-app | `desktop` |
 | `ts-lib` | yes | `packages/{{ name }}` | base | `lib` |
+| `npm-cli` | yes | `packages/{{ name }}` | base | `cli` |
 | `docs` | no | — (root) | base | — |
 
 Every JS package has the scripts the CI runs: `lint`, `format:check`, `typecheck`, `test`, `build`
@@ -482,6 +484,30 @@ add `regex`; `hello --json`) and assertions for the JSON/exit/stderr contract, `
 
 Verification of the cargo-deny invocation and the `$TURBO_ROOT$` inputs is recorded in §13.
 
+### 6.11 `npm-cli`
+
+`packages/<name>` (default `cli`, var `crate` default `cli`, both `^[a-z][a-z0-9-]*$`): the npm side
+of a `rust-cli` binary, package `@<scope>/<name>` with `hull.release = "npm-cli"`. `crate` names the
+rust-cli instance it ships; it is checked as a pattern only, so `requires` stays `["base"]` and the
+generated AGENTS.md, README.md and the version-sync test say "needs a rust-cli instance named
+`<crate>`" (a stricter `requires` is a follow-up decision). `package.json` [shared] has
+`bin: { "<crate>": "bin/launcher.js" }`, `files: ["bin"]`, provenance, a devDependency
+`@<scope>/<crate>-crate: workspace:*` (so `--affected` runs this package's tests after a crate change),
+and the scripts `lint`, `format:check`, `typecheck`, `test` only; it never carries `optionalDependencies`,
+`repository`, `postinstall` or `preinstall` (written by `scripts/stage.mjs` at release time).
+`turbo.json` [owned] sets `typecheck.dependsOn` and `test.dependsOn` to `[]`, so a launcher-only PR never
+builds the crate. `bin/launcher.js` (plain JS, `// @ts-check`) resolves `<name>-<platform>-<arch>` with
+`createRequire(import.meta.url)`, runs `bin/<crate>[.exe]` with inherited stdio, forwards the exit code,
+re-raises the child's signal; `<BIN>_BINARY` (`bin.toUpperCase().replaceAll("-", "_")`, so `my-cli`
+gives `MY_CLI_BINARY`) overrides the path; a missing platform package prints one stderr line with the
+platform and `cargo install <crate>`, exit 3. `scripts/stage.mjs` exports `TARGETS` (the five platforms,
+the single source for the release workflow) and `stage({ pkgDir, artifactsDir, outDir, repository })`;
+it fails on a missing artifact or a launcher version that differs from `crates/<crate>/Cargo.toml`.
+`test/*.test.js` [owned] read scope, name and bin from the package's own `package.json` at run time.
+`typecheck` is `node --check` on the five JavaScript files: `tsc --noEmit` with `checkJs` works under
+TypeScript 7 (verified 2026-10-17) but needs `@types/node`, which the catalog does not pin; adding it
+is a dependency decision (Blocked in PROGRESS). `tsconfig.json` [owned] keeps `checkJs` for editors.
+
 ### 6.12 `ts-lib`
 
 `packages/<name>` (default `lib`): a publishable ESM TypeScript library, package `@<scope>/<name>`
@@ -497,7 +523,8 @@ artifact (about 2 s extra locally: publint 0.2 s, attw 1.3 s). `src/index.ts`, `
 `README.md`, `CLAUDE.md` [seed]; `AGENTS.md` [owned]. Optional piece var `ts-lib.repository` (GitHub URL,
 default empty) renders `repository` in `package.json`; npm provenance fails with E422 without it, so
 AGENTS.md and README tell the user to set it before the first publish (the file is shared, so adding
-it later works). The catalog carries `publint` and
+it later works). The var pattern is `https://github.com/<owner>/<repo>` with `[A-Za-z0-9._-]` segments
+(no quotes or backslashes, so no JSON injection); write the URL without `.git`. The catalog carries `publint` and
 `@arethetypeswrong/cli` (unused entries are harmless).
 
 ## 7. Versions (template pnpm catalog, exact pins)
@@ -745,6 +772,8 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 ## 13. Unverified / to check during the build
 
 Verified 2026-10-17 (rust-cli, agent-layer spec §9 item 8; Rust 1.99.1, cargo-deny 0.20.2, cargo-nextest 0.9.148, turbo 2.11.8): (a) `cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources` works from `crates/cli` and exits 0 (`--manifest-path` and `--config` are global options and must precede `check`: the order `check --config …` from the plan draft fails with "unexpected argument '--config'"); with an added `native-tls` dependency it exits 2 with `banned` for `native-tls`, `openssl` and `openssl-sys`. (b) Touching the root `Cargo.lock` makes `turbo run test --filter=<crate>` miss the cache, also with `globalDependencies` reduced to the two JS files, so the `$TURBO_ROOT$` inputs work on their own. (c) A second `turbo run lint format:check typecheck test build` is 11/11 cached (1 s).
+
+Verified 2026-10-17 (npm-cli, agent-layer spec §9 item 8; TypeScript 7.0.2): `tsc --noEmit` with `allowJs` and `checkJs` type-checks the launcher, `stage.mjs` and the tests, but only with `@types/node` installed (without it TS2688 on `types: ["node"]`, and no `node:*` module types); the catalog does not pin it, so `typecheck` is `node --check` until that dependency is approved.
 
 Verified 2026-10-17 (ts-lib, agent-layer spec §9 item 8): `attw --pack . --profile esm-only` runs next to TypeScript 7.0.2 (it uses its bundled 5.6.1-rc) and passes; `vp pack` emits `index.d.mts` with `isolatedDeclarations`.
 

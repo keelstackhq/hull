@@ -1,0 +1,17 @@
+# npm launcher package
+
+Ships the native binary of the rust-cli instance named like the `bin` key in `package.json`; it
+needs a rust-cli instance named `{{ crate }}` in `crates/{{ crate }}`.
+
+- `bin/launcher.js` resolves `<name>-<platform>-<arch>` with `createRequire`, runs it with inherited
+  stdio, forwards the exit code and re-raises a signal. `<BIN>_BINARY` (bin name upper-cased,
+  `-` to `_`) points it at a local build.
+- Never add `postinstall`, `preinstall`, a download or network code; never commit
+  `optionalDependencies` or `repository` (`scripts/stage.mjs` writes both at release time).
+- `scripts/stage.mjs` turns release artifacts into `dist-npm/`; the platform list is `TARGETS`.
+- `version` here and in `crates/{{ crate }}/Cargo.toml` must match; bump both together.
+  `test/version-sync.test.js` checks it.
+- `typecheck` is `node --check` (no `@types/node` in the catalog for `tsc`); `test` and `typecheck`
+  do not build the crate.
+- A human pushes the tag `{{ crate }}-v<version>`; the release workflow publishes the platform
+  packages, then the launcher.

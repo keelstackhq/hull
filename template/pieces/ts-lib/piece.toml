@@ -6,7 +6,7 @@ target = "packages/{{ name }}"
 
 [vars]
 name = { prompt = "library name", default = "lib", pattern = "^[a-z][a-z0-9-]*$" }
-repository = { prompt = "GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional)", default = "", pattern = "^(https://github\\.com/[^/ ]+/[^/ ]+)?$" }
+repository = { prompt = "GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional)", default = "", pattern = "^(https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?$" }
 
 [files]
 owned = ["vite.config.ts", "tsconfig.json", "AGENTS.md"]

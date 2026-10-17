@@ -348,7 +348,7 @@ test("add-piece skill lists rust-cli", async () => {
   const { dir } = await renderCombo(["base"]);
   assert.match(
     await read(dir, ".claude/skills/add-piece/SKILL.md"),
-    /\(preact-app, ui-storybook, astro-site, hono-worker, rust-tool, rust-cli, tauri-app, ts-lib, docs\)/,
+    /\(preact-app, ui-storybook, astro-site, hono-worker, rust-tool, rust-cli, tauri-app, ts-lib, npm-cli, docs\)/,
   );
 });
 
