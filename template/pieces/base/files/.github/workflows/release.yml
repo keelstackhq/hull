@@ -20,6 +20,7 @@ jobs:
     outputs:
       kind: ${{ steps.plan.outputs.kind }}
       dir: ${{ steps.plan.outputs.dir }}
+      package: ${{ steps.plan.outputs.package }}
       bin: ${{ steps.plan.outputs.bin }}
       version: ${{ steps.plan.outputs.version }}
       npm_dirs: ${{ steps.plan.outputs.npm_dirs }}
@@ -75,6 +76,7 @@ jobs:
       run:
         shell: bash
     env:
+      PACKAGE: ${{ needs.plan.outputs.package }}
       BIN: ${{ needs.plan.outputs.bin }}
       TARGET: ${{ matrix.target }}
     steps:
@@ -90,7 +92,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Build
         run: |
-          cargo build --release --locked -p "$BIN" --target "$TARGET"
+          cargo build --release --locked -p "$PACKAGE" --target "$TARGET"
       - name: Archive
         run: |
           mkdir -p "out/$TARGET"
@@ -120,6 +122,7 @@ jobs:
     if: needs.plan.outputs.kind == 'rust-cli'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: release
     permissions:
       contents: write
       id-token: write
@@ -144,13 +147,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           BIN: ${{ needs.plan.outputs.bin }}
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
           files=(./*.tar.gz ./*.zip SHA256SUMS completions/* "$BIN.1")
+          extra=()
+          case "$VERSION" in *-*) extra=(--prerelease) ;; esac
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
           else
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
-              --generate-notes "${files[@]}"
+              --generate-notes "${extra[@]}" "${files[@]}"
           fi
 
   npm:
@@ -168,6 +174,7 @@ jobs:
     env:
       KIND: ${{ needs.plan.outputs.kind }}
       DIR: ${{ needs.plan.outputs.dir }}
+      VERSION: ${{ needs.plan.outputs.version }}
       NPM_DIRS: ${{ needs.plan.outputs.npm_dirs }}
     steps:
       - uses: actions/checkout@v5
@@ -190,19 +197,21 @@ jobs:
         if: env.KIND == 'rust-cli'
         run: |
           set -euo pipefail
-          for dir in $(jq -r '.[]' <<< "$NPM_DIRS"); do
+          dist_tag=latest
+          case "$VERSION" in *-*) dist_tag=next ;; esac
+          while read -r dir; do
             node "$dir/scripts/stage.mjs" --artifacts "$RUNNER_TEMP/artifacts" \
               --out "$RUNNER_TEMP/npm/$dir" > "$RUNNER_TEMP/staged.txt"
             while read -r pkg; do
               name=$(jq -r .name "$pkg/package.json")
-              version=$(jq -r .version "$pkg/package.json")
-              if npm view "$name@$version" version >/dev/null 2>&1; then
-                echo "skip $name@$version: already published"
+              ver=$(jq -r .version "$pkg/package.json")
+              if npm view "$name@$ver" version >/dev/null 2>&1; then
+                echo "skip $name@$ver: already published"
               else
-                npm publish "$pkg" --provenance --access public
+                npm publish "$pkg" --provenance --access public --tag "$dist_tag"
               fi
             done < "$RUNNER_TEMP/staged.txt"
-          done
+          done < <(jq -r '.[]' <<< "$NPM_DIRS")
       - name: Build and test the library
         if: env.KIND == 'ts-lib'
         run: |
@@ -214,14 +223,16 @@ jobs:
         working-directory: ${{ needs.plan.outputs.dir }}
         run: |
           set -euo pipefail
+          dist_tag=latest
+          case "$VERSION" in *-*) dist_tag=next ;; esac
           name=$(jq -r .name package.json)
-          version=$(jq -r .version package.json)
-          if npm view "$name@$version" version >/dev/null 2>&1; then
-            echo "skip $name@$version: already published"
+          ver=$(jq -r .version package.json)
+          if npm view "$name@$ver" version >/dev/null 2>&1; then
+            echo "skip $name@$ver: already published"
             exit 0
           fi
           npm pkg set repository.type=git "repository.url=git+https://github.com/$GITHUB_REPOSITORY.git"
           mkdir -p "$RUNNER_TEMP/pack"
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           tgz=$(ls "$RUNNER_TEMP"/pack/*.tgz)
-          npm publish "$tgz" --provenance --access public
+          npm publish "$tgz" --provenance --access public --tag "$dist_tag"

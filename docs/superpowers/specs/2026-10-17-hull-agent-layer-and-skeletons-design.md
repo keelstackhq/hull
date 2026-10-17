@@ -286,8 +286,9 @@ parses `GITHUB_REF_NAME` = `<instance>-v<semver>`. Pairing rule: candidates are
 `[[bin]]` name from its `Cargo.toml`) the companions are **all** `npm-cli` packages under
 `packages/*` (any directory name) whose `bin` key equals the binary name; each companion's version
 must equal the tag too. A ts-lib primary (version from `package.json`) is its own `npm_dirs`.
-Outputs `kind`, `dir`, `bin` (empty for ts-lib), `version`, `npm_dirs` (JSON) as `key=value`
-lines; errors exit 1 with the reason and nothing publishes: tag not matching `TAG_RE` (or an
+Outputs `kind`, `dir`, `package` (the Cargo package name, which `cargo build -p` takes; empty for
+ts-lib), `bin` (the `[[bin]]` name; empty for ts-lib), `version`, `npm_dirs` (JSON; directory names
+that are not plain names are skipped) as `key=value` lines; errors exit 1 with the reason and nothing publishes: tag not matching `TAG_RE` (or an
 instance that is not a plain directory name) or no candidate → `unknown tag <tag>`; two primaries
 → `ambiguous: <dir>, <dir>`; an `npm-cli` candidate whose `bin` is not the primary's →
 `ambiguous: …`; only an `npm-cli` candidate → `<dir> is an npm-cli package: push <crate>-v<version>

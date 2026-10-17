@@ -1,5 +1,5 @@
 // Release plan for a pushed tag `<instance>-v<semver>`: which package to release and how.
-// Reads GITHUB_REF_NAME, prints `kind=`, `dir=`, `bin=`, `version=`, `npm_dirs=` lines for
+// Reads GITHUB_REF_NAME, prints `kind=`, `dir=`, `package=`, `bin=`, `version=`, `npm_dirs=` lines for
 // $GITHUB_OUTPUT; exit 1 with the reason on stderr when nothing may publish. Node built-ins only.
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -64,7 +64,7 @@ function sameVersion(tag, version, file, found) {
  * Decide what a release tag publishes.
  * @param {string} tag e.g. `cli-v1.2.0`
  * @param {{ read(rel: string): string | null, list(rel: string): string[] }} fs paths relative to the repo root
- * @returns {{ kind: "rust-cli" | "ts-lib", dir: string, bin: string, version: string, npm_dirs: string[] }}
+ * @returns {{ kind: "rust-cli" | "ts-lib", dir: string, package: string, bin: string, version: string, npm_dirs: string[] }}
  */
 export function plan(tag, fs) {
   const m = TAG_RE.exec(tag);
@@ -90,7 +90,14 @@ export function plan(tag, fs) {
 
   if (primary.pkg.hull.release === "ts-lib") {
     sameVersion(tag, version, `${primary.dir}/package.json`, primary.pkg.version);
-    return { kind: "ts-lib", dir: primary.dir, bin: "", version, npm_dirs: [primary.dir] };
+    return {
+      kind: "ts-lib",
+      dir: primary.dir,
+      package: "",
+      bin: "",
+      version,
+      npm_dirs: [primary.dir],
+    };
   }
 
   const cargoFile = `${primary.dir}/Cargo.toml`;
@@ -107,13 +114,21 @@ export function plan(tag, fs) {
   }
   const npmDirs = [];
   for (const name of [...fs.list("packages")].sort()) {
+    if (!SAFE_NAME.test(name)) continue;
     const dir = `packages/${name}`;
     const pkg = readJson(fs, `${dir}/package.json`);
     if (pkg?.hull?.release !== "npm-cli" || binOf(pkg) !== bin) continue;
     sameVersion(tag, version, `${dir}/package.json`, pkg.version);
     npmDirs.push(dir);
   }
-  return { kind: "rust-cli", dir: primary.dir, bin, version, npm_dirs: npmDirs };
+  return {
+    kind: "rust-cli",
+    dir: primary.dir,
+    package: info.name ?? instance,
+    bin,
+    version,
+    npm_dirs: npmDirs,
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -141,7 +156,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const p = plan(process.env.GITHUB_REF_NAME ?? "", fs);
     process.stdout.write(
-      `kind=${p.kind}\ndir=${p.dir}\nbin=${p.bin}\nversion=${p.version}\nnpm_dirs=${JSON.stringify(p.npm_dirs)}\n`,
+      `kind=${p.kind}\ndir=${p.dir}\npackage=${p.package}\nbin=${p.bin}\nversion=${p.version}\nnpm_dirs=${JSON.stringify(p.npm_dirs)}\n`,
     );
   } catch (e) {
     process.stderr.write(`release-plan: ${e instanceof Error ? e.message : String(e)}\n`);

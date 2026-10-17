@@ -684,19 +684,20 @@ anywhere (no `NPM_TOKEN`, `NODE_AUTH_TOKEN` or npm secret); `id-token: write` on
 publishing jobs.
 
 - `plan`: `.github/scripts/release-plan.mjs` (Node built-ins only; `plan(tag, fs)` exported for
-  hull's tests) reads `GITHUB_REF_NAME` and writes `kind`, `dir`, `bin`, `version`, `npm_dirs` to
+  hull's tests) reads `GITHUB_REF_NAME` and writes `kind`, `dir`, `package`, `bin`, `version`, `npm_dirs` to
   `$GITHUB_OUTPUT`, or exits 1 with the reason (pairing rule and errors: new spec §4.4). For
   rust-cli it installs the pinned toolchain and `cargo-deny@0.20.2` and runs
   `cargo deny --manifest-path <dir>/Cargo.toml --config <dir>/deny.toml check advisories` (global
   options before the subcommand; advisories run only here, never on PRs).
 - `binaries` (rust-cli): matrix over npm-cli's `TARGETS` (`linux-x64`/`linux-arm64` musl on
   `ubuntu-latest`/`ubuntu-24.04-arm`, both darwin targets on `macos-latest`, `win32-x64` on
-  `windows-latest`); `cargo build --release --locked -p <bin> --target <t>`; uploads
+  `windows-latest`); `cargo build --release --locked -p <package> --target <t>`; uploads
   `<t>/<bin>[.exe]` (the layout `stage.mjs --artifacts` reads) and `<bin>-<t>.tar.gz` (`.zip` on
   Windows); the `linux-x64` leg adds `completions/<bin>.{bash,zsh,fish,powershell}` and `<bin>.1`.
-- `github-release` (rust-cli; `contents: write`, `id-token: write`, `attestations: write`):
+- `github-release` (rust-cli; `environment: release`; `contents: write`, `id-token: write`, `attestations: write`):
   `SHA256SUMS`, `actions/attest-build-provenance` on the archives, `gh release create <tag>
-  --verify-tag` (or `gh release upload --clobber` when the release exists, so a re-run is safe).
+  --verify-tag` (`--prerelease` when the version has a `-` suffix; `gh release upload --clobber`
+  when the release exists, so a re-run is safe).
 - `npm` (rust-cli with npm-cli companions, or ts-lib; `environment: release`, `contents: read`,
   `id-token: write`): `setup-node` with `node-version: 24` and `registry-url` (the placeholder
   token it exports is not a secret; npm exchanges the OIDC token). npm-cli: `stage.mjs` per
@@ -704,8 +705,9 @@ publishing jobs.
   last. ts-lib: `pnpm install --frozen-lockfile`, `pnpm turbo run build test --filter <name>`,
   `npm pkg set repository.type=git repository.url=git+https://github.com/$GITHUB_REPOSITORY.git`,
   `pnpm pack` (rewrites `catalog:`/`workspace:`). Every publish is
-  `npm publish <dir|tgz> --provenance --access public`, skipped when `npm view <name>@<version>`
-  already answers.
+  `npm publish <dir|tgz> --provenance --access public --tag <dist-tag>` (`next` for a version with a
+  `-` prerelease suffix, else `latest`; npm refuses or would mark a prerelease `latest` otherwise),
+  skipped when `npm view <name>@<version>` already answers.
 
 Human steps (in the generated `docs/agents/project.md` Blocked section and the owned npm-cli /
 ts-lib `AGENTS.md`): the `release` environment with a tag rule; the first publish of each new npm

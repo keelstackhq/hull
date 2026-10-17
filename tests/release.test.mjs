@@ -59,6 +59,7 @@ test("cli-v1.2.0 with crates/cli + packages/cli (bin cli) → rust-cli, npm_dirs
   assert.deepEqual(plan("cli-v1.2.0", fixture("cli-pair")), {
     kind: "rust-cli",
     dir: "crates/cli",
+    package: "cli",
     bin: "cli",
     version: "1.2.0",
     npm_dirs: ["packages/cli"],
@@ -69,6 +70,7 @@ test("renamed companion packages/npm (bin cli) is paired → npm_dirs [packages/
   assert.deepEqual(plan("cli-v1.2.0", fixture("cli-renamed")), {
     kind: "rust-cli",
     dir: "crates/cli",
+    package: "cli",
     bin: "cli",
     version: "1.2.0",
     npm_dirs: ["packages/npm"],
@@ -79,6 +81,7 @@ test("lib-v0.3.0 → ts-lib at packages/lib, npm_dirs [packages/lib]", () => {
   assert.deepEqual(plan("lib-v0.3.0", fixture("lib")), {
     kind: "ts-lib",
     dir: "packages/lib",
+    package: "",
     bin: "",
     version: "0.3.0",
     npm_dirs: ["packages/lib"],
@@ -99,6 +102,7 @@ test("my-tool-v1.0.0-rc.1 → instance my-tool, version 1.0.0-rc.1", () => {
   assert.deepEqual(plan("my-tool-v1.0.0-rc.1", fs), {
     kind: "ts-lib",
     dir: "packages/my-tool",
+    package: "",
     bin: "",
     version: "1.0.0-rc.1",
     npm_dirs: ["packages/my-tool"],
@@ -167,7 +171,7 @@ test("CLI prints kind/dir/bin/version/npm_dirs lines; exit 1 with the reason on 
   assert.equal(ok.status, 0, ok.stderr);
   assert.equal(
     ok.stdout,
-    'kind=rust-cli\ndir=crates/cli\nbin=cli\nversion=1.2.0\nnpm_dirs=["packages/cli"]\n',
+    'kind=rust-cli\ndir=crates/cli\npackage=cli\nbin=cli\nversion=1.2.0\nnpm_dirs=["packages/cli"]\n',
   );
   const bad = spawnSync("node", [PLAN], {
     cwd: join(FIXTURES, "cli-pair"),
@@ -200,6 +204,7 @@ test("jobs plan/binaries/github-release/npm; id-token: write only on github-rele
     attestations: "write",
   });
   assert.deepEqual(WF.jobs.npm.permissions, { contents: "read", "id-token": "write" });
+  assert.equal(WF.jobs["github-release"].environment, "release");
   assert.equal(WF.jobs.binaries.if, "needs.plan.outputs.kind == 'rust-cli'");
   assert.equal(WF.jobs["github-release"].if, "needs.plan.outputs.kind == 'rust-cli'");
   for (const job of Object.keys(WF.jobs)) {
@@ -220,8 +225,12 @@ test("npm job: environment release; every npm publish has --provenance --access 
   for (const r of publishing) {
     const lines = r.split("\n").filter((l) => /\bnpm publish\b/.test(l));
     assert.equal(lines.length, 1);
-    assert.match(lines[0], /npm publish "\$[a-z]+" --provenance --access public$/);
-    assert.match(r, /if npm view "\$name@\$version" version >\/dev\/null 2>&1; then/);
+    assert.match(
+      lines[0],
+      /npm publish "\$[a-z]+" --provenance --access public --tag "\$dist_tag"$/,
+    );
+    assert.match(r, /dist_tag=latest\n\s*case "\$VERSION" in \*-\*\) dist_tag=next ;; esac\n/);
+    assert.match(r, /if npm view "\$name@\$ver" version >\/dev\/null 2>&1; then/);
   }
   const lib = runs("npm").join("\n");
   assert.match(lib, /pnpm install --frozen-lockfile/);
@@ -256,7 +265,8 @@ test("binaries matrix targets deep-equal Object.values(TARGETS); runners ubuntu-
     ["ubuntu-latest", "ubuntu-24.04-arm", "macos-latest", "macos-latest", "windows-latest"],
   );
   const build = runs("binaries").find((r) => r.includes("cargo build"));
-  assert.equal(build.trim(), 'cargo build --release --locked -p "$BIN" --target "$TARGET"');
+  assert.equal(build.trim(), 'cargo build --release --locked -p "$PACKAGE" --target "$TARGET"');
+  assert.equal(WF.jobs.binaries.env.PACKAGE, "${{ needs.plan.outputs.package }}");
   const extras = steps("binaries").find((s) => s.run?.includes("completions"));
   assert.equal(extras.if, "matrix.platform == 'linux-x64'");
   assert.match(extras.run, /for shell in bash zsh fish powershell; do/);
@@ -278,7 +288,7 @@ test("plan job runs cargo deny check advisories only for rust-cli", () => {
     'cargo deny --manifest-path "$DIR/Cargo.toml" --config "$DIR/deny.toml" check advisories',
   ]);
   const outputs = WF.jobs.plan.outputs;
-  assert.deepEqual(Object.keys(outputs), ["kind", "dir", "bin", "version", "npm_dirs"]);
+  assert.deepEqual(Object.keys(outputs), ["kind", "dir", "package", "bin", "version", "npm_dirs"]);
   const run = steps("plan").find((s) => s.id === "plan").run;
   assert.match(run, /node \.github\/scripts\/release-plan\.mjs > "\$RUNNER_TEMP\/plan\.txt"/);
 });
@@ -317,4 +327,46 @@ test("project.md renders the Blocked section only with npm-cli or ts-lib; branch
   assert.match(cliText, /within 2 days/);
   assert.doesNotMatch(cliText, /\n\n\n/);
   assert.ok(lineCount(cliText) - lineCount(text) <= 12, `${lineCount(cliText)} lines`);
+});
+
+test("prereleases: dist-tag next on npm, --prerelease on the GitHub release", () => {
+  assert.equal(WF.jobs.npm.env.VERSION, "${{ needs.plan.outputs.version }}");
+  const dist = (version) => {
+    const r = spawnSync(
+      "bash",
+      ["-c", 'dist_tag=latest\ncase "$VERSION" in *-*) dist_tag=next ;; esac\necho "$dist_tag"'],
+      { env: { ...process.env, VERSION: version }, encoding: "utf8" },
+    );
+    return r.stdout.trim();
+  };
+  assert.deepEqual([dist("1.0.0"), dist("1.0.0-rc.1")], ["latest", "next"]);
+  const gh = runs("github-release").find((r) => r.includes("gh release create"));
+  assert.match(gh, /case "\$VERSION" in \*-\*\) extra=\(--prerelease\) ;; esac/);
+  assert.match(gh, /--generate-notes "\$\{extra\[@\]\}" "\$\{files\[@\]\}"/);
+});
+
+test("npm_dirs loop reads jq output line by line; plan drops unsafe package dir names", () => {
+  const loop = runs("npm").find((r) => r.includes("stage.mjs"));
+  assert.match(loop, /while read -r dir; do/);
+  assert.match(loop, /done < <\(jq -r '\.\[\]' <<< "\$NPM_DIRS"\)/);
+  assert.doesNotMatch(loop, /for dir in \$\(/);
+  const fs = memory({
+    "crates/cli/package.json": '{"hull":{"release":"rust-cli"}}',
+    "crates/cli/Cargo.toml": '[package]\nname = "cli"\nversion = "1.2.0"\n',
+    "packages/a b/package.json":
+      '{"version":"1.2.0","bin":{"cli":"x"},"hull":{"release":"npm-cli"}}',
+    "packages/ok/package.json":
+      '{"version":"1.2.0","bin":{"cli":"x"},"hull":{"release":"npm-cli"}}',
+  });
+  assert.deepEqual(plan("cli-v1.2.0", fs).npm_dirs, ["packages/ok"]);
+});
+
+test("package is the cargo package name, bin the [[bin]] name", () => {
+  const fs = memory({
+    "crates/tool/package.json": '{"hull":{"release":"rust-cli"}}',
+    "crates/tool/Cargo.toml":
+      '[package]\nname = "tool"\nversion = "1.0.0"\n\n[[bin]]\nname = "tl"\npath = "src/main.rs"\n',
+  });
+  const p = plan("tool-v1.0.0", fs);
+  assert.deepEqual([p.package, p.bin], ["tool", "tl"]);
 });
