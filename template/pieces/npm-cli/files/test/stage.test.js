@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { TARGETS, stage } from "../scripts/stage.mjs";
 
@@ -46,10 +46,7 @@ const json = (file) => JSON.parse(readFileSync(file, "utf8"));
 
 test("stages five platform packages and the launcher", () => {
   const dirs = stage({ ...fixture(), repository: "acme/tool" });
-  expect(dirs.map((d) => d.split("/").pop())).toEqual([
-    ...platforms.map((p) => `${short}-${p}`),
-    short,
-  ]);
+  expect(dirs.map((d) => basename(d))).toEqual([...platforms.map((p) => `${short}-${p}`), short]);
   for (const platform of platforms) {
     const dir = dirs.find((d) => d.endsWith(`${short}-${platform}`)) ?? "";
     const p = json(join(dir, "package.json"));

@@ -11,6 +11,14 @@ const bin = Object.keys(pkg.bin)[0] ?? "";
 const platform = `${process.platform}-${process.arch}`;
 const override = process.env[`${bin.toUpperCase().replaceAll("-", "_")}_BINARY`];
 
+/** The crate is not on crates.io (`publish = false`), so install from the repository or a checkout. */
+function installHint() {
+  const url = String(pkg.repository?.url ?? "").replace(/^git\+/, "");
+  return url
+    ? `cargo install --locked --git ${url} ${bin}`
+    : `cargo install --locked --path crates/${bin}`;
+}
+
 /** @returns {string} path of the native binary */
 function binaryPath() {
   if (override) return override;
@@ -21,7 +29,7 @@ function binaryPath() {
   } catch {
     process.stderr.write(
       `${bin}: no prebuilt binary for ${platform} (package ${name} is not installed); ` +
-        `build from source with \`cargo install ${bin}\`\n`,
+        `build from source with \`${installHint()}\`\n`,
     );
     process.exit(3);
   }

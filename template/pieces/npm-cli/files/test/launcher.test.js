@@ -20,11 +20,14 @@ const platform = `${process.platform}-${process.arch}`;
 const posix = process.platform !== "win32";
 
 /** A temp node_modules holding a copy of the launcher; `fake` adds a platform package. */
-function install(fake = "") {
+function install(fake = "", repository = "") {
   const root = mkdtempSync(join(tmpdir(), "launcher-"));
   const own = join(root, "node_modules", pkg.name);
   mkdirSync(join(own, "bin"), { recursive: true });
-  copyFileSync(pkgFile, join(own, "package.json"));
+  writeFileSync(
+    join(own, "package.json"),
+    JSON.stringify(repository ? { ...pkg, repository: { type: "git", url: repository } } : pkg),
+  );
   copyFileSync(new URL("../bin/launcher.js", import.meta.url), join(own, "bin/launcher.js"));
   if (fake) {
     const dir = join(root, "node_modules", `${pkg.name}-${platform}`);
@@ -76,11 +79,28 @@ test.skipIf(!posix)(`${envName} overrides the platform package`, () => {
   expect(r.stdout).toBe("override");
 });
 
-test("a missing platform package exits 3 with one line naming the platform and cargo install", () => {
+test("a missing platform package exits 3 with one line naming the platform and a safe install", () => {
   const r = run(install(), []);
   expect(r.status).toBe(3);
   const lines = r.stderr.trim().split("\n");
   expect(lines).toHaveLength(1);
   expect(lines[0]).toContain(platform);
-  expect(lines[0]).toContain(`cargo install ${bin}`);
+  expect(lines[0]).toContain(`cargo install --locked --path crates/${bin}`);
+  expect(lines[0]).not.toContain(`cargo install ${bin}`);
+});
+
+test("the install hint uses --git when package.json has a repository url", () => {
+  const r = run(install("", "git+https://github.com/acme/tool.git"), []);
+  expect(r.status).toBe(3);
+  expect(r.stderr.trim()).toContain(
+    `cargo install --locked --git https://github.com/acme/tool.git ${bin}`,
+  );
+});
+
+test.skipIf(!posix)("re-raises the child's signal", () => {
+  const launcher = install(
+    script(`process.kill(process.pid, "SIGTERM");\nsetTimeout(() => {}, 5000);`),
+  );
+  const r = run(launcher, []);
+  expect(r.signal).toBe("SIGTERM");
 });

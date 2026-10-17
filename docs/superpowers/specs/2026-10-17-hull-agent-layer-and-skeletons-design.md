@@ -245,7 +245,7 @@ missing.
 | `turbo.json` | owned | extends `//`; `test.dependsOn: []` and `typecheck.dependsOn: []` (no build of the crate for a unit test or a typecheck, so a launcher-only PR never runs cargo) |
 | `tsconfig.json` | owned | extends base, `allowJs`, `checkJs`, includes `bin`, `scripts`, `test` |
 | `vite.config.ts` | owned | test options only |
-| `bin/launcher.js` | owned | plain JS, `// @ts-check`, no `.jinja`: binary name = the `bin` key pointing at itself; platform package = `${name}-${process.platform}-${process.arch}`; resolve via `createRequire(import.meta.url).resolve(pkg + "/package.json")`; `<BIN>_BINARY` env override for local dev (`<BIN>` = `bin.toUpperCase().replaceAll("-", "_")`, so `my-cli` gives `MY_CLI_BINARY`); `spawnSync` with inherited stdio, forwards exit code, re-raises the child's signal; unsupported platform or missing package → one stderr line naming the platform and `cargo install` fallback, exit 3. No postinstall, no download, no network |
+| `bin/launcher.js` | owned | plain JS, `// @ts-check`, no `.jinja`: binary name = the `bin` key pointing at itself; platform package = `${name}-${process.platform}-${process.arch}`; resolve via `createRequire(import.meta.url).resolve(pkg + "/package.json")`; `<BIN>_BINARY` env override for local dev (`<BIN>` = `bin.toUpperCase().replaceAll("-", "_")`, so `my-cli` gives `MY_CLI_BINARY`); `spawnSync` with inherited stdio, forwards exit code, re-raises the child's signal; unsupported platform or missing package → one stderr line naming the platform and a source-install fallback (`cargo install --locked --git <repository.url> <bin>` when `package.json` has `repository.url`, else `cargo install --locked --path crates/<bin>`; never `cargo install <bin>`: the crate is `publish = false`), exit 3. No postinstall, no download, no network |
 | `scripts/stage.mjs` | owned | release-time only: `--artifacts <dir>` (`<target>/<bin>[.exe]`) → `dist-npm/`: one package per platform (`os`, `cpu`, `bin/<bin>[.exe]`, `files`, `license` copied, `repository.url` from `GITHUB_REPOSITORY`), and the launcher package with exact-version `optionalDependencies` for all five. Fails unless the launcher version equals the crate `Cargo.toml` version and every artifact exists |
 | `test/launcher.test.js` | owned | fake platform package in a temp `node_modules` with a tiny executable script: exit-code forwarding, stdio, env override, unsupported-platform message |
 | `test/stage.test.js` | owned | staged package.json set: names, `os`/`cpu`, exact versions, no `scripts`, `repository`; missing artifact fails |
@@ -256,7 +256,7 @@ missing.
 `typecheck`: `tsc --noEmit` with `checkJs` passes under TypeScript 7 (verified 2026-10-17, §9 item 8), but
 only with `@types/node`, which the catalog does not pin and the plan did not list; the script is therefore
 `node --check` on `bin/launcher.js`, `scripts/stage.mjs` and the three tests until that dependency is
-approved. The `tsconfig.json` stays for editors.
+approved. The `tsconfig.json` stays, but editors show `node:*` errors until `@types/node` is installed.
 
 Platforms (as splice §12): `linux-x64`/`linux-arm64` (static musl, so no `libc` field),
 `darwin-x64`, `darwin-arm64`, `win32-x64` (`x86_64-pc-windows-msvc`).

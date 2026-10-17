@@ -109,7 +109,7 @@ test("entries live in the seed pack.entries.ts; vite.config.ts imports them", as
   assert.match(agents, /`repository`/);
 });
 
-test("repository var pattern: https://github.com/<owner>/<repo> only, no .git, quotes or backslashes", async () => {
+test("repository var pattern: https://github.com/<owner>/<repo> only; no quotes, backslashes, extra path or trailing slash (a trailing .git is not excluded: the regex subset has no lookahead)", async () => {
   const p = (await loadTemplate(REAL_TEMPLATE)).pieces.get("ts-lib");
   const re = new RegExp(p.vars.repository.pattern);
   for (const ok of ["", "https://github.com/acme/lib", "https://github.com/a.b_c-d/e.f-g_h"])

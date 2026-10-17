@@ -500,13 +500,13 @@ builds the crate. `bin/launcher.js` (plain JS, `// @ts-check`) resolves `<name>-
 `createRequire(import.meta.url)`, runs `bin/<crate>[.exe]` with inherited stdio, forwards the exit code,
 re-raises the child's signal; `<BIN>_BINARY` (`bin.toUpperCase().replaceAll("-", "_")`, so `my-cli`
 gives `MY_CLI_BINARY`) overrides the path; a missing platform package prints one stderr line with the
-platform and `cargo install <crate>`, exit 3. `scripts/stage.mjs` exports `TARGETS` (the five platforms,
+platform and the build-from-source command, exit 3 (`cargo install --locked --git <repository.url> <crate>` when the launcher's `package.json` has `repository.url`, which `stage.mjs` writes; else `cargo install --locked --path crates/<crate>`; never plain `cargo install <crate>`, since the crate has `publish = false` and the name belongs to an unrelated crates.io crate). `scripts/stage.mjs` exports `TARGETS` (the five platforms,
 the single source for the release workflow) and `stage({ pkgDir, artifactsDir, outDir, repository })`;
 it fails on a missing artifact or a launcher version that differs from `crates/<crate>/Cargo.toml`.
 `test/*.test.js` [owned] read scope, name and bin from the package's own `package.json` at run time.
 `typecheck` is `node --check` on the five JavaScript files: `tsc --noEmit` with `checkJs` works under
 TypeScript 7 (verified 2026-10-17) but needs `@types/node`, which the catalog does not pin; adding it
-is a dependency decision (Blocked in PROGRESS). `tsconfig.json` [owned] keeps `checkJs` for editors.
+is a dependency decision (Blocked in PROGRESS). `tsconfig.json` [owned] keeps `checkJs`; editors show `node:*` errors until `@types/node` is installed.
 
 ### 6.12 `ts-lib`
 
