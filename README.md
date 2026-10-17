@@ -15,8 +15,11 @@ stack, tool versions and config, and keeps them current. Your app code stays you
 ```bash
 node scripts/render.mjs new --template template --out ../my-repo \
   --piece base --piece preact-app:web --piece hono-worker:api --data scope=acme
-cd ../my-repo && git init && pnpm install && pnpm run ci
+cd ../my-repo && git init && pnpm install && node scripts/agents-index.mjs && pnpm run ci
 ```
+
+The dev renderer runs no `[[post]]` hooks, so run `node scripts/agents-index.mjs` yourself after
+rendering to create the docs index (splice will run it).
 
 The renderer only supports `new`; there is no `add` or `update` until splice ships. To render
 piece combinations and run their CI command the way hull's CI does:
@@ -41,6 +44,9 @@ touched) and `splice check` in CI.
 | `astro-site` | Astro 7 static site sharing the Vite+ core |
 | `hono-worker` | Hono on Cloudflare Workers with JSON request logs, Workers Logs, optional Sentry; OTel export unverified (see Logging) |
 | `rust-tool` | Rust crate in a root Cargo workspace, orchestrated and cached by Turbo |
+| `rust-cli` | Rust CLI skeleton with a JSON/exit-code contract, pinned toolchain and cargo-deny; distributable |
+| `npm-cli` | npm launcher plus per-platform packages that ship a `rust-cli` binary, published with provenance |
+| `ts-lib` | ESM TypeScript library checked by publint and attw |
 | `tauri-app` | Tauri v2 desktop shell around a preact-app, built on a schedule |
 | `docs` | docspack: versioned docs for every tool, searchable by agents offline |
 
@@ -59,10 +65,12 @@ Not a template option. To use Blacksmith, Namespace or Depot, change `runs-on` i
 
 ## Built for Claude Code
 
-A lean `CLAUDE.md`, subagents with fixed models (`explorer` haiku, `implementer` sonnet,
-`reviewer` opus, `ci-fixer` sonnet), skills (`verify`, `add-piece`, `docs-lookup`), a `/loop`
-default that iterates until checks pass, an opt-in Stop hook, and superpowers + caveman enabled
-for the team.
+A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, a project `Explore`
+subagent on haiku plus `implementer` sonnet, `reviewer` opus and `ci-fixer` sonnet, skills
+(`verify`, `add-piece`, `docs-lookup`), a `/loop` default that iterates until checks pass, a
+PreToolUse guard hook (denies publish, force or tag pushes and secret reads; asks before editing
+template-owned files), a generated docs index (`docs/agents/index.md`), an opt-in Stop hook, and
+superpowers + caveman enabled for the team.
 
 ## Logging
 

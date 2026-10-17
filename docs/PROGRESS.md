@@ -39,7 +39,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-17 · 04/7 · `feat(rust-cli): Rust CLI skeleton with JSON/exit contract, pinned toolchain and cargo-deny` · tests/rust-cli.test.mjs 19/19, full suite green, lint+fmt clean; RED first (19 failing); generated crate: clippy -D warnings, fmt, 12 integration + 2 unit tests (nextest), cargo deny ok; hand dogfood base+rust-cli:cli (install, agents-index, turbo 11/11 tasks, index --check) ok; dogfood base, site ok. Deviation: cargo-deny needs `--manifest-path`/`--config` before `check` (spec amended); cargo-deny 0.20.2 and Rust 1.99.1 installed locally. Fix round 1: ci.yml installs the pinned toolchain via `rustup toolchain install` (no `@stable`), env-isolation test checks `env -i` and the exact key set, `Report::success` debug-asserts reserved keys.
 - 2026-10-17 · 04/8 · `feat(npm-cli): npm launcher and platform packages for a rust-cli binary` · tests/npm-cli.test.mjs 10/10, ts-lib repository-pattern test, all-pieces budget test, full suite green, lint+fmt clean; RED first (12 failing); hand dogfood base+rust-cli:cli+npm-cli:cli: turbo 15/15 tasks (generated launcher 3, stage 5, version-sync 1 tests), index --check ok; after a crate-only change `turbo run test --affected` lists `@hullci/cli#test` and the crate test (no crate build task), `typecheck --dry=json` lists only `@hullci/cli#typecheck`. Deviation: typecheck is `node --check` (tsc 7 `checkJs` works but needs `@types/node`, not in the catalog; spec §4.2, base §6.11). ts-lib `repository` var pattern tightened.
 - 2026-10-17 · 04/9 · `feat(base): tag-driven release workflow with npm trusted publishing and provenance` · 550/550 tests (new tests/release.test.mjs 19, guard/npm-cli/ts-lib +1 each, parity cargo-deny pin extended to release.yml), lint+fmt clean; RED first (5 failing incl. missing release-plan.mjs); actionlint 1.7.7 + shellcheck 0.10.0 clean on release.yml and ci.yml; dogfood base, web, site, docs ok; hand dogfood base+rust-cli:cli+npm-cli:cli (turbo 15/15) and base+ts-lib:lib (11/11) ok, index --check ok; in the rendered cli/lib repos `GITHUB_REF_NAME=cli-v0.0.0` / `lib-v0.0.0 node .github/scripts/release-plan.mjs` print the plan, `cli-v1.0.0` exits 1 naming `crates/cli/Cargo.toml`; `pnpm pack` of the lib rewrites `catalog:` to exact pins. Always-loaded bytes with the project.md Blocked section: cli 4103, lib 3807 (CEILING 4150). Fix round 1 (`fix(base): prerelease dist-tags and release workflow hardening`): npm publishes pass `--tag next|latest` (prerelease = version with `-`), `gh release create --prerelease` for prereleases, `cargo build -p <package>` from a new `package=` plan output, `environment: release` on github-release, npm_dirs read line by line and filtered to plain names.
-- 2026-10-17 · 04/10 · `ci: dogfood cli and lib combos` · 557/557 tests (new: affected-combos cli/lib/release.yml, parity cargo generate-lockfile for rust-cli + hull ci.yml cargo-deny pin, hull-workflows Rust condition exit codes and rust-cache/tool step), lint+fmt clean; RED first (5 failing); dogfood base, web, site, docs, cli, lib ok twice. Always-loaded bytes (CEILING 4150 unchanged): base 3185, web 3841, site 3656, docs 3458, cli 4103, lib 3807. actionlint not installed. Spec §10.1/§10.2 updated; GitHub CI time to be read after push.
+- 2026-10-17 · 04/10 · `ci: dogfood cli and lib combos` · 557/557 tests (new: affected-combos cli/lib/release.yml, parity cargo generate-lockfile for rust-cli + hull ci.yml cargo-deny pin, hull-workflows Rust condition exit codes and rust-cache/tool step), lint+fmt clean; RED first (5 failing); dogfood base, web, site, docs, cli, lib ok twice. Always-loaded bytes (CEILING 4150 unchanged): base 3185, web 3841, site 3656, docs 3458, cli 4103, lib 3807. actionlint 1.7.7 exit 0, run by the controller. Spec §10.1/§10.2 updated; GitHub CI time to be read after push.
+- 2026-10-17 · 04/11 · `docs: amend hull spec and CLAUDE.md for agent layer v2 and skeleton pieces` · docs-only; coverage check of agent-layer spec §7 against the base spec found gaps in header, §9 and §12, fixed; new spec Status approved and §10 records the user decisions (D5 ask, D11 tag-driven, no changesets); hull CLAUDE.md 102 lines; README pieces, Claude Code section, quick start; dogfood.mjs comment; tests, lint, format run.
 
 ## Measurements
 
@@ -83,11 +84,21 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
+- Tag hull v0.1.0 only after splice M2 (class-change rules, splice spec §10 item 12) is released: `<target>/CLAUDE.md` changed from owned to seed and `explorer.md` was removed, and no migration exists because no lock exists yet. If v0.1.0 is tagged first, add the migration first.
+
 ## Status
 
 Written 2026-10-15 when the build loop stopped. Plans 01 and 02 are fully checked. Plan 03 Tasks 1–5
 are checked; Tasks 6–8 are Blocked (hoard and splice are unreleased; the release needs a human).
 Milestones 1, 2 and 3 are reviewed (lines above). 325 tests pass, lint and format are clean.
+
+**Milestone 4 (2026-10-17, plan 04 agent layer and skeletons, Tasks 1–11):** `AGENTS.md` canonical with a thin `CLAUDE.md`, project `Explore` on haiku, PreToolUse guard hook (asks on owned edits), generated docs index with a CI check, per-instance `AGENTS.md`, new pieces `ts-lib`, `rust-cli`, `npm-cli`, tag-driven `release.yml` with provenance, combos `cli` and `lib` dogfooded. Spec: `docs/superpowers/specs/2026-10-17-hull-agent-layer-and-skeletons-design.md` (approved; base spec amended). Task 12 (cli CI timing on `keelstackhq/cli-canary`) is not done.
+
+**Open items after milestone 4**
+
+- cli combo CI time on GitHub is unmeasured until Task 12 lands (canary repo needs a human, see Blocked).
+- Release Blocked items: first real release of a keelstackhq tool, and tagging v0.1.0 only after splice M2.
+- Human decisions: add `@types/node` to the catalog (npm-cli typecheck back to `tsc`); npm-cli `requires` = `["base", "rust-cli"]`.
 
 **What works**
 

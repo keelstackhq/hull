@@ -9,7 +9,7 @@ versions and config, never app logic. Consumers render it with `splice` from
   sections your task touches; change the spec in the same commit when behaviour changes.
 - Contract: `docs/template-format.md` — shared with `keelstackhq/splice`, binding (incl. §9).
   Never edit it here alone; changes go to both repos in the same week.
-- Plans: `docs/superpowers/plans/` (01 base-renderer, 02 web-pieces, 03 native-docs-dogfood).
+- Plans: `docs/superpowers/plans/` (01 base-renderer, 02 web-pieces, 03 native-docs-dogfood, 04 agent-layer-skeletons).
 - Progress: `docs/PROGRESS.md` — one line per finished task, plus Blocked and Status.
 
 ## Layout
@@ -17,13 +17,14 @@ versions and config, never app logic. Consumers render it with `splice` from
 ```
 template/splice.toml            template manifest (format 1)
 template/pieces/<id>/           piece.toml + files/ (base, preact-app, ui-storybook, astro-site,
-                                hono-worker, rust-tool, tauri-app, docs)
+                                hono-worker, rust-tool, rust-cli, npm-cli, ts-lib, tauri-app, docs)
 scripts/render.mjs, lib/        dev renderer (contract §1-§4, §8, §9; `new` only)
 scripts/combos.json             piece combinations hull CI renders
 scripts/dogfood.mjs             render combos, run their CI command
 scripts/affected-combos.mjs     which combos a diff touches
 renovate/default.json           Renovate preset generated repos extend
-tests/                          node:test: renderer units + template invariants
+tests/                          node:test: renderer units + template invariants + module tests of
+                                guard.mjs, agents-index.mjs, release-plan.mjs
 ```
 
 ## Commands
@@ -61,14 +62,15 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
   never on the PR path.
 - **CI task list** is `CI_TASKS` in `scripts/lib/ci-tasks.mjs`; the parity test keeps the generated
   workflow, the base `ci` script and dogfood in sync.
-- **Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines** (`AGENTS.md` ≤ 60, `CLAUDE.md` ≤ 20). Per-instance notes go in `<target>/AGENTS.md`.
+- **Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines** (`AGENTS.md` ≤ 60, `CLAUDE.md` ≤ 20). Per-instance notes:
+  `<target>/AGENTS.md` owned, `<target>/CLAUDE.md` seed.
 - **No secrets in logs** (hono-worker logs never include query strings, headers or bodies).
 
 ## How to work here
 
 - Test first (superpowers:test-driven-development): failing test, watch it fail, implement, pass.
 - One plan task per commit, message as in the plan (`feat:`, `fix:`, `test:`, `ci:`, `docs:`).
-- Subagents: `explorer` (haiku) for every search or "where is X"; `implementer` (sonnet) writes
+- Subagents: `Explore` (haiku) for every search or "where is X"; `implementer` (sonnet) writes
   code for one task; `reviewer` (opus) reviews read-only. Keep their reports ≤ 15 lines.
 - Read files by section (offset/limit or grep), not whole, unless they are short.
 - Verify with real output before claiming a pass (superpowers:verification-before-completion).

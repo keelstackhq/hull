@@ -24,7 +24,7 @@ export function comboSteps(cacheDir, pieces = [], dir = ".") {
   const steps = [
     ["git", ["init", "-q"]],
     ["pnpm", ["install", "--no-frozen-lockfile", "--prefer-offline"]],
-    // the rust-tool and rust-cli [[post]] hook, which the dev renderer does not run; keeps Cargo.lock (a turbo
+    // the rust-tool and rust-cli [[post]] hooks, which the dev renderer does not run; keeps Cargo.lock (a turbo
     // input) stable, so a second run hits the cache
     ...(pieces.some((p) => RUST_PIECES.has(p.split(":")[0]))
       ? [["cargo", ["generate-lockfile"]]]

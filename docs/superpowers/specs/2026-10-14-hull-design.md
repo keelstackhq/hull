@@ -1,6 +1,6 @@
 # hull — design
 
-Date: 2026-10-14 · Status: approved for build · Org `keelstackhq`, repo `keelstackhq/hull`
+Date: 2026-10-14 · Status: approved for build · amended by `2026-10-17-hull-agent-layer-and-skeletons-design.md` (agent layer v2, skeleton pieces) · Org `keelstackhq`, repo `keelstackhq/hull`
 
 hull is an opinionated, AI-native monorepo template. It owns structure, stack, tool versions and
 config, never app logic. Consumers render it with `splice` (`keelstackhq/splice`, Rust) from
@@ -745,6 +745,10 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
   violation, with file, line and tag).
 - `--json` prints exactly one object `{ok, command: "new", changes, messages}`; without it, one
   line per file. Library entry `renderNew(options) → Result` for tests and `dogfood.mjs`.
+- A path that changes ownership class between template versions (for example `<target>/CLAUDE.md`,
+  owned before the agent-layer amendment, seed now) is handled by splice, not by hull: splice spec
+  §10 item 12 (owned to seed keeps the file and drops it from the lock; seed to owned creates it if
+  absent, else conflicts). Hull ships no migration for it before v0.1.0, because no lock exists yet.
 
 ## 10. hull's own CI
 
@@ -820,7 +824,17 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 - Invariants over the real `template/`: manifests valid; every `files/` path classified by at most
   one class; `[merge]` keys are shared; every `.jinja` passes the subset check; no `{{` in
   `files/` paths; elif-chain branches identical; rendered `AGENTS.md` + `CLAUDE.md` ≤ 80 lines per combo;
-  generated `ci.yml` structure (§8.1); settings and agent frontmatter shape.
+  generated `ci.yml` structure (§8.1, including the agents-index check and `cargo-deny`); settings
+  and agent frontmatter shape (`Explore` on haiku, read-only; no `explorer`); per-instance
+  `AGENTS.md` ≤ 20 lines with `CLAUDE.md` exactly `@AGENTS.md` (seed); `docs/agents/index.md`
+  ≤ 8192 bytes per combo.
+- Module tests for the hull-tested template scripts: `guard.mjs` (`decide()` table, one spawn
+  test), `agents-index.mjs` (exact output, determinism, `--check`, budget) and `release-plan.mjs`
+  (`plan()` on fixtures); `release.yml` shape (tag trigger, `contents: read`, `id-token: write`
+  only on publishing jobs, `--provenance`, no npm token).
+- Skeleton pieces: `rust-cli` (exact `=x.y.z` pins, no OpenSSL, `deny.toml`, debug `--locked`
+  build), `npm-cli` (no `optionalDependencies` or install scripts, `bin` = crate), `ts-lib`
+  (`exports` shape, publint and attw in `build`).
 - Dogfood: each combo installs, lints, formats, typechecks, tests and builds.
 - Timing: `ci-timing.mjs` against §8.4 and §10.2 budgets.
 

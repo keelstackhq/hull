@@ -1,6 +1,6 @@
 # hull — agent layer v2 and skeleton pieces (design)
 
-Date: 2026-10-17 · Status: draft for review · Amends `2026-10-14-hull-design.md` (the base spec). Evidence: `reports/Developer and agent DX ecosystem.md`, sections "Small, human-written, enforced
+Date: 2026-10-17 · Status: approved, implemented by plan 04 (2026-10-17) · Amends `2026-10-14-hull-design.md` (the base spec). Evidence: `reports/Developer and agent DX ecosystem.md`, sections "Small, human-written, enforced
 context beats more agents" and "Hull's skeletons are stubs where agents most need depth".
 
 Two changes. (A) The generated AI layer: `AGENTS.md` becomes canonical, `CLAUDE.md` thin, the
@@ -429,8 +429,13 @@ lines" becomes "Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines", and its layou
    a ceiling (measured max 3,764 bytes in the `web` combo + 10 % = 4,150), so growth fails a test
    instead of being printed.
 
-## 10. Choices left to the user
+## 10. Choices made by the user (2026-10-17)
 
-- **D11 release model**: tag-driven now and hoist later (recommended), or adopt changesets now.
-- **D14 naming**: `@<scope>/<name>-crate` for the private Rust workspace package, or another suffix.
-- **D5 owned edits**: `ask` (recommended) or `deny`.
+- **D5 owned edits: ask.** The guard hook asks the human before editing a template-owned file
+  ("Approve, ask on owned edits"); `.splice/lock.toml` edits are denied.
+- **D11 release model: tag-driven.** `release.yml` publishes on a pushed `<instance>-v<semver>` tag
+  until `hoist release` ships. No changesets.
+- **D14 naming: `@<scope>/<name>-crate`** for the private Rust workspace package (the
+  recommended default, as implemented).
+- Open and recorded in `docs/PROGRESS.md` (Status, Blocked): add `@types/node` to the catalog so
+  npm-cli `typecheck` is back to `tsc`; npm-cli `requires` = `["base", "rust-cli"]`.
