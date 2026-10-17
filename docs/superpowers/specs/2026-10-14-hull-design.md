@@ -208,7 +208,9 @@ Root files (class in brackets):
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
 - `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
-  `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
+  `desktop.yml.jinja` [owned] (§8.3), `release.yml` [owned] with
+  `.github/scripts/release-plan.mjs` [owned] (§8.7; plain files, rendered in every repo, idle
+  without a rust-cli or ts-lib package). The contract subset cannot emit GitHub's `${{ … }}` from a
   `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
   piece conditions; see §4.3 item 8.
 - `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-cli, rust-tool or tauri-app:
@@ -221,7 +223,10 @@ Root files (class in brackets):
   duplicated per branch (the subset has no `or`), so it renders for either piece.
 - `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
   base-only repo runs every CI task.
-- `README.md.jinja` [seed], `docs/agents/project.md` [seed].
+- `README.md.jinja` [seed], `docs/agents/project.md.jinja` [seed]: with npm-cli or ts-lib (a
+  marked `npm-cli`/`ts-lib` chain) it adds a `## Blocked` section with the human release steps of
+  §8.7. A seed renders only on `new`, so the owned npm-cli and ts-lib `AGENTS.md` files carry the
+  same steps for a later `splice add`.
 - AI layer, §6.9.
 
 ### 6.2 `preact-app`
@@ -522,8 +527,8 @@ artifact (about 2 s extra locally: publint 0.2 s, attw 1.3 s). `src/index.ts`, `
 `pack.entries.ts` (the entry list `vite.config.ts` imports, so the owned config never needs edits),
 `README.md`, `CLAUDE.md` [seed]; `AGENTS.md` [owned]. Optional piece var `ts-lib.repository` (GitHub URL,
 default empty) renders `repository` in `package.json`; npm provenance fails with E422 without it, so
-AGENTS.md and README tell the user to set it before the first publish (the file is shared, so adding
-it later works). The var pattern is `https://github.com/<owner>/<repo>` with `[A-Za-z0-9._-]` segments
+`release.yml` sets it to the workflow's repository before `pnpm pack` (§8.7) and AGENTS.md says so;
+the README still tells a user who publishes by other means to set it (the file is shared). The var pattern is `https://github.com/<owner>/<repo>` with `[A-Za-z0-9._-]` segments
 (no quotes or backslashes, so no JSON injection); write the URL without `.git`. The catalog carries `publint` and
 `@arethetypeswrong/cli` (unused entries are harmless).
 
@@ -560,7 +565,9 @@ Checked with `npm view` on 2026-10-14.
 | crates `tracing` / `tracing-subscriber` | 0.1.44 / 0.3.23 | rust-cli; 2025-12-18 / 2026-03-13 |
 | dev crates `assert_cmd` / `predicates` / `insta` / `tempfile` | 2.2.2 / 3.1.4 / 1.49.0 / 3.27.0 | rust-cli; `insta` with `json` only; 2026-05-11 / 2026-02-11 / 2026-10-03 / 2026-03-11 |
 | Rust toolchain | 1.99.1 | rust-cli `rust-toolchain.toml` and `rust-version`; stable manifest dated 2026-10-15 |
-| `cargo-deny` | 0.20.2 | `taiki-e/install-action` in `ci.yml`; Renovate tracks it with a regex manager; 2026-07-09 |
+| `cargo-deny` | 0.20.2 | `taiki-e/install-action` in `ci.yml` and `release.yml` (§8.7); Renovate tracks it with a regex manager; 2026-07-09 |
+| npm CLI (release) | Node 24's bundled npm | `release.yml` `setup-node` `node-version: 24` (Node 24.22.0 ships npm 11.19.1); trusted publishing needs npm ≥ 11.5.1, Node ≥ 22.14.0 (docs.npmjs.com/trusted-publishers, 2026-10-17); no separate pin |
+| Actions (release) | `actions/attest-build-provenance@v4`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `taiki-e/install-action@v2` | major tags (latest v4.2.2, v7.0.2, v8.0.2, v2.87.29 on 2026-10-17); Renovate pins digests; checkout/pnpm/setup-node as in `ci.yml` |
 
 ### 7.1 Turbo and Vite+
 
@@ -667,6 +674,47 @@ tracks `cargo-deny@x.y.z` in `.github/workflows/*.yml` (datasource `crate`); the
 manager bumps `rust-toolchain.toml`, so the toolchain needs no regex; automerge for minor/patch and digests with `platformAutomerge`; weekly
 `lockFileMaintenance`. Open question: once `splice update` runs as a bot, template-managed catalog
 entries move to `ignoreDeps` so Renovate and the template do not both bump them.
+
+### 8.7 `release.yml` (tag-driven)
+
+Plain owned file in every repo. A human pushes `<instance>-v<semver>`; trigger
+`on.push.tags: ["*-v[0-9]*"]`, top-level `permissions: contents: read`, `concurrency:
+release-${{ github.ref }}` without cancel, every checkout `fetch-depth: 0`. No npm token exists
+anywhere (no `NPM_TOKEN`, `NODE_AUTH_TOKEN` or npm secret); `id-token: write` only on the two
+publishing jobs.
+
+- `plan`: `.github/scripts/release-plan.mjs` (Node built-ins only; `plan(tag, fs)` exported for
+  hull's tests) reads `GITHUB_REF_NAME` and writes `kind`, `dir`, `bin`, `version`, `npm_dirs` to
+  `$GITHUB_OUTPUT`, or exits 1 with the reason (pairing rule and errors: new spec §4.4). For
+  rust-cli it installs the pinned toolchain and `cargo-deny@0.20.2` and runs
+  `cargo deny --manifest-path <dir>/Cargo.toml --config <dir>/deny.toml check advisories` (global
+  options before the subcommand; advisories run only here, never on PRs).
+- `binaries` (rust-cli): matrix over npm-cli's `TARGETS` (`linux-x64`/`linux-arm64` musl on
+  `ubuntu-latest`/`ubuntu-24.04-arm`, both darwin targets on `macos-latest`, `win32-x64` on
+  `windows-latest`); `cargo build --release --locked -p <bin> --target <t>`; uploads
+  `<t>/<bin>[.exe]` (the layout `stage.mjs --artifacts` reads) and `<bin>-<t>.tar.gz` (`.zip` on
+  Windows); the `linux-x64` leg adds `completions/<bin>.{bash,zsh,fish,powershell}` and `<bin>.1`.
+- `github-release` (rust-cli; `contents: write`, `id-token: write`, `attestations: write`):
+  `SHA256SUMS`, `actions/attest-build-provenance` on the archives, `gh release create <tag>
+  --verify-tag` (or `gh release upload --clobber` when the release exists, so a re-run is safe).
+- `npm` (rust-cli with npm-cli companions, or ts-lib; `environment: release`, `contents: read`,
+  `id-token: write`): `setup-node` with `node-version: 24` and `registry-url` (the placeholder
+  token it exports is not a secret; npm exchanges the OIDC token). npm-cli: `stage.mjs` per
+  companion (it writes `repository` from `GITHUB_REPOSITORY`), platform packages first, launcher
+  last. ts-lib: `pnpm install --frozen-lockfile`, `pnpm turbo run build test --filter <name>`,
+  `npm pkg set repository.type=git repository.url=git+https://github.com/$GITHUB_REPOSITORY.git`,
+  `pnpm pack` (rewrites `catalog:`/`workspace:`). Every publish is
+  `npm publish <dir|tgz> --provenance --access public`, skipped when `npm view <name>@<version>`
+  already answers.
+
+Human steps (in the generated `docs/agents/project.md` Blocked section and the owned npm-cli /
+ts-lib `AGENTS.md`): the `release` environment with a tag rule; the first publish of each new npm
+name by hand; an npm trusted publisher (repo, `release.yml`, environment `release`) on each
+package (launcher and five platform packages, or the library), which must see its first publish
+within 2 days. Unverified until the first real release (hull PROGRESS Blocked): `npm publish` of a
+`pnpm pack` tarball with `--provenance`, private repos (npm makes no provenance for them;
+attestations need a public repo or GitHub Enterprise Cloud), `ubuntu-24.04-arm`, and
+`macos-latest` building `x86_64-apple-darwin`.
 
 ## 9. Dev renderer `scripts/render.mjs`
 

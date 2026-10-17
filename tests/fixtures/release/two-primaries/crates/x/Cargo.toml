@@ -1,0 +1,11 @@
+[package]
+name = "x"
+version = "1.0.0"
+edition = "2024"
+
+[[bin]]
+name = "x"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "=4.6.7" }

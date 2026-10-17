@@ -1,0 +1,10 @@
+{
+  "name": "@acme/npm",
+  "version": "1.2.0",
+  "bin": {
+    "cli": "bin/launcher.js"
+  },
+  "hull": {
+    "release": "npm-cli"
+  }
+}

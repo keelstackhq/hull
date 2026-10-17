@@ -58,6 +58,8 @@ Files (owned):
 - `.github/workflows/desktop.yml`
 - `.github/scripts/affected.mjs`
 - `.github/scripts/rust-affected.mjs`
+- `.github/workflows/release.yml`
+- `.github/scripts/release-plan.mjs`
 - `scripts/agents-index.mjs`
 - `Cargo.toml`
 - `rust-toolchain.toml`

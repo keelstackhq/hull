@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -9,6 +10,7 @@ import {
   ownedPaths,
   targetPath,
 } from "../template/pieces/base/files/.claude/hooks/guard.mjs";
+import { renderCombo } from "./helpers.mjs";
 
 const GUARD = fileURLToPath(
   new URL("../template/pieces/base/files/.claude/hooks/guard.mjs", import.meta.url),
@@ -194,4 +196,14 @@ test("guard imports only node: built-ins", () => {
   const specs = [...src.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]);
   assert.ok(specs.length > 0);
   for (const s of specs) assert.match(s, /^node:/);
+});
+
+test("rendered base tree contains .github/workflows/release.yml, the file the guard's publish reason names", async () => {
+  const { reason } = decide(bash("npm publish"), ctx);
+  const named = /\(([a-z]+\.yml)\)/.exec(reason)?.[1];
+  assert.equal(named, "release.yml");
+  const { dir, result } = await renderCombo(["base"]);
+  const c = result.changes.find((x) => x.path === `.github/workflows/${named}`);
+  assert.equal(c?.class, "owned");
+  assert.match(readFileSync(join(dir, ".github/workflows", named), "utf8"), /^name: release$/m);
 });

@@ -64,15 +64,29 @@ test("comboSteps writes the index before turbo and checks it after", () => {
   assert.ok(write < turbo && turbo < check && check < vite);
 });
 
-test("cargo-deny pin is one version across template ci.yml and the renovate regex fixture", async () => {
+test("cargo-deny pin equal in template ci.yml, release.yml and the renovate regex", async () => {
   const preset = JSON.parse(await readFile(new URL("../renovate/default.json", import.meta.url)));
   const regex = new RegExp(
     preset.customManagers.find((m) => m.depNameTemplate === "cargo-deny").matchStrings[0],
     "g",
   );
-  const yml = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
-  const found = [...yml.matchAll(regex)].map((m) => m.groups.currentValue);
+  const pins = async (file) => {
+    const yml = await readFile(`${base}.github/workflows/${file}`, "utf8");
+    return [...yml.matchAll(regex)].map((m) => m.groups.currentValue);
+  };
+  const found = await pins("ci.yml");
   assert.deepEqual(found, ["0.20.2"]);
+  assert.deepEqual(await pins("release.yml"), found);
+  // the preset's file pattern covers both workflows
+  const files = new RegExp(
+    preset.customManagers
+      .find((m) => m.depNameTemplate === "cargo-deny")
+      .managerFilePatterns[0].slice(1, -1),
+  );
+  assert.deepEqual(
+    [".github/workflows/ci.yml", ".github/workflows/release.yml"].map((f) => files.test(f)),
+    [true, true],
+  );
   // a fixture in the shape Renovate sees: the same text, one pin
   const fixture = "      tool: cargo-nextest,cargo-deny@0.20.2\n";
   assert.deepEqual(

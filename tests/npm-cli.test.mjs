@@ -131,3 +131,12 @@ test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", asyn
   assert.match(agents, /postinstall/);
   assert.match(agents, /`version`/);
 });
+
+test("AGENTS.md names the trusted-publisher and first-publish steps, ≤ 20 lines", async () => {
+  const { agents: raw } = await assertInstanceNotes(PIECES, "packages/cli");
+  const agents = raw.replace(/\s+/g, " ");
+  assert.match(agents, /first publish of each new npm name/);
+  assert.match(agents, /trusted publisher \(this repo, `release\.yml`, environment `release`\)/);
+  assert.match(agents, /the launcher and all five platform packages/);
+  assert.match(agents, /within 2 days/);
+});

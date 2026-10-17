@@ -277,12 +277,22 @@ harmless, base spec §6.1). `packages/shared` stays internal and unchanged.
 
 ### 4.4 Release (`base`, owned, plain files)
 
-`.github/scripts/release-plan.mjs` (Node built-ins only, exported `plan(tag, fsView)` for tests):
-parses `GITHUB_REF_NAME` = `<instance>-v<semver>`; finds `crates/<instance>/package.json` or
-`packages/<instance>/package.json` with a `hull.release` field; checks the version (Cargo.toml for
-rust-cli, package.json otherwise) equals the tag; for rust-cli also finds npm-cli packages whose
-`bin` key is the crate. Outputs `kind`, `dir`, `npm_dirs`, `bin`; unknown tag shape, no match,
-two unrelated matches or a version mismatch → exit 1 with the reason (nothing publishes).
+`.github/scripts/release-plan.mjs` (Node built-ins only, exported `plan(tag, fs)` with
+`fs = { read(rel): string | null, list(rel): string[] }`, and
+`TAG_RE = /^(.+)-v(\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?)$/`, so instance names may contain hyphens):
+parses `GITHUB_REF_NAME` = `<instance>-v<semver>`. Pairing rule: candidates are
+`crates/<instance>` and `packages/<instance>` whose `package.json` has a `hull.release` field; the
+**primary** is the one `rust-cli` or `ts-lib` candidate. For a `rust-cli` primary (version and
+`[[bin]]` name from its `Cargo.toml`) the companions are **all** `npm-cli` packages under
+`packages/*` (any directory name) whose `bin` key equals the binary name; each companion's version
+must equal the tag too. A ts-lib primary (version from `package.json`) is its own `npm_dirs`.
+Outputs `kind`, `dir`, `bin` (empty for ts-lib), `version`, `npm_dirs` (JSON) as `key=value`
+lines; errors exit 1 with the reason and nothing publishes: tag not matching `TAG_RE` (or an
+instance that is not a plain directory name) or no candidate → `unknown tag <tag>`; two primaries
+→ `ambiguous: <dir>, <dir>`; an `npm-cli` candidate whose `bin` is not the primary's →
+`ambiguous: …`; only an `npm-cli` candidate → `<dir> is an npm-cli package: push <crate>-v<version>
+…`; a version mismatch → `tag <tag> is version <v> but <file> has <found>`. Workflow details: base
+spec §8.7.
 
 `.github/workflows/release.yml`: `on: push: tags: ["*-v[0-9]*"]`; `permissions: contents: read`
 at the top; `concurrency: release-${{ github.ref }}` (no cancel).

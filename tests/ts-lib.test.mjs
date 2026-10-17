@@ -126,3 +126,11 @@ test("repository var pattern: https://github.com/<owner>/<repo> only; no quotes,
     assert.equal(re.test(bad), false, bad);
   await assert.rejects(renderCombo(PIECES, { "ts-lib.repository": 'https://github.com/a/b"c' }));
 });
+
+test("AGENTS.md names the trusted-publisher and first-publish steps, ≤ 20 lines", async () => {
+  const { agents: raw } = await assertInstanceNotes(PIECES, "packages/lib");
+  const agents = raw.replace(/\s+/g, " ");
+  assert.match(agents, /first publish of each new npm name/);
+  assert.match(agents, /trusted publisher \(this repo, `release\.yml`, environment `release`\)/);
+  assert.match(agents, /within 2 days/);
+});

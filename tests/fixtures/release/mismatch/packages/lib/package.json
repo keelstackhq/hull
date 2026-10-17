@@ -1,0 +1,7 @@
+{
+  "name": "@acme/lib",
+  "version": "0.2.0",
+  "hull": {
+    "release": "ts-lib"
+  }
+}

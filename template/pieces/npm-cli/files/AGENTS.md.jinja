@@ -13,5 +13,7 @@ needs a rust-cli instance named `{{ crate }}` in `crates/{{ crate }}`.
   `test/version-sync.test.js` checks it.
 - `typecheck` is `node --check` (no `@types/node` in the catalog for `tsc`); `test` and `typecheck`
   do not build the crate.
-- A human pushes the tag `{{ crate }}-v<version>`; the release workflow publishes the platform
-  packages, then the launcher.
+- A human pushes the tag `{{ crate }}-v<version>`; `release.yml` publishes the platform packages,
+  then the launcher. Human steps first: first publish of each new npm name by hand; a trusted
+  publisher (this repo, `release.yml`, environment `release`) on the launcher and all five
+  platform packages, then release within 2 days; a `release` environment with a tag rule.
