@@ -1,0 +1,7 @@
+{
+  "name": "acme",
+  "private": true,
+  "scripts": {
+    "ci": "turbo run lint format:check typecheck test build --affected"
+  }
+}

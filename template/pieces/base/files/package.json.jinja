@@ -11,7 +11,8 @@
     "format": "vp fmt",
 {% if "docs" in pieces %}    "docs:packs": "node scripts/docs-packs.mjs",
     "docs:sync": "docspack sync && docspack index --repo",
-{% endif %}    "format:check": "vp fmt --check package.json turbo.json tsconfig.base.json vite.config.ts pnpm-workspace.yaml renovate.json CLAUDE.md AGENTS.md README.md .claude .github docs",
+{% endif %}    "agents:index": "node scripts/agents-index.mjs",
+    "format:check": "vp fmt --check package.json turbo.json tsconfig.base.json vite.config.ts pnpm-workspace.yaml renovate.json CLAUDE.md AGENTS.md README.md .claude .github scripts docs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

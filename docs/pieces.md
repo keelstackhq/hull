@@ -57,6 +57,7 @@ Files (owned):
 - `.github/workflows/desktop.yml`
 - `.github/scripts/affected.mjs`
 - `.github/scripts/rust-affected.mjs`
+- `scripts/agents-index.mjs`
 - `Cargo.toml`
 - `rust-toolchain.toml`
 - `renovate.json`
