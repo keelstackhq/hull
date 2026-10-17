@@ -22,8 +22,8 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 - Keep files small and focused; one task per change; no drive-by refactors.
 - Versions live in the catalog in `pnpm-workspace.yaml` as exact pins; use `catalog:` in packages.
 - Files owned by the template (configs, workflows, `.claude/`) are updated by `splice update`;
-  put local changes in seed files, `docs/agents/project.md` or below the import in a package's
-  `CLAUDE.md`.
+  put local changes in seed files, `docs/agents/project.md` or a package's
+  `AGENTS.md`.
 - Never print or commit secrets; never read `.env*` or `.dev.vars`.
 - Releases are tag pushes made by a human; never publish or push tags yourself.
 - At most 2-3 parallel agents, on files that barely overlap.

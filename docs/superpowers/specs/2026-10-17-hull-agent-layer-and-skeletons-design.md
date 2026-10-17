@@ -385,8 +385,7 @@ lines" becomes "Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines", and its layou
 
 ## 9. Risks and facts to verify at plan time
 
-1. A project agent named `Explore` overrides the built-in one (report cites the subagent docs);
-   verify on the current Claude Code, else keep the file and note the gap.
+1. A project agent named `Explore` overrides the built-in one. **Verified 2026-10-17** (Claude Code in this container): in a scratch render of `base`, with `.claude/agents/explore.md` edited to `model: sonnet` plus a marker line, `claude -p "Use the Explore subagent to find which file defines the 'ci-fixer' agent in .claude/agents. Quote the subagent's reply verbatim." --output-format stream-json --verbose` showed `subagent_type":"Explore"`, only `claude-sonnet-5-5` model entries (no haiku) and the marker in the reply; the unedited file (haiku) run showed `claude-haiku-5-5`. The project file wins over the built-in.
 2. PreToolUse JSON output fields (`hookSpecificOutput.permissionDecision` = `deny`/`ask`,
    `permissionDecisionReason`) and that `ask` prompts even under `acceptEdits`; verify against
    code.claude.com/docs hooks.

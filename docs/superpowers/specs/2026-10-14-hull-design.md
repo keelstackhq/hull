@@ -664,14 +664,14 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 - Unit tests for every `scripts/lib` module (node:test, fixtures in `tests/fixtures/template/`).
 - Invariants over the real `template/`: manifests valid; every `files/` path classified by at most
   one class; `[merge]` keys are shared; every `.jinja` passes the subset check; no `{{` in
-  `files/` paths; elif-chain branches identical; rendered `CLAUDE.md` ≤ 80 lines per combo;
+  `files/` paths; elif-chain branches identical; rendered `AGENTS.md` + `CLAUDE.md` ≤ 80 lines per combo;
   generated `ci.yml` structure (§8.1); settings and agent frontmatter shape.
 - Dogfood: each combo installs, lints, formats, typechecks, tests and builds.
 - Timing: `ci-timing.mjs` against §8.4 and §10.2 budgets.
 
 ## 13. Unverified / to check during the build
 
-Verified 2026-10-17 (agent-layer spec §9 item 3, Claude Code in this container): an `@docs/agents/index.md` import of a missing file loads without error; after `node scripts/agents-index.mjs` it loads; `@AGENTS.md` in a nested `CLAUDE.md` resolves relative to that file (`apps/web/AGENTS.md` content was loaded from `apps/web`).
+Verified 2026-10-17 (agent-layer spec §9 items 1 and 3; a project `Explore` agent overrides the built-in one; Claude Code in this container): an `@docs/agents/index.md` import of a missing file loads without error; after `node scripts/agents-index.mjs` it loads; `@AGENTS.md` in a nested `CLAUDE.md` resolves relative to that file (`apps/web/AGENTS.md` content was loaded from `apps/web`).
 
 Still open: Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
 (§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm manager bumps the

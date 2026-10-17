@@ -100,6 +100,15 @@ test("AGENTS.md rules: secrets, releases, parallel agents, ask becomes deny", as
   assert.match(text, /hook `ask` becomes a denial in `-p`\/unattended runs/);
 });
 
+test("AGENTS.md sends local notes to project.md or a package AGENTS.md, not CLAUDE.md", async () => {
+  const text = await read((await renderCombo(["base"])).dir, "AGENTS.md");
+  assert.match(
+    text,
+    /put local changes in seed files, `docs\/agents\/project\.md` or a package's\n {2}`AGENTS\.md`\./,
+  );
+  assert.ok(!/below the import/.test(text));
+});
+
 test("agent files: frontmatter name matches case-sensitively", async () => {
   const { dir } = await renderCombo(["base"]);
   for (const [name, file] of AGENTS_LIST) {
@@ -158,7 +167,8 @@ test("every piece id except base and docs has a branch in both Pieces chains and
 test("always-loaded bytes per combo (AGENTS + CLAUDE + project + index) stay under the ceiling", async () => {
   for (const pieces of COMBOS) {
     const { dir } = await renderCombo(pieces, comboVars);
-    spawnSync("node", ["scripts/agents-index.mjs"], { cwd: dir });
+    const idx = spawnSync("node", ["scripts/agents-index.mjs"], { cwd: dir, encoding: "utf8" });
+    assert.equal(idx.status, 0, `${pieces}: ${idx.stderr}`);
     let bytes = 0;
     for (const f of ["AGENTS.md", "CLAUDE.md", "docs/agents/project.md", "docs/agents/index.md"]) {
       bytes += Buffer.byteLength(await read(dir, f));
