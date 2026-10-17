@@ -151,6 +151,7 @@ repo secrets or wrangler vars, not template vars.
 | `astro-site` | yes | `apps/{{ name }}` | base | `site` |
 | `hono-worker` | yes | `apps/{{ name }}` | base | `api` |
 | `rust-tool` | yes | `crates/{{ name }}` | base | `tool` |
+| `rust-cli` | yes | `crates/{{ name }}` | base | `cli` |
 | `tauri-app` | yes | `apps/{{ name }}` | base, preact-app | `desktop` |
 | `ts-lib` | yes | `packages/{{ name }}` | base | `lib` |
 | `docs` | no | — (root) | base | — |
@@ -184,8 +185,9 @@ Root files (class in brackets):
   for vitest/preset-vite/Storybook peers (`check-single-vite` still guards against a real second
   vite). Checked against pnpm 12.11.2 on 2026-10-14/15.
 - `turbo.json.jinja` [shared, json]: `globalDependencies` = root `vite.config.ts`, `tsconfig.base.json`, plus
-  `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` when rust-tool is present (otherwise turbo maps
-  root Cargo changes only to `//` and `--affected` would skip the crates); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
+  `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` when rust-tool or rust-cli is present (otherwise turbo maps
+  root Cargo changes only to `//` and `--affected` would skip the crates; the template keeps today's one-line layout without Rust and
+  the multi-line block with it, via a marked `rust-cli`/`rust-tool` chain plus an unmarked chain whose `else` is the one-line form); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
   `deploy:preview` and `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv` §8.2), `storybook:build` (outputs `storybook-static/**`),
   `build:desktop` (no cache). No `vp run` cache anywhere (Turbo caches, §7.1).
@@ -207,11 +209,14 @@ Root files (class in brackets):
   `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
   `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
   piece conditions; see §4.3 item 8.
-- `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-tool or tauri-app:
-  `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-tool, `"apps/*/src-tauri"` only
-  with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
-  `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition, `stable`
-  with `clippy`, `rustfmt`.
+- `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-cli, rust-tool or tauri-app:
+  `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-cli or rust-tool, via a nested marked chain;
+  `"apps/*/src-tauri"` only with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
+  `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition: `channel = "1.99.1"` with
+  `clippy`, `rustfmt` when rust-cli is present (the crate's `rust-version` is the same number), otherwise `stable`
+  (`clippy` + `rustfmt` with rust-tool, `rustfmt` for tauri-app alone).
+  `.github/scripts/rust-affected.mjs.jinja` is a marked chain `rust-cli` / `rust-tool` with the body
+  duplicated per branch (the subset has no `or`), so it renders for either piece.
 - `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
   base-only repo runs every CI task.
 - `README.md.jinja` [seed], `docs/agents/project.md` [seed].
@@ -312,7 +317,7 @@ cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `cargo generate-lockfile` on `new` and `cargo update --workspace` on `add` (adds the new member
 without bumping locked crates); dogfood runs the same command, because the dev renderer
 does not run `[[post]]`.
-`AGENTS.md` [owned] (≤ 20 lines; points a distributed CLI to `rust-cli`) and `CLAUDE.md` [seed] (`@AGENTS.md`).
+`AGENTS.md` [owned] (≤ 20 lines; points a distributed CLI to `rust-cli`, §6.10) and `CLAUDE.md` [seed] (`@AGENTS.md`).
 
 ### 6.7 `tauri-app`
 
@@ -439,6 +444,44 @@ files.
   accepts the workspace trust dialog. The marketplace names inside those repos' manifests were not
   checked.
 
+### 6.10 `rust-cli`
+
+`crates/<name>` (default `cli`): a production Rust CLI skeleton (agent-layer spec §4.1). The private workspace
+package is `@<scope>/<name>-crate` (the published npm name belongs to `npm-cli`) with
+`hull.release = "rust-cli"`; the binary and the crate are named `<name>`, version `0.0.0`.
+`Cargo.toml.jinja` [shared, toml]: edition 2024, `rust-version = "1.99.1"` (equals the toolchain
+pin), `[[bin]]`, `[lints] workspace = true`, every dependency pinned `=x.y.z` (§7). Scripts, all with
+`-p <name>`, `--locked` where cargo reads the lockfile: `build` `cargo build -p <name> --locked` (a debug
+build: release binaries are built only by the release workflow), `lint` `cargo clippy -p <name>
+--all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans
+licenses sources`, `format:check`, `typecheck` `cargo check -p <name> --all-targets --locked`, `test`
+`cargo nextest run -p <name> --locked`. `turbo.json` [owned] extends `//`; every task's inputs name
+`src/**`, `Cargo.toml` and the three root files with `$TURBO_ROOT$` (`Cargo.toml`, `Cargo.lock`,
+`rust-toolchain.toml`), lint/typecheck/test/format also `tests/**`, lint also `deny.toml`; build outputs
+`$TURBO_ROOT$/target/debug/<name>`. `deny.toml` [owned]: bans `openssl`, `openssl-sys`, `native-tls`;
+license allow-list (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-3.0, Zlib),
+`private.ignore` (the seed has no license), `unused-allowed-license = "allow"` (the list is policy, not a
+usage report), crates.io only; `[advisories]` is configured but only `release.yml` checks it, so a new
+advisory never fails an unrelated PR. No Rust file contains the instance name.
+
+Sources are `seed`. The crate is binary-only: `src/main.rs` (parse, log init, dispatch, exit code),
+`src/run.rs` (`pub fn run(cli: Cli) -> Result<Report, Error>`), `cli.rs` (clap derive; global `--json`,
+`-C DIR`, `-v`, `-q`; `hello [--name N]`, `completions <shell>`, `man`), `exit.rs` (0 ok, 1 negative
+result, 2 usage, 3 config/environment/runtime), `error.rs` (thiserror), `output.rs` (the only writer of
+stdout: `--json` prints exactly one object and a newline, also for clap errors when `--json` is in argv),
+`log.rs` (tracing to stderr; `RUST_LOG`, else `-q`/`-v`). A `src/lib.rs` is not possible in a seed,
+because a plain file cannot name `my_cli` after an instance (agent-layer spec §4.1, amended).
+`tests/common/mod.rs` [seed, plain] builds the command with `assert_cmd::cargo::cargo_bin_cmd!()` (the
+package name is the binary name), `env_clear()` and only `PATH`, a temp `HOME`/`XDG_*` and `NO_COLOR=1`; no
+test sets process env (`set_var` is unsafe in edition 2024 and the workspace forbids unsafe), a test
+asserts on `get_envs()` of the built command instead. `tests/cli.rs` [seed] has inline insta snapshots
+(`--help` after `String::replace(env!("CARGO_PKG_NAME"), "[BIN]")`, since insta's `filters` feature would
+add `regex`; `hello --json`) and assertions for the JSON/exit/stderr contract, `RUST_LOG=trace`,
+`completions`, `man`. `AGENTS.md` [owned] (≤ 20 lines) states the contract; `CLAUDE.md` [seed]
+(`@AGENTS.md`). `[[post]]`: `cargo generate-lockfile` on `new`, `cargo update --workspace` on `add`.
+
+Verification of the cargo-deny invocation and the `$TURBO_ROOT$` inputs is recorded in §13.
+
 ### 6.12 `ts-lib`
 
 `packages/<name>` (default `lib`): a publishable ESM TypeScript library, package `@<scope>/<name>`
@@ -485,6 +528,12 @@ Checked with `npm view` on 2026-10-14.
 | `publint` | 0.3.25 | ts-lib `build`; checked with `npm view` 2026-10-17 |
 | `@arethetypeswrong/cli` | 0.18.5 | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17 |
 | pnpm / Node | 12.11.2 / 24 | Node 24 is the active LTS |
+| crates `clap` / `clap_complete` / `clap_mangen` | 4.6.7 / 4.6.11 / 0.3.3 | rust-cli `Cargo.toml` (not in the pnpm catalog); crates.io publish dates 2026-09-14 / 2026-09-15 / 2026-08-12 |
+| crates `thiserror` / `serde` / `serde_json` | 2.0.21 / 1.0.229 / 1.0.154 | rust-cli; 2026-09-23 / 2026-07-18 / 2026-10-11 |
+| crates `tracing` / `tracing-subscriber` | 0.1.44 / 0.3.23 | rust-cli; 2025-12-18 / 2026-03-13 |
+| dev crates `assert_cmd` / `predicates` / `insta` / `tempfile` | 2.2.2 / 3.1.4 / 1.49.0 / 3.27.0 | rust-cli; `insta` with `json` only; 2026-05-11 / 2026-02-11 / 2026-10-03 / 2026-03-11 |
+| Rust toolchain | 1.99.1 | rust-cli `rust-toolchain.toml` and `rust-version`; stable manifest dated 2026-10-15 |
+| `cargo-deny` | 0.20.2 | `taiki-e/install-action` in `ci.yml`; Renovate tracks it with a regex manager; 2026-07-09 |
 
 ### 7.1 Turbo and Vite+
 
@@ -535,7 +584,7 @@ upstream.
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
      `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,
-     `Swatinem/rust-cache`, `taiki-e/install-action` (`cargo-nextest`), all `if: rust == 'true'`.
+     `Swatinem/rust-cache`, `taiki-e/install-action` (`tool: cargo-nextest,cargo-deny@0.20.2`; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
   8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
      step summary, timed from a first `Start timer` step.
@@ -586,7 +635,9 @@ verify): `config:recommended`, `helpers:pinGitHubActionDigests`, `rangeStrategy:
 `minimumReleaseAge: "3 days"`, groups `vite-plus` (`vite-plus` + `@voidzero-dev/vite-plus-core`,
 which must move together), `storybook`, `astro`, `tauri`, `cloudflare` (wrangler + workers-types),
 `turbo`, `react` (react + react-dom), `cascivo` (`@cascivo/*`), `sentry` (`@sentry/*`), `preact`
-(preact + `@preact/*`); automerge for minor/patch and digests with `platformAutomerge`; weekly
+(preact + `@preact/*`), `clap` (`clap`, `clap_*`), `tracing` (`tracing`, `tracing-*`); a regex custom manager
+tracks `cargo-deny@x.y.z` in `.github/workflows/*.yml` (datasource `crate`); the native `rust-toolchain`
+manager bumps `rust-toolchain.toml`, so the toolchain needs no regex; automerge for minor/patch and digests with `platformAutomerge`; weekly
 `lockFileMaintenance`. Open question: once `splice update` runs as a bot, template-managed catalog
 entries move to `ignoreDeps` so Renovate and the template do not both bump them.
 
@@ -692,6 +743,8 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 - Timing: `ci-timing.mjs` against §8.4 and §10.2 budgets.
 
 ## 13. Unverified / to check during the build
+
+Verified 2026-10-17 (rust-cli, agent-layer spec §9 item 8; Rust 1.99.1, cargo-deny 0.20.2, cargo-nextest 0.9.148, turbo 2.11.8): (a) `cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources` works from `crates/cli` and exits 0 (`--manifest-path` and `--config` are global options and must precede `check`: the order `check --config …` from the plan draft fails with "unexpected argument '--config'"); with an added `native-tls` dependency it exits 2 with `banned` for `native-tls`, `openssl` and `openssl-sys`. (b) Touching the root `Cargo.lock` makes `turbo run test --filter=<crate>` miss the cache, also with `globalDependencies` reduced to the two JS files, so the `$TURBO_ROOT$` inputs work on their own. (c) A second `turbo run lint format:check typecheck test build` is 11/11 cached (1 s).
 
 Verified 2026-10-17 (ts-lib, agent-layer spec §9 item 8): `attw --pack . --profile esm-only` runs next to TypeScript 7.0.2 (it uses its bundled 5.6.1-rc) and passes; `vp pack` emits `index.d.mts` with `isolatedDeclarations`.
 

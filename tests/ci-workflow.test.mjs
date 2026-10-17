@@ -310,3 +310,8 @@ test("index check runs after checkout, before the early-exit step, with no if", 
   assert.equal(s.run, "node scripts/agents-index.mjs --check");
   assert.equal("if" in s, false);
 });
+
+test("generated ci.yml installs cargo-nextest and cargo-deny@0.20.2", () => {
+  assert.equal(step("taiki-e/install-action").with.tool, "cargo-nextest,cargo-deny@0.20.2");
+  assert.match(step("taiki-e/install-action").if, /steps\.rust\.outputs\.rust == 'true'/);
+});

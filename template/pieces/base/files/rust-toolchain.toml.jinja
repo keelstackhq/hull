@@ -1,4 +1,7 @@
-{% if "rust-tool" in pieces %}[toolchain]
+{% if "rust-cli" in pieces %}[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+{% elif "rust-tool" in pieces %}[toolchain]
 channel = "stable"
 components = ["clippy", "rustfmt"]
 {% elif "tauri-app" in pieces %}[toolchain]

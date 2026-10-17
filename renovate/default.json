@@ -15,6 +15,13 @@
       "matchStrings": ["TURBO_VERSION: (?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "turbo",
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
+      "matchStrings": ["cargo-deny@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "cargo-deny",
+      "datasourceTemplate": "crate"
     }
   ],
   "packageRules": [
@@ -30,6 +37,8 @@
     { "groupName": "cascivo", "matchPackageNames": ["@cascivo/**"] },
     { "groupName": "sentry", "matchPackageNames": ["@sentry/**"] },
     { "groupName": "preact", "matchPackageNames": ["preact", "@preact/**"] },
+    { "groupName": "clap", "matchPackageNames": ["clap", "clap_*"] },
+    { "groupName": "tracing", "matchPackageNames": ["tracing", "tracing-*"] },
     { "groupName": "turbo", "matchPackageNames": ["turbo", "@turbo/**"] },
     {
       "matchUpdateTypes": ["minor", "patch", "digest"],

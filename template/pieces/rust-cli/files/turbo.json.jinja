@@ -1,0 +1,48 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "src/**",
+        "Cargo.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/rust-toolchain.toml"
+      ],
+      "outputs": ["$TURBO_ROOT$/target/debug/{{ name }}"]
+    },
+    "lint": {
+      "inputs": [
+        "src/**",
+        "tests/**",
+        "Cargo.toml",
+        "deny.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/rust-toolchain.toml"
+      ]
+    },
+    "format:check": { "inputs": ["src/**", "tests/**", "Cargo.toml"] },
+    "typecheck": {
+      "inputs": [
+        "src/**",
+        "tests/**",
+        "Cargo.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/rust-toolchain.toml"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "src/**",
+        "tests/**",
+        "Cargo.toml",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/rust-toolchain.toml"
+      ]
+    }
+  }
+}

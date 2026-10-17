@@ -180,6 +180,40 @@ Merge strategies:
 - `package.json`: json
 - `wrangler.jsonc`: text
 
+## rust-cli
+
+A production Rust CLI crate: one JSON object per run, fixed exit codes, pinned toolchain, cargo-deny
+
+- Multiple instances: yes
+- Target: `crates/{{ name }}`
+- Requires: `base`
+
+Variables:
+
+- `name`: crate and binary name; default `cli`; pattern `^[a-z][a-z0-9-]*$`
+
+Files (owned):
+
+- `turbo.json`
+- `deny.toml`
+- `AGENTS.md`
+
+Files (shared):
+
+- `Cargo.toml`
+- `package.json`
+
+Files (seed):
+
+- `src/**`
+- `tests/**`
+- `CLAUDE.md`
+
+Merge strategies:
+
+- `Cargo.toml`: toml
+- `package.json`: json
+
 ## rust-tool
 
 A Rust crate in a Cargo workspace, orchestrated by Turborepo (clippy, rustfmt, nextest)

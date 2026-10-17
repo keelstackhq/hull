@@ -1,0 +1,13 @@
+{
+  "name": "@{{ scope }}/{{ name }}-crate",
+  "version": "0.0.0",
+  "private": true,
+  "hull": { "release": "rust-cli" },
+  "scripts": {
+    "build": "cargo build -p {{ name }} --locked",
+    "lint": "cargo clippy -p {{ name }} --all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources",
+    "format:check": "cargo fmt -p {{ name }} --check",
+    "typecheck": "cargo check -p {{ name }} --all-targets --locked",
+    "test": "cargo nextest run -p {{ name }} --locked"
+  }
+}

@@ -36,6 +36,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-17 · 04/4 · `feat(base): AGENTS.md canonical, thin CLAUDE.md, Explore subagent on haiku` · 478/478 tests, lint+fmt clean; dogfood base, web, site, docs, desktop ok; lines AGENTS/CLAUDE: base 38/11, web 44/11, site 43/11, docs 39/12; always-loaded bytes (AGENTS+CLAUDE+project+index): base 3205, web 3764, site 3611, docs 3478; CEILING = 4150 (max 3764 + 10 %). Spec §9 item 3 checked with `claude -p` 2026-10-17: missing index import is not an error, loads after `agents-index`, nested `@AGENTS.md` resolves relative to the file. Per-instance `AGENTS.md` files arrive in Task 5 (bullets point to them already).
 - 2026-10-17 · 04/5 · `feat: per-instance AGENTS.md owned, CLAUDE.md seed for local notes` · 485/485 tests, lint+fmt clean; dogfood base, web, site, docs, desktop ok; six pieces ship `files/AGENTS.md[.jinja]` (owned, ≤ 20 lines; hono-worker trimmed 21 → 20) and `files/CLAUDE.md` = `@AGENTS.md` (seed); rust-tool AGENTS.md points a distributed CLI to `rust-cli`; `assertInstanceNotes` in tests/helpers.mjs; docs/pieces.md regenerated; spec §4.2, §4.3.3, §6.3-6.6 updated.
 - 2026-10-17 · 04/6 · `feat(ts-lib): ESM TypeScript library with publint and attw checks` · tests/ts-lib.test.mjs 8/8, full suite green, lint+fmt clean; hand dogfood base+ts-lib:lib (install, agents-index, turbo lint/format:check/typecheck/test/build, index --check) ok; dogfood base ok; ts-lib adds ~2 s to build (vp pack 0.5 s, publint 0.2 s, attw 1.3 s); attw runs next to TS 7 (bundled 5.6.1-rc).
+- 2026-10-17 · 04/7 · `feat(rust-cli): Rust CLI skeleton with JSON/exit contract, pinned toolchain and cargo-deny` · tests/rust-cli.test.mjs 19/19, full suite green, lint+fmt clean; RED first (19 failing); generated crate: clippy -D warnings, fmt, 12 integration + 2 unit tests (nextest), cargo deny ok; hand dogfood base+rust-cli:cli (install, agents-index, turbo 11/11 tasks, index --check) ok; dogfood base, site ok. Deviation: cargo-deny needs `--manifest-path`/`--config` before `check` (spec amended); cargo-deny 0.20.2 and Rust 1.99.1 installed locally.
 
 ## Measurements
 
@@ -48,6 +49,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-15 · site warm rerun · 2.3 s, 16/16 tasks cached incl. the crate · cloud container
 - 2026-10-15 · hull CI on GitHub (run 38752514194, PR #1, first valid run) · cold caches, all 4 PR combos dogfooded (diff vs root commit) · job `ci` 86 s (14:33:53→14:35:19 UTC), `ci-ok` green · ubuntu-latest. Within the 120 s hull budget even cold; warm one-piece and docs-only runs not yet measured.
 - 2026-10-15 · one repo with all 8 pieces · `turbo run lint format:check typecheck test build` 32/32 tasks in 18 s cold, no Tauri compile · cloud container
+- 2026-10-17 · hand dogfood base+rust-cli:cli · `turbo run lint format:check typecheck test build` 11/11 tasks 22 s cold turbo (cargo registry warm, fresh `target/`), 1 s warm (11/11 cached); touching root `Cargo.lock` → test cache miss, also without globalDependencies · cloud container, Rust 1.99.1
 
 ## Blocked
 

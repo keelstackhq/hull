@@ -206,28 +206,28 @@ reads (§4.4). Every task the CI runs exists as a package script.
 | Path (under target) | Class | Content |
 |---|---|---|
 | `Cargo.toml.jinja` | shared toml | `[package]` name `{{ name }}`, version `0.0.0`, edition 2024, `rust-version` = toolchain pin, `publish = false`; `[[bin]]`; `[lints] workspace = true`; deps pinned `=x.y.z`: `clap` (derive, env), `clap_complete`, `clap_mangen`, `thiserror`, `serde` (derive), `serde_json`, `tracing`, `tracing-subscriber` (env-filter, fmt); dev-deps `assert_cmd`, `predicates`, `insta` (json), `tempfile` |
-| `package.json.jinja` | shared json | name `@{{ scope }}/{{ name }}-crate` (D14), private, `hull.release = "rust-cli"`; scripts: `build` `cargo build -p {{ name }} --locked` (D15), `lint` `cargo clippy -p {{ name }} --all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml check --config deny.toml bans licenses sources`, `format:check` `cargo fmt -p {{ name }} --check`, `typecheck` `cargo check -p {{ name }} --all-targets --locked`, `test` `cargo nextest run -p {{ name }} --locked` |
+| `package.json.jinja` | shared json | name `@{{ scope }}/{{ name }}-crate` (D14), private, `hull.release = "rust-cli"`; scripts: `build` `cargo build -p {{ name }} --locked` (D15), `lint` `cargo clippy -p {{ name }} --all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources` (`--manifest-path` and `--config` are global options of cargo-deny 0.20, so they precede `check`), `format:check` `cargo fmt -p {{ name }} --check`, `typecheck` `cargo check -p {{ name }} --all-targets --locked`, `test` `cargo nextest run -p {{ name }} --locked` |
 | `turbo.json.jinja` | owned | extends `//`; inputs `src/**`, `tests/**`, `Cargo.toml`, `deny.toml`, `$TURBO_ROOT$/Cargo.{toml,lock}`, `$TURBO_ROOT$/rust-toolchain.toml`; build outputs `$TURBO_ROOT$/target/debug/{{ name }}` |
 | `deny.toml` | owned | bans `openssl`, `openssl-sys`, `native-tls` (rustls only); license allow-list (MIT, Apache-2.0, BSD-2/3, ISC, Unicode-3.0, Zlib); `sources`: crates.io only; advisories configured but checked only in `release.yml` (§4.4), never on PRs (a new advisory must not fail an unrelated PR) |
-| `src/main.rs` | seed | `fn main() -> ExitCode`: `Cli::try_parse`; clap error → exit 2 (help/version → 0), as a JSON error object when `--json` is in argv; init tracing; `lib::run`; print report; return its exit code |
-| `src/lib.rs` | seed | `#![forbid(unsafe_code)]`; `pub fn run(cli: Cli) -> Result<Report, Error>`; dispatch |
+| `src/main.rs` | seed | `fn main() -> ExitCode`: `Cli::try_parse_from`; clap error → exit 2 (help/version → 0), as a JSON error object when `--json` is in argv; init tracing; `run::run`; print report; return its exit code |
+| `src/run.rs` | seed | `pub fn run(cli: Cli) -> Result<Report, Error>`; dispatch. The crate is binary-only: a seed `main.rs` cannot name an instance-dependent lib crate (`my-cli` → `my_cli`), so there is no `src/lib.rs`; `unsafe_code` is forbidden by the workspace lints |
 | `src/cli.rs` | seed | clap derive: global `--json`, `-C <dir>`, `-v…` (count), `-q`; subcommands `hello [--name N]` (the example, returns `{greeting}`), `completions <shell>` (clap_complete to stdout), `man` (clap_mangen roff to stdout) |
 | `src/exit.rs` | seed | `#[repr(u8)] enum Exit { Ok = 0, Failure = 1, Usage = 2, Error = 3 }` → `ExitCode` (D9) |
 | `src/error.rs` | seed | `thiserror` enum `Error { Usage, Config, Io, … }`, `exit()` mapping; messages say how to fix |
 | `src/output.rs` | seed | `Report { version: 1, command, ok, exit_code, messages, #[serde(flatten)] data }`; `render_json` (one object + `\n`), `render_human` (terse lines); nothing else writes stdout |
 | `src/log.rs` | seed | tracing-subscriber to **stderr**, filter from `RUST_LOG` else `-v`/`-q`; ANSI off when `NO_COLOR` is set or stderr is not a TTY |
-| `tests/common/mod.rs.jinja` | seed | `cli()` = `Command::cargo_bin("{{ name }}")` with `env_clear()`, then only `PATH`, `HOME`/`XDG_*` = a fresh tempdir, `NO_COLOR=1`; a test can never see the developer's tokens or config |
-| `tests/cli.rs` | seed | inline insta snapshots (no `.snap` files, no `{{ }}` paths): `--help`, `hello --json`; `--json` stdout parses as exactly one object; usage error → exit 2 and still one JSON object with `--json`; nothing on stdout without `--json` goes to stderr; `completions bash` and `man` non-empty; `RUST_LOG=trace` output only on stderr |
+| `tests/common/mod.rs` | seed (plain, no `.jinja`) | `cli()` = `assert_cmd::cargo::cargo_bin_cmd!()` (the package name is the binary name) with `env_clear()`, then only `PATH`, `HOME`/`XDG_*` = a fresh tempdir, `NO_COLOR=1`; a test can never see the developer's tokens or config. No test sets process env (`set_var` is unsafe in edition 2024); a test asserts on the built command's `get_envs()` |
+| `tests/cli.rs` | seed | inline insta snapshots (no `.snap` files, no `{{ }}` paths): `--help` (after `String::replace(env!("CARGO_PKG_NAME"), "[BIN]")`, because insta's `filters` feature would add `regex`), `hello --json`; `--json` stdout parses as exactly one object; usage error → exit 2 and still one JSON object with `--json`; nothing on stdout without `--json` goes to stderr; `completions bash` and `man` non-empty; `RUST_LOG=trace` output only on stderr |
 | `AGENTS.md` | owned | the output/exit/logging contract above, test helper rule ("always `common::cli()`"), `cargo insta review` (never blind-accept), "network code must use rustls; deny.toml enforces it" |
 | `CLAUDE.md` | seed | `@AGENTS.md` |
 
 `[[post]]`: `cargo generate-lockfile` on `new`, `cargo update --workspace` on `add` (as rust-tool).
-Rust sources contain no `{{`/`{%`/`{#` (subset check); only `tests/common/mod.rs.jinja` renders.
+Rust sources contain no `{{`/`{%`/`{#` and no instance name; no Rust file is a `.jinja` template.
 
 Base changes for rust-cli (all `{# same-branches #}` chains gain a `rust-cli` branch first):
 `Cargo.toml.jinja` (members `crates/*` for rust-tool or rust-cli), `rust-toolchain.toml.jinja`
 (with rust-cli: `channel = "<pinned 1.x.y>"`, components clippy + rustfmt; otherwise unchanged),
-`turbo.json.jinja` globalDependencies (Cargo files), `.github/scripts/rust-affected.mjs.jinja`
+`turbo.json.jinja` globalDependencies (Cargo files; two constructs, a marked `rust-cli`/`rust-tool` chain for the multi-line block and an unmarked chain whose `else` is today's one-line form, so both layouts stay byte-identical), `.github/scripts/rust-affected.mjs.jinja`
 (rendered for rust-cli too), `ci.yml` taiki-e `tool: cargo-nextest,cargo-deny` (runtime guard
 unchanged: only when an affected package has a `Cargo.toml`). The release-mode musl, macOS and
 Windows builds are never on the PR path.
