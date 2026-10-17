@@ -16,6 +16,19 @@ test("piece change selects combos with that piece", () =>
 test("base change selects all", () =>
   assert.deepEqual(affectedCombos(["template/pieces/base/files/a"], combos), ["base", "web"]));
 
+test("rust-cli, npm-cli and ts-lib changes select the cli and lib combos", () => {
+  const real = JSON.parse(
+    readFileSync(new URL("../scripts/combos.json", import.meta.url), "utf8"),
+  ).combos;
+  assert.deepEqual(affectedCombos(["template/pieces/rust-cli/files/x"], real), ["cli"]);
+  assert.deepEqual(affectedCombos(["template/pieces/npm-cli/files/x"], real), ["cli"]);
+  assert.deepEqual(affectedCombos(["template/pieces/ts-lib/files/x"], real), ["lib"]);
+  assert.deepEqual(
+    affectedCombos(["template/pieces/base/files/.github/workflows/release.yml"], real),
+    ["base", "web", "site", "docs", "cli", "lib"],
+  );
+});
+
 test("renderer, manifest, workflow and root package changes select all", () => {
   for (const f of [
     "scripts/render.mjs",

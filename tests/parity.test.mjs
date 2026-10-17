@@ -45,6 +45,16 @@ test("comboSteps runs the rust-tool post hook (cargo generate-lockfile) before t
   assert.ok(!comboSteps("/c", ["base"], "/d").some(([c]) => c === "cargo"));
 });
 
+test("comboSteps runs cargo generate-lockfile for the rust-cli combo before turbo", () => {
+  const steps = comboSteps("/c", ["base", "rust-cli:cli", "npm-cli:cli"], "/d").map(([c, a]) =>
+    [c, ...a].join(" "),
+  );
+  const lock = steps.indexOf("cargo generate-lockfile");
+  assert.ok(lock > steps.findIndex((s) => s.startsWith("pnpm install")));
+  assert.ok(lock < steps.findIndex((s) => s.startsWith("pnpm turbo run")));
+  assert.ok(!comboSteps("/c", ["base", "ts-lib:lib"], "/d").some(([c]) => c === "cargo"));
+});
+
 test("dogfood and generated ci.yml both run `node scripts/agents-index.mjs --check`", async () => {
   const ci = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
   assert.match(ci, /^\s+run: node scripts\/agents-index\.mjs --check$/m);
@@ -77,6 +87,11 @@ test("cargo-deny pin equal in template ci.yml, release.yml and the renovate rege
   const found = await pins("ci.yml");
   assert.deepEqual(found, ["0.20.2"]);
   assert.deepEqual(await pins("release.yml"), found);
+  const hull = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.deepEqual(
+    [...hull.matchAll(regex)].map((m) => m.groups.currentValue),
+    found,
+  );
   // the preset's file pattern covers both workflows
   const files = new RegExp(
     preset.customManagers

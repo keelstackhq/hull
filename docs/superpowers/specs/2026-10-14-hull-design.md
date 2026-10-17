@@ -756,6 +756,8 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
 | `web` | base, preact-app:web, ui-storybook, hono-worker:api |
 | `site` | base, astro-site:site, rust-tool:tool (rust-tool from plan 03) |
 | `docs` | base, docs (from plan 03) |
+| `cli` | base, rust-cli:cli, npm-cli:cli |
+| `lib` | base, ts-lib:lib |
 | `desktop` | base, preact-app:web, tauri-app:desktop — scheduled/manual only |
 
 Template var `scope = "hullci"` for all.
@@ -775,7 +777,9 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    `node scripts/agents-index.mjs` (the dev renderer does not run `[[post]]`),
    `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
    `node scripts/agents-index.mjs --check`, and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
-   selected combo contains rust-tool.
+   selected combo contains rust-tool or rust-cli (`cargo generate-lockfile` runs for both, standing in
+   for the `[[post]]` hook); that step also adds `Swatinem/rust-cache@v2` (workspace `combos/cli -> target`)
+   and installs `cargo-nextest` and `cargo-deny@0.20.2`, which the cli combo's generated `ci` task list uses.
 4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
    on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
    download time, never correctness.
@@ -784,6 +788,7 @@ Sequential in one job is the default. Plan 02 measures it; a matrix is adopted o
 measured sequential time exceeds 3 minutes warm and a matrix would cut it by more than half.
 Measured 2026-10-15 (cloud container, warm pnpm store): base+web+site cold 24–42 s, warm 4.5–6.8 s,
 so hull CI stays sequential. `scripts/check-single-vite.mjs` changes also select all combos.
+Local dogfood (2026-10-17, cloud container, shared `--cache-dir`): cold base 2.0 s, web 11.6, site 8.8, docs 1.9, cli 48.9 (Rust build), lib 4.7; warm 0.6 / 1.7 / 1.8 / 1.0 / 1.6 / 0.8. The GitHub `ci` time of the six combos is read after the first push.
 Budget for hull's own PR CI: ≤ 120 s warm when one piece changes, ≤ 20 s docs-only.
 
 ### 10.3 `desktop.yml` (hull)
