@@ -450,7 +450,11 @@ with `hull.release = "ts-lib"` (read by the release workflow). `vite.config.ts` 
 rejects the default export of `vite.config.ts` under `isolatedDeclarations` (TS9037).
 `build` is `vp pack && publint && attw --pack . --profile esm-only`; the checks run on the built
 artifact (about 2 s extra locally: publint 0.2 s, attw 1.3 s). `src/index.ts`, `src/index.test.ts`,
-`README.md`, `CLAUDE.md` [seed]; `AGENTS.md` [owned]. The catalog carries `publint` and
+`pack.entries.ts` (the entry list `vite.config.ts` imports, so the owned config never needs edits),
+`README.md`, `CLAUDE.md` [seed]; `AGENTS.md` [owned]. Optional piece var `ts-lib.repository` (GitHub URL,
+default empty) renders `repository` in `package.json`; npm provenance fails with E422 without it, so
+AGENTS.md and README tell the user to set it before the first publish (the file is shared, so adding
+it later works). The catalog carries `publint` and
 `@arethetypeswrong/cli` (unused entries are harmless).
 
 ## 7. Versions (template pnpm catalog, exact pins)

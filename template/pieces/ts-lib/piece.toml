@@ -6,11 +6,12 @@ target = "packages/{{ name }}"
 
 [vars]
 name = { prompt = "library name", default = "lib", pattern = "^[a-z][a-z0-9-]*$" }
+repository = { prompt = "GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional)", default = "", pattern = "^(https://github\\.com/[^/ ]+/[^/ ]+)?$" }
 
 [files]
 owned = ["vite.config.ts", "tsconfig.json", "AGENTS.md"]
 shared = ["package.json"]
-seed = ["src/**", "README.md", "CLAUDE.md"]
+seed = ["pack.entries.ts", "src/**", "README.md", "CLAUDE.md"]
 
 [merge]
 "package.json" = "json"

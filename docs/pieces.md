@@ -261,6 +261,7 @@ Publishable ESM TypeScript library with publint and attw checks
 Variables:
 
 - `name`: library name; default `lib`; pattern `^[a-z][a-z0-9-]*$`
+- `repository`: GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional); default ``; pattern `^(https://github\.com/[^/ ]+/[^/ ]+)?$`
 
 Files (owned):
 
@@ -274,6 +275,7 @@ Files (shared):
 
 Files (seed):
 
+- `pack.entries.ts`
 - `src/**`
 - `README.md`
 - `CLAUDE.md`

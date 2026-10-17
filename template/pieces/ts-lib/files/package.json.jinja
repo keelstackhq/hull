@@ -19,7 +19,11 @@
   },
   "hull": {
     "release": "ts-lib"
-  },
+  },{% if repository %}
+  "repository": {
+    "type": "git",
+    "url": "git+{{ repository }}.git"
+  },{% endif %}
   "scripts": {
     "build": "vp pack && publint && attw --pack . --profile esm-only",
     "lint": "vp lint",

@@ -88,3 +88,23 @@ test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", asyn
   const { agents } = await assertInstanceNotes(PIECES, "packages/lib");
   assert.match(agents, /publint/);
 });
+
+test("repository is omitted by default and rendered when given", async () => {
+  const bare = JSON.parse(await read((await renderCombo(PIECES)).dir, "packages/lib/package.json"));
+  assert.equal(bare.repository, undefined);
+  const { dir } = await renderCombo(PIECES, { "ts-lib.repository": "https://github.com/acme/lib" });
+  const pkg = JSON.parse(await read(dir, "packages/lib/package.json"));
+  assert.deepEqual(pkg.repository, { type: "git", url: "git+https://github.com/acme/lib.git" });
+});
+
+test("entries live in the seed pack.entries.ts; vite.config.ts imports them", async () => {
+  const { dir, result } = await renderCombo(PIECES);
+  assert.equal(byPath(result)["packages/lib/pack.entries.ts"], "seed");
+  assert.match(await read(dir, "packages/lib/pack.entries.ts"), /\["src\/index\.ts"\]/);
+  const vite = await read(dir, "packages/lib/vite.config.ts");
+  assert.match(vite, /import \{ entries \} from "\.\/pack\.entries"/);
+  assert.match(vite, /entry: entries/);
+  const agents = await read(dir, "packages/lib/AGENTS.md");
+  assert.match(agents, /`pack\.entries\.ts`/);
+  assert.match(agents, /`repository`/);
+});
