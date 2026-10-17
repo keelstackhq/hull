@@ -58,6 +58,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Blocked
 
+- Task 12 cli canary: create an empty private repo `keelstackhq/cli-canary` (no README), then attach it to the agent session with push access (`add_repo` keelstackhq/cli-canary, access push); Task 12 then runs from Step 3.
 - First real release of a keelstackhq tool (needs a public npm scope + repo settings): verify `npm publish <pnpm-pack tgz> --provenance`, private-repo behaviour (npm generates no provenance for private repos; artifact attestations need a public repo or GitHub Enterprise Cloud), `ubuntu-24.04-arm`, `macos-latest` cross-building `x86_64-apple-darwin`, and that the `npm view <name>@<version> || npm publish` skip works with setup-node's placeholder `NODE_AUTH_TOKEN` (a 401 on the read would make a re-run try to republish). Before it, per repo: create the GitHub environment `release` with a tag rule `*-v*`; publish each new npm name once by hand; add an npm trusted publisher (repo, `release.yml`, environment `release`) to the launcher and all five platform packages, or the library, then release within 2 days.
 
 - Decision (npm-cli): (1) `requires = ["base"]` → raise to `["base","rust-cli"]`? Follow-up; today the AGENTS/README sentence and the version-sync message say "needs a rust-cli instance named `<crate>`". (2) Add `@types/node` (24.19.2, published 2026-10-09) to the catalog so npm-cli `typecheck` can be `tsc --noEmit` with `checkJs` (verified to pass under TS 7); until approved it is `node --check`.
