@@ -6,7 +6,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 import { assertSameBranches } from "./invariants.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -178,11 +178,12 @@ test("rust-affected.mjs end to end: reads stdin JSON, prints rust=", async () =>
   assert.equal(run("not json"), "rust=true");
 });
 
-test("base CLAUDE.md lists rust-tool and stays within 80 lines", async () => {
+test("base AGENTS.md lists rust-tool; AGENTS + CLAUDE stay within 80 lines", async () => {
   const { dir } = await renderCombo(["base", "rust-tool:tool"]);
-  const t = await read(dir, "CLAUDE.md");
+  const t = await read(dir, "AGENTS.md");
   assert.match(t, /\(rust-tool\)/);
-  assert.ok(t.split("\n").length <= 80);
+  assert.match(t, /`crates\/<name>\/AGENTS\.md`/);
+  assert.ok(lineCount(t) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
 });
 
 test("site combo includes rust-tool", async () => {

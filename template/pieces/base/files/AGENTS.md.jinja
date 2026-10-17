@@ -1,0 +1,63 @@
+# {{ scope }}
+
+Monorepo generated from {{ template.name }} {{ template.version }}: pnpm workspaces, Turborepo,
+TypeScript, Vite+. Packages live in `apps/*`, `packages/*`, `crates/*`.
+
+## Commands
+
+```bash
+pnpm install        # install, also runs in the SessionStart hook
+pnpm check          # lint, format:check, typecheck, test (all packages)
+pnpm run ci         # the CI task list on changed packages (--affected)
+pnpm format         # vp fmt
+pnpm agents:index   # regenerate docs/agents/index.md
+```
+
+Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap tasks in `vp run`.
+
+## Rules
+
+- Test first: write the failing test, watch it fail, implement, watch it pass.
+- Verify with real output before saying a task is done or fixed.
+- Keep files small and focused; one task per change; no drive-by refactors.
+- Versions live in the catalog in `pnpm-workspace.yaml` as exact pins; use `catalog:` in packages.
+- Files owned by the template (configs, workflows, `.claude/`) are updated by `splice update`;
+  put local changes in seed files, `docs/agents/project.md` or below the import in a package's
+  `CLAUDE.md`.
+- Never print or commit secrets; never read `.env*` or `.dev.vars`.
+- Releases are tag pushes made by a human; never publish or push tags yourself.
+- At most 2-3 parallel agents, on files that barely overlap.
+- Before a long task write the next steps to `docs/agents/project.md`; start fresh rather than
+  compacting.
+- A hook `ask` becomes a denial in `-p`/unattended runs: do the change by hand or run interactively.
+{# One line per piece kind goes here, each in its own if on its piece id. #}{# same-branches #}{% if "preact-app" in pieces %}
+## Pieces
+{% elif "ui-storybook" in pieces %}
+## Pieces
+{% elif "astro-site" in pieces %}
+## Pieces
+{% elif "hono-worker" in pieces %}
+## Pieces
+{% elif "rust-tool" in pieces %}
+## Pieces
+{% elif "tauri-app" in pieces %}
+## Pieces
+{% endif %}{% if "preact-app" in pieces %}
+- `apps/*` (preact-app): Preact apps on Vite+ with cascivo; see `apps/<name>/AGENTS.md`.{% endif %}{% if "ui-storybook" in pieces %}
+- `packages/ui` (ui-storybook): Preact components with Storybook; see `packages/ui/AGENTS.md`.{% endif %}{% if "astro-site" in pieces %}
+- `apps/*` (astro-site): Astro static sites with Preact islands; see `apps/<name>/AGENTS.md`.{% endif %}{% if "hono-worker" in pieces %}
+- `apps/*` (hono-worker): Hono workers with JSON request logs; see `apps/<name>/AGENTS.md`.{% endif %}{% if "rust-tool" in pieces %}
+- `crates/*` (rust-tool): Rust crates in a Cargo workspace; scripts use `-p <crate>`, never `--workspace`; see `crates/<name>/AGENTS.md`.{% endif %}{% if "tauri-app" in pieces %}
+- `apps/*` (tauri-app): Tauri v2 desktop shell; Rust builds only in `desktop.yml`; see `apps/<name>/AGENTS.md`.{% endif %}{# same-branches #}{% if "preact-app" in pieces %}
+{% elif "ui-storybook" in pieces %}
+{% elif "astro-site" in pieces %}
+{% elif "hono-worker" in pieces %}
+{% elif "rust-tool" in pieces %}
+{% elif "tauri-app" in pieces %}
+{% endif %}
+## Where to look
+
+- `docs/agents/project.md`: repo-specific notes; read first.
+- `docs/agents/index.md`: generated map of commands, packages and docs.{% if "docs" in pieces %}
+- `docs/agents/docs.md`: how to look up dependency docs.{% endif %}
+- `<dir>/AGENTS.md`: notes for one package.

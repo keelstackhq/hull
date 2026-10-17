@@ -61,7 +61,7 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
   never on the PR path.
 - **CI task list** is `CI_TASKS` in `scripts/lib/ci-tasks.mjs`; the parity test keeps the generated
   workflow, the base `ci` script and dogfood in sync.
-- **Generated `CLAUDE.md` ≤ 80 lines.** Per-instance notes go in `<target>/CLAUDE.md`.
+- **Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines** (`AGENTS.md` ≤ 60, `CLAUDE.md` ≤ 20). Per-instance notes go in `<target>/AGENTS.md`.
 - **No secrets in logs** (hono-worker logs never include query strings, headers or bodies).
 
 ## How to work here

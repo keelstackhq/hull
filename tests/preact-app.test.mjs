@@ -5,7 +5,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -95,12 +95,13 @@ test("wrangler.jsonc serves dist as an SPA with observability", async () => {
   assert.equal(w.compatibility_date, "2026-10-01");
 });
 
-test("root CLAUDE.md mentions apps when preact-app is present and stays ≤ 80 lines", async () => {
+test("root AGENTS.md mentions apps when preact-app is present; AGENTS + CLAUDE stay ≤ 80 lines", async () => {
   const withApp = (await renderCombo(["base", "preact-app"])).dir;
-  const text = await read(withApp, "CLAUDE.md");
+  const text = await read(withApp, "AGENTS.md");
   assert.match(text, /apps\/\*/);
   assert.match(text, /preact-app/);
-  assert.ok(text.split("\n").length <= 80);
-  const without = await read((await renderCombo(["base"])).dir, "CLAUDE.md");
+  assert.match(text, /`apps\/<name>\/AGENTS\.md`/);
+  assert.ok(lineCount(text) + lineCount(await read(withApp, "CLAUDE.md")) <= 80);
+  const without = await read((await renderCombo(["base"])).dir, "AGENTS.md");
   assert.ok(!/preact-app/.test(without));
 });

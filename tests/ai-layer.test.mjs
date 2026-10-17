@@ -1,14 +1,27 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
-const AGENTS = ["explorer", "implementer", "reviewer", "ci-fixer"];
+const AGENTS_LIST = [
+  ["Explore", "explore.md"],
+  ["implementer", "implementer.md"],
+  ["reviewer", "reviewer.md"],
+  ["ci-fixer", "ci-fixer.md"],
+];
+const combosJson = JSON.parse(readFileSync(new URL("../scripts/combos.json", import.meta.url)));
+const COMBOS = [
+  ...combosJson.combos.filter((c) => !c.scheduled).map((c) => c.pieces),
+  ["base", "docs"],
+];
+const comboVars = combosJson.vars ?? {};
+/** Always-loaded bytes ceiling: measured max 3,764 (web) plus 10 %, rounded up. */
+const CEILING = 4150;
 
 /** Parse flat `key: value` frontmatter. */
 function frontmatter(text) {
@@ -22,54 +35,136 @@ function frontmatter(text) {
   );
 }
 
-const agentFm = async (dir, name) => frontmatter(await read(dir, `.claude/agents/${name}.md`));
+const agentsText = async (dir) => ({
+  agents: await read(dir, "AGENTS.md"),
+  claude: await read(dir, "CLAUDE.md"),
+});
 
-test("piece bullets sit under a Pieces heading and no blank lines between items", async () => {
+test("per combo: AGENTS.md <= 60, CLAUDE.md <= 20, together <= 80, no triple newline", async () => {
+  for (const pieces of COMBOS) {
+    const { dir } = await renderCombo(pieces, comboVars);
+    const { agents, claude } = await agentsText(dir);
+    assert.ok(lineCount(agents) <= 60, `${pieces} AGENTS.md ${lineCount(agents)}`);
+    assert.ok(lineCount(claude) <= 20, `${pieces} CLAUDE.md ${lineCount(claude)}`);
+    assert.ok(lineCount(agents) + lineCount(claude) <= 80, `${pieces} total`);
+    assert.ok(!/\n\n\n/.test(agents), `${pieces} AGENTS.md has a triple newline`);
+    assert.ok(!/\n\n\n/.test(claude), `${pieces} CLAUDE.md has a triple newline`);
+  }
+});
+
+test("CLAUDE.md lines 1-3 import AGENTS, project notes and index; docs.md is line 4 only with docs", async () => {
+  for (const pieces of [["base"], ["base", "docs"]]) {
+    const lines = (await read((await renderCombo(pieces)).dir, "CLAUDE.md")).split("\n");
+    assert.deepEqual(lines.slice(0, 3), [
+      "@AGENTS.md",
+      "@docs/agents/project.md",
+      "@docs/agents/index.md",
+    ]);
+    assert.equal(lines[3], pieces.includes("docs") ? "@docs/agents/docs.md" : "");
+    assert.equal(lines.filter((l) => l.startsWith("@")).length, pieces.includes("docs") ? 4 : 3);
+  }
+});
+
+test("AGENTS.md has no @ line and points to project notes and the index", async () => {
+  for (const pieces of [["base"], ["base", "docs"]]) {
+    const text = await read((await renderCombo(pieces)).dir, "AGENTS.md");
+    assert.ok(!/^@/m.test(text));
+    assert.match(text, /`docs\/agents\/project\.md`/);
+    assert.match(text, /`docs\/agents\/index\.md`/);
+  }
+  const withDocs = await read((await renderCombo(["base", "docs"])).dir, "AGENTS.md");
+  assert.match(withDocs, /`docs\/agents\/docs\.md`/);
+  assert.ok(
+    !/docs\/agents\/docs\.md/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")),
+  );
+});
+
+test("AGENTS.md commands block lists install, check, run ci, format and agents:index", async () => {
+  const text = await read((await renderCombo(["base"])).dir, "AGENTS.md");
+  const block = /```bash\n([\s\S]*?)\n```/.exec(text)[1].split("\n");
+  const cmds = block.map((l) => l.split("#")[0].trim());
+  assert.deepEqual(cmds, [
+    "pnpm install",
+    "pnpm check",
+    "pnpm run ci",
+    "pnpm format",
+    "pnpm agents:index",
+  ]);
+});
+
+test("AGENTS.md rules: secrets, releases, parallel agents, ask becomes deny", async () => {
+  const text = await read((await renderCombo(["base"])).dir, "AGENTS.md");
+  assert.match(text, /never read `\.env\*` or `\.dev\.vars`/);
+  assert.match(text, /Releases are tag pushes made by a human/);
+  assert.match(text, /At most 2-3 parallel agents/);
+  assert.match(text, /hook `ask` becomes a denial in `-p`\/unattended runs/);
+});
+
+test("agent files: frontmatter name matches case-sensitively", async () => {
+  const { dir } = await renderCombo(["base"]);
+  for (const [name, file] of AGENTS_LIST) {
+    assert.equal(frontmatter(await read(dir, `.claude/agents/${file}`)).name, name, file);
+  }
+  assert.ok(!existsSync(join(dir, ".claude/agents/explorer.md")));
+});
+
+test("Explore: haiku, read-only tools, use proactively", async () => {
+  const fm = frontmatter(
+    await read((await renderCombo(["base"])).dir, ".claude/agents/explore.md"),
+  );
+  assert.equal(fm.name, "Explore");
+  assert.equal(fm.model, "haiku");
+  assert.equal(fm.tools, "Read, Grep, Glob");
+  assert.match(fm.description, /use proactively/i);
+});
+
+test("no 'explorer' in rendered .claude/, AGENTS.md or CLAUDE.md", async () => {
+  const { dir } = await renderCombo(["base", "docs"]);
+  const walk = (d) =>
+    readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)],
+    );
+  for (const f of [...walk(join(dir, ".claude")), join(dir, "AGENTS.md"), join(dir, "CLAUDE.md")]) {
+    assert.ok(!/explorer/i.test(readFileSync(f, "utf8")), f);
+  }
+});
+
+test("piece bullets sit under ## Pieces in AGENTS.md with no blank lines between items", async () => {
   const { dir } = await renderCombo(["base", "preact-app", "ui-storybook", "astro-site:site"]);
-  const text = await read(dir, "CLAUDE.md");
+  const text = await read(dir, "AGENTS.md");
   assert.match(
     text,
     /\n## Pieces\n\n- `apps\/\*` \(preact-app\)[^\n]*\n- `packages\/ui`[^\n]*\n- `apps\/\*` \(astro-site\)[^\n]*\n\n## /,
   );
-  assert.ok(!/## Pieces/.test(await read((await renderCombo(["base"])).dir, "CLAUDE.md")));
+  assert.ok(!/## Pieces/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")));
+  assert.ok(!/## Pieces/.test(await read(dir, "CLAUDE.md")));
 });
 
-test("CLAUDE.md ≤ 80 lines and imports project notes", async () => {
-  for (const pieces of [["base"], ["base", "docs"]]) {
-    const { dir } = await renderCombo(pieces);
-    const text = await read(dir, "CLAUDE.md");
-    assert.ok(text.split("\n").length <= 80, `${pieces} has ${text.split("\n").length} lines`);
-    assert.match(text, /^@docs\/agents\/project\.md$/m);
-    assert.match(text, /pnpm check/);
-    assert.match(text, /pnpm run ci/);
-    assert.equal(/^@docs\/agents\/docs\.md$/m.test(text), pieces.includes("docs"));
-  }
-});
-
-test("AGENTS.md points to CLAUDE.md", async () => {
-  const { dir } = await renderCombo(["base"]);
-  assert.match(await read(dir, "AGENTS.md"), /CLAUDE\.md/);
-});
-
-test("agents have name/description/tools/model with the routing table", async () => {
-  const { dir } = await renderCombo(["base"]);
-  const fms = Object.fromEntries(
-    await Promise.all(AGENTS.map(async (a) => [a, await agentFm(dir, a)])),
+test("every piece id except base and docs has a branch in both Pieces chains and one bullet", () => {
+  const ids = readdirSync(join(REAL_TEMPLATE, "pieces")).filter(
+    (i) => i !== "base" && i !== "docs",
   );
-  for (const a of AGENTS) {
-    assert.equal(fms[a].name, a);
-    assert.ok(fms[a].description && fms[a].tools && fms[a].model, a);
+  const src = readFileSync(join(REAL_TEMPLATE, "pieces/base/files/AGENTS.md.jinja"), "utf8");
+  const [, heading, rest] = /same-branches #\}([\s\S]*?)\{% endif %\}([\s\S]*)/.exec(src);
+  const [bullets, trailing] = rest.split("{# same-branches #}");
+  for (const id of ids) {
+    const re = new RegExp(`\\{% (?:el)?if "${id}" in pieces %\\}`, "g");
+    assert.equal(heading.match(re)?.length, 1, `${id} in heading chain`);
+    assert.equal(trailing.match(re)?.length, 1, `${id} in trailing chain`);
+    assert.equal(bullets.match(re)?.length, 1, `${id} bullet`);
   }
-  const models = Object.fromEntries(AGENTS.map((a) => [a, fms[a].model]));
-  assert.deepEqual(models, {
-    explorer: "haiku",
-    implementer: "sonnet",
-    reviewer: "opus",
-    "ci-fixer": "sonnet",
-  });
-  assert.match(fms.explorer.description, /use proactively/i);
-  assert.ok(!/Edit|Write/.test(fms.reviewer.tools));
-  assert.ok(!/Edit|Write|Bash/.test(fms.explorer.tools));
+});
+
+test("always-loaded bytes per combo (AGENTS + CLAUDE + project + index) stay under the ceiling", async () => {
+  for (const pieces of COMBOS) {
+    const { dir } = await renderCombo(pieces, comboVars);
+    spawnSync("node", ["scripts/agents-index.mjs"], { cwd: dir });
+    let bytes = 0;
+    for (const f of ["AGENTS.md", "CLAUDE.md", "docs/agents/project.md", "docs/agents/index.md"]) {
+      bytes += Buffer.byteLength(await read(dir, f));
+    }
+    assert.ok(bytes <= CEILING, `${pieces}: ${bytes} bytes`);
+  }
 });
 
 test("settings.json is valid and wires hooks", async () => {
@@ -209,12 +304,6 @@ test("no template file runs `pnpm ci` (pnpm's built-in clean install)", async ()
     ).flat();
   for (const f of await walk(REAL_TEMPLATE)) {
     assert.ok(!/pnpm ci\b/.test(await readFile(f, "utf8")), f);
-  }
-});
-
-test("rendered CLAUDE.md has no consecutive blank lines", async () => {
-  for (const r of [await renderCombo(["base"]), await renderCombo(["base", "docs"])]) {
-    assert.ok(!/\n\n\n/.test(await read(r.dir, "CLAUDE.md")));
   }
 });
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -72,9 +72,11 @@ test("piece CLAUDE.md documents the .astro tooling limits", async () => {
   assert.match(text, /oxfmt `\.astro` support is experimental/);
 });
 
-test("root CLAUDE.md mentions astro-site and stays ≤ 80 lines", async () => {
-  const text = await read((await renderCombo(["base", "astro-site:site"])).dir, "CLAUDE.md");
+test("root AGENTS.md mentions astro-site; AGENTS + CLAUDE stay ≤ 80 lines", async () => {
+  const { dir } = await renderCombo(["base", "astro-site:site"]);
+  const text = await read(dir, "AGENTS.md");
   assert.match(text, /astro-site/);
-  assert.ok(text.split("\n").length <= 80);
-  assert.ok(!/astro-site/.test(await read((await renderCombo(["base"])).dir, "CLAUDE.md")));
+  assert.match(text, /`apps\/<name>\/AGENTS\.md`/);
+  assert.ok(lineCount(text) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
+  assert.ok(!/astro-site/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")));
 });

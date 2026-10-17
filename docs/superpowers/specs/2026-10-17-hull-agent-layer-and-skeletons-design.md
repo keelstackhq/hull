@@ -93,8 +93,8 @@ no file-by-file overview (ETH study: no gain).
 ```
 @AGENTS.md
 @docs/agents/project.md
-@docs/agents/index.md
-{% if "docs" in pieces %}@docs/agents/docs.md{% endif %}
+@docs/agents/index.md{% if "docs" in pieces %}
+@docs/agents/docs.md{% endif %}
 
 ## Claude Code
 - Subagents: `Explore` (haiku, search/read), `implementer` (sonnet), `reviewer` (opus, read-only),
@@ -409,7 +409,9 @@ lines" becomes "Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines", and its layou
    `template/migrations/<v>.toml` with `[[remove]] .claude/agents/explorer.md` and accept that
    reclassed per-instance `CLAUDE.md` files keep their old text (seed is never touched).
 10. The fixed AI-layer cost grows by the index (≤ 8 KB) while `CLAUDE.md` shrinks; the
-   ai-layer test prints always-loaded bytes per combo so growth is visible in review.
+   ai-layer test asserts always-loaded bytes per combo (AGENTS + CLAUDE + project + index) against
+   a ceiling (measured max 3,764 bytes in the `web` combo + 10 % = 4,150), so growth fails a test
+   instead of being printed.
 
 ## 10. Choices left to the user
 

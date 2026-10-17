@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -78,9 +78,11 @@ test("storybook:build is off the PR path and cached by turbo", async () => {
   assert.deepEqual(turbo.tasks["storybook:build"].outputs, ["storybook-static/**"]);
 });
 
-test("root CLAUDE.md mentions packages/ui and stays ≤ 80 lines", async () => {
-  const text = await read((await renderCombo(["base", "ui-storybook"])).dir, "CLAUDE.md");
+test("root AGENTS.md mentions packages/ui; AGENTS + CLAUDE stay ≤ 80 lines", async () => {
+  const { dir } = await renderCombo(["base", "ui-storybook"]);
+  const text = await read(dir, "AGENTS.md");
   assert.match(text, /packages\/ui/);
-  assert.ok(text.split("\n").length <= 80);
-  assert.ok(!/ui-storybook/.test(await read((await renderCombo(["base"])).dir, "CLAUDE.md")));
+  assert.match(text, /`packages\/ui\/AGENTS\.md`/);
+  assert.ok(lineCount(text) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
+  assert.ok(!/ui-storybook/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")));
 });

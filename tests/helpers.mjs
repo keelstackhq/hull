@@ -16,3 +16,6 @@ export async function renderCombo(pieces, vars = {}) {
   const result = await renderNew({ template: REAL_TEMPLATE, out: dir, pieces, vars });
   return { dir, result };
 }
+
+/** Line count like `wc -l`: a file ending in a newline counts its lines. */
+export const lineCount = (text) => text.split("\n").length - 1;
