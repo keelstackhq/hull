@@ -152,6 +152,7 @@ repo secrets or wrangler vars, not template vars.
 | `hono-worker` | yes | `apps/{{ name }}` | base | `api` |
 | `rust-tool` | yes | `crates/{{ name }}` | base | `tool` |
 | `tauri-app` | yes | `apps/{{ name }}` | base, preact-app | `desktop` |
+| `ts-lib` | yes | `packages/{{ name }}` | base | `lib` |
 | `docs` | no | — (root) | base | — |
 
 Every JS package has the scripts the CI runs: `lint`, `format:check`, `typecheck`, `test`, `build`
@@ -438,6 +439,20 @@ files.
   accepts the workspace trust dialog. The marketplace names inside those repos' manifests were not
   checked.
 
+### 6.12 `ts-lib`
+
+`packages/<name>` (default `lib`): a publishable ESM TypeScript library, package `@<scope>/<name>`
+with `hull.release = "ts-lib"` (read by the release workflow). `vite.config.ts` [owned] packs
+`src/index.ts` as `format: ["esm"]` with `dts: true` into `dist/index.mjs` and `dist/index.d.mts`;
+`exports` has `types` first plus `./package.json`; `files: ["dist"]`, `sideEffects: false`,
+`publishConfig: { access: "public", provenance: true }`. `tsconfig.json` [owned] sets
+`declaration` (TS5069 requires it) and `isolatedDeclarations`, and includes only `src`: TypeScript 7
+rejects the default export of `vite.config.ts` under `isolatedDeclarations` (TS9037).
+`build` is `vp pack && publint && attw --pack . --profile esm-only`; the checks run on the built
+artifact (about 2 s extra locally: publint 0.2 s, attw 1.3 s). `src/index.ts`, `src/index.test.ts`,
+`README.md`, `CLAUDE.md` [seed]; `AGENTS.md` [owned]. The catalog carries `publint` and
+`@arethetypeswrong/cli` (unused entries are harmless).
+
 ## 7. Versions (template pnpm catalog, exact pins)
 
 Checked with `npm view` on 2026-10-14.
@@ -463,6 +478,8 @@ Checked with `npm view` on 2026-10-14.
 | `react`, `react-dom` | 19.3.0 | dev-only cascivo peers, aliased to `preact/compat`; published 2026-09-09 |
 | `happy-dom` | 20.14.6 | DOM environment for component tests; published 2026-10-08 |
 | `docspack` | 1.5.0 | |
+| `publint` | 0.3.25 | ts-lib `build`; checked with `npm view` 2026-10-17 |
+| `@arethetypeswrong/cli` | 0.18.5 | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17 |
 | pnpm / Node | 12.11.2 / 24 | Node 24 is the active LTS |
 
 ### 7.1 Turbo and Vite+
@@ -671,6 +688,8 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 - Timing: `ci-timing.mjs` against §8.4 and §10.2 budgets.
 
 ## 13. Unverified / to check during the build
+
+Verified 2026-10-17 (ts-lib, agent-layer spec §9 item 8): `attw --pack . --profile esm-only` runs next to TypeScript 7.0.2 (it uses its bundled 5.6.1-rc) and passes; `vp pack` emits `index.d.mts` with `isolatedDeclarations`.
 
 Verified 2026-10-17 (agent-layer spec §9 items 1 and 3; a project `Explore` agent overrides the built-in one; Claude Code in this container): an `@docs/agents/index.md` import of a missing file loads without error; after `node scripts/agents-index.mjs` it loads; `@AGENTS.md` in a nested `CLAUDE.md` resolves relative to that file (`apps/web/AGENTS.md` content was loaded from `apps/web`).
 

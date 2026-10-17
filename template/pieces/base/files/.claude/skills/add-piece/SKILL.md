@@ -1,6 +1,6 @@
 ---
 name: add-piece
-description: Add a template piece (preact-app, ui-storybook, astro-site, hono-worker, rust-tool, tauri-app, docs) to this repository with splice. Use when asked to add an app, package, worker or docs to the repo.
+description: Add a template piece (preact-app, ui-storybook, astro-site, hono-worker, rust-tool, tauri-app, ts-lib, docs) to this repository with splice. Use when asked to add an app, package, worker or docs to the repo.
 ---
 
 1. Run `pnpm dlx @keelstackhq/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (for example `add preact-app --name web --yes --json`).

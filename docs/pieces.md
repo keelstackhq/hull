@@ -250,6 +250,38 @@ Merge strategies:
 - `src-tauri/Cargo.toml`: toml
 - `src-tauri/tauri.conf.json`: json
 
+## ts-lib
+
+Publishable ESM TypeScript library with publint and attw checks
+
+- Multiple instances: yes
+- Target: `packages/{{ name }}`
+- Requires: `base`
+
+Variables:
+
+- `name`: library name; default `lib`; pattern `^[a-z][a-z0-9-]*$`
+
+Files (owned):
+
+- `vite.config.ts`
+- `tsconfig.json`
+- `AGENTS.md`
+
+Files (shared):
+
+- `package.json`
+
+Files (seed):
+
+- `src/**`
+- `README.md`
+- `CLAUDE.md`
+
+Merge strategies:
+
+- `package.json`: json
+
 ## ui-storybook
 
 Preact UI component package on cascivo with Storybook 10.6

@@ -42,18 +42,22 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 ## Pieces
 {% elif "tauri-app" in pieces %}
 ## Pieces
+{% elif "ts-lib" in pieces %}
+## Pieces
 {% endif %}{% if "preact-app" in pieces %}
 - `apps/*` (preact-app): Preact apps on Vite+ with cascivo; see `apps/<name>/AGENTS.md`.{% endif %}{% if "ui-storybook" in pieces %}
 - `packages/ui` (ui-storybook): Preact components with Storybook; see `packages/ui/AGENTS.md`.{% endif %}{% if "astro-site" in pieces %}
 - `apps/*` (astro-site): Astro static sites with Preact islands; see `apps/<name>/AGENTS.md`.{% endif %}{% if "hono-worker" in pieces %}
 - `apps/*` (hono-worker): Hono workers with JSON request logs; see `apps/<name>/AGENTS.md`.{% endif %}{% if "rust-tool" in pieces %}
 - `crates/*` (rust-tool): Rust crates in a Cargo workspace; scripts use `-p <crate>`, never `--workspace`; see `crates/<name>/AGENTS.md`.{% endif %}{% if "tauri-app" in pieces %}
-- `apps/*` (tauri-app): Tauri v2 desktop shell; Rust builds only in `desktop.yml`; see `apps/<name>/AGENTS.md`.{% endif %}{# same-branches #}{% if "preact-app" in pieces %}
+- `apps/*` (tauri-app): Tauri v2 desktop shell; Rust builds only in `desktop.yml`; see `apps/<name>/AGENTS.md`.{% endif %}{% if "ts-lib" in pieces %}
+- `packages/*` (ts-lib): publishable ESM libraries, `build` runs publint and attw; see `packages/<name>/AGENTS.md`.{% endif %}{# same-branches #}{% if "preact-app" in pieces %}
 {% elif "ui-storybook" in pieces %}
 {% elif "astro-site" in pieces %}
 {% elif "hono-worker" in pieces %}
 {% elif "rust-tool" in pieces %}
 {% elif "tauri-app" in pieces %}
+{% elif "ts-lib" in pieces %}
 {% endif %}
 ## Where to look
 
