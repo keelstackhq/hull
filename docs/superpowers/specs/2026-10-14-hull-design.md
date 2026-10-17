@@ -583,8 +583,8 @@ upstream.
      `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
-     `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,
-     `Swatinem/rust-cache`, `taiki-e/install-action` (`tool: cargo-nextest,cargo-deny@0.20.2`; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
+     `Cargo.toml`; then a `rustup toolchain install` step (installs the channel and components pinned in `rust-toolchain.toml`; `dtolnay/rust-toolchain@stable` would download a second toolchain once stable moves past the pin),
+     `Swatinem/rust-cache` (extra `key` = `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action` (`tool: cargo-nextest,cargo-deny@0.20.2`; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
   8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
      step summary, timed from a first `Start timer` step.

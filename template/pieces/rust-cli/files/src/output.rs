@@ -9,6 +9,9 @@ use serde_json::{Map, Value};
 use crate::error::Error;
 use crate::exit::Exit;
 
+/// Top-level keys of the JSON object that command data must not reuse.
+const RESERVED_KEYS: [&str; 6] = ["version", "command", "ok", "exit_code", "messages", "error"];
+
 #[derive(Debug, Serialize)]
 pub struct ErrorBody {
     pub kind: &'static str,
@@ -38,6 +41,11 @@ impl Report {
             Value::Object(map) => map,
             other => Map::from_iter([("value".to_owned(), other)]),
         };
+        debug_assert!(
+            data.keys()
+                .all(|key| !RESERVED_KEYS.contains(&key.as_str())),
+            "data keys must not reuse a reserved top-level key: {RESERVED_KEYS:?}"
+        );
         Report {
             version: 1,
             command: command.to_owned(),
@@ -116,6 +124,12 @@ mod tests {
             render_json(&report).unwrap(),
             "{\"version\":1,\"command\":\"hello\",\"ok\":true,\"exit_code\":0,\"messages\":[],\"greeting\":\"hi\"}\n"
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "reserved top-level key")]
+    fn data_may_not_reuse_a_reserved_key() {
+        Report::success("hello", "", serde_json::json!({ "ok": false }));
     }
 
     #[test]

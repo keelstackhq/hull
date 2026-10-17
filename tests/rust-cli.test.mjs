@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
+import YAML from "yaml";
 import { parse as parseToml } from "smol-toml";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
@@ -151,7 +152,7 @@ test("deny.toml: licenses allow-list, private crates ignored, crates.io-only sou
     "unknown-git": "deny",
     "allow-registry": ["https://github.com/rust-lang/crates.io-index"],
   });
-  assert.ok(deny.advisories, "advisories section exists (checked only in release.yml)");
+  assert.equal(deny.advisories.yanked, "deny"); // advisories are checked only in release.yml
 });
 
 test("package name ends in -crate; build is cargo build -p <name> --locked (debug); scripts use -p and --locked", async () => {
@@ -203,7 +204,12 @@ test("turbo inputs include tests/**, deny.toml, $TURBO_ROOT$/Cargo.lock, $TURBO_
     assert.ok(t.tasks[task].inputs.includes("tests/**"), task);
   }
   assert.ok(t.tasks.lint.inputs.includes("deny.toml"));
-  assert.deepEqual(t.tasks["format:check"].inputs, ["src/**", "tests/**", "Cargo.toml"]);
+  assert.deepEqual(t.tasks["format:check"].inputs, [
+    "src/**",
+    "tests/**",
+    "Cargo.toml",
+    "$TURBO_ROOT$/rust-toolchain.toml",
+  ]);
 });
 
 test("no Rust source contains {{, {% or {#", async () => {
@@ -344,4 +350,17 @@ test("add-piece skill lists rust-cli", async () => {
     await read(dir, ".claude/skills/add-piece/SKILL.md"),
     /\(preact-app, ui-storybook, astro-site, hono-worker, rust-tool, rust-cli, tauri-app, ts-lib, docs\)/,
   );
+});
+
+test("ci.yml installs the toolchain pinned in rust-toolchain.toml, never @stable, and keys the cache on it", async () => {
+  const { dir } = await renderCombo(PIECES);
+  const raw = await read(dir, ".github/workflows/ci.yml");
+  assert.doesNotMatch(raw, /rust-toolchain@stable/);
+  const steps = YAML.parse(raw).jobs.ci.steps;
+  const toolchain = steps.find((s) => s.id === "toolchain");
+  assert.equal(toolchain.run, "rustup toolchain install");
+  assert.match(toolchain.if, /steps\.rust\.outputs\.rust == 'true'/);
+  const cache = steps.find((s) => s.uses?.startsWith("Swatinem/rust-cache@"));
+  assert.ok(steps.indexOf(toolchain) < steps.indexOf(cache));
+  assert.equal(cache.with.key, "${{ hashFiles('rust-toolchain.toml') }}");
 });

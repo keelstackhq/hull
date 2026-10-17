@@ -117,15 +117,16 @@ test("rust steps are guarded by the decision step, which only runs when rust-aff
   assert.match(decision.run, /turbo query affected --packages/);
   assert.match(decision.run, /node \.github\/scripts\/rust-affected\.mjs/);
   assert.match(decision.run, /rust=true/);
-  const rustSteps = steps.filter((s) => /^(dtolnay|Swatinem|taiki-e)\//.test(s.uses ?? ""));
+  const rustSteps = steps.filter((s) => /^(Swatinem|taiki-e)\//.test(s.uses ?? ""));
   assert.deepEqual(
     rustSteps.map((s) => s.uses.split("@")[0]),
-    ["dtolnay/rust-toolchain", "Swatinem/rust-cache", "taiki-e/install-action"],
+    ["Swatinem/rust-cache", "taiki-e/install-action"],
   );
   for (const s of rustSteps) assert.match(s.if, /steps\.rust\.outputs\.rust == 'true'/, s.uses);
-  assert.equal(rustSteps[2].with.tool, "cargo-nextest,cargo-deny@0.20.2");
+  assert.equal(rustSteps[1].with.tool, "cargo-nextest,cargo-deny@0.20.2");
   const idx = (s) => steps.indexOf(s);
-  assert.ok(idx(decision) < idx(rustSteps[0]));
+  const toolchain = steps.find((s) => s.id === "toolchain");
+  assert.ok(idx(decision) < idx(toolchain) && idx(toolchain) < idx(rustSteps[0]));
   assert.ok(idx(rustSteps.at(-1)) < steps.length - 2);
   assert.match(steps.at(-2).run, /^pnpm turbo run /);
   assert.equal(byPath(result)[".github/scripts/rust-affected.mjs"], "owned");

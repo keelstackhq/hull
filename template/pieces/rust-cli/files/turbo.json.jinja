@@ -23,7 +23,9 @@
         "$TURBO_ROOT$/rust-toolchain.toml"
       ]
     },
-    "format:check": { "inputs": ["src/**", "tests/**", "Cargo.toml"] },
+    "format:check": {
+      "inputs": ["src/**", "tests/**", "Cargo.toml", "$TURBO_ROOT$/rust-toolchain.toml"]
+    },
     "typecheck": {
       "inputs": [
         "src/**",

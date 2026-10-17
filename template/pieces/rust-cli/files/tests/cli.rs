@@ -171,19 +171,37 @@ fn trace_logs_go_to_stderr_and_stdout_stays_one_object() {
 }
 
 #[test]
-fn the_test_command_never_sees_tokens_and_has_no_color() {
+fn the_test_command_starts_from_an_empty_env_with_exactly_these_vars() {
     let cli = cli();
-    let envs: Vec<_> = cli.get_envs().collect();
-    for name in ["GITHUB_TOKEN", "GH_TOKEN"] {
-        assert!(
-            !envs
-                .iter()
-                .any(|(key, value)| *key == name && value.is_some()),
-            "{name} must not reach the command"
-        );
-    }
+    // `env_clear()` shows up in the command's Debug output as `env -i`.
     assert!(
-        envs.iter()
-            .any(|(key, value)| *key == "NO_COLOR" && *value == Some(std::ffi::OsStr::new("1")))
+        format!("{:?}", *cli).contains("env -i"),
+        "common::cli() must call env_clear(): {:?}",
+        *cli
+    );
+    let mut keys: Vec<String> = Vec::new();
+    for (key, value) in cli.get_envs() {
+        let value = value.unwrap_or_else(|| panic!("{key:?} is removed instead of set"));
+        if key == "NO_COLOR" {
+            assert_eq!(value, "1");
+        }
+        keys.push(key.to_string_lossy().into_owned());
+    }
+    keys.sort();
+    let mut expected = vec![
+        "HOME",
+        "NO_COLOR",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ];
+    if std::env::var_os("PATH").is_some() {
+        expected.push("PATH");
+    }
+    expected.sort_unstable();
+    assert_eq!(
+        keys, expected,
+        "no token or other variable reaches the command"
     );
 }

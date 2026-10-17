@@ -77,12 +77,14 @@ jobs:
             echo "::warning::turbo query affected --packages failed (exit $code); running Rust steps"
             echo "rust=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust toolchain (from rust-toolchain.toml)
+        id: toolchain
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
-        with:
-          components: clippy, rustfmt
+        run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
+        with:
+          key: ${{ hashFiles('rust-toolchain.toml') }}
       - uses: taiki-e/install-action@v2
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         with:
