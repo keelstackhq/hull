@@ -116,6 +116,11 @@ function main(argv) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const file = join(root, OUT);
   const text = buildIndex(root);
+  if (Buffer.byteLength(text) > BUDGET) {
+    process.stderr.write(
+      `docs/agents/index.md is over ${BUDGET} bytes: commands and packages alone exceed the budget; shorten root scripts or package scripts\n`,
+    );
+  }
   if (argv.includes("--check")) {
     if (!existsSync(file) || readText(file) !== text) {
       process.stderr.write("docs/agents/index.md is stale: run `pnpm agents:index`\n");

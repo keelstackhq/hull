@@ -28,7 +28,10 @@ export function comboSteps(cacheDir, pieces = [], dir = ".") {
     ...(pieces.some((p) => p.split(":")[0] === "rust-tool")
       ? [["cargo", ["generate-lockfile"]]]
       : []),
+    // the base [[post]] hook, which the dev renderer does not run
+    ["node", ["scripts/agents-index.mjs"]],
     [cmd, [...args, `--cache-dir=${cacheDir}`]],
+    ["node", ["scripts/agents-index.mjs", "--check"]],
   ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
     steps.push(["node", [CHECK_SINGLE_VITE, dir]]);

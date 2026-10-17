@@ -259,3 +259,11 @@ test("statusline without jq does not fabricate model or cost", async () => {
   assert.match(r.stdout, /8%/);
   assert.match(r.stdout, /\$\?/);
 });
+
+test("verify skill runs the index check first and says pnpm run ci does not", async () => {
+  const { dir } = await renderCombo(["base"]);
+  const text = await read(dir, ".claude/skills/verify/SKILL.md");
+  assert.match(text, /node scripts\/agents-index\.mjs --check/);
+  assert.match(text, /`pnpm run ci` does not run this check \(it is not a turbo task\); CI does/);
+  assert.ok(text.indexOf("agents-index.mjs --check") < text.indexOf("pnpm turbo run"));
+});

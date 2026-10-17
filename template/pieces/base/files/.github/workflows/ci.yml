@@ -27,6 +27,8 @@ jobs:
         with:
           fetch-depth: 0
           filter: blob:none
+      - name: Agents index current?
+        run: node scripts/agents-index.mjs --check
       - name: Anything affected?
         id: affected
         env:

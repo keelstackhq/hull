@@ -483,7 +483,10 @@ upstream.
 - Job `ci`, `ubuntu-latest`, `timeout-minutes: 15`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
   the PR base sha, `merge_group.base_sha`, or `github.event.before`:
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
-  2. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
+  2. Index check: a separate step with no `if`, using the runner's `node`:
+     `node scripts/agents-index.mjs --check` fails when `docs/agents/index.md` is stale (docs-only
+     cost < 1 s).
+  3. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
      `TURBO_VERSION` (= the catalog pin, tracked by the Renovate preset) from the npm registry with
      `curl` (~1 s; `npx` took ~5-7 s), then `turbo query affected --tasks lint format:check
      typecheck test build` writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
@@ -493,10 +496,10 @@ upstream.
      Root `format:check` covers every root-owned file, but docs-only changes (e.g. `CLAUDE.md`,
      `docs/**`) do not trigger it on PRs (§8.4).
      All later steps have `if: steps.affected.outputs.skip != 'true'`.
-  3. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
+  4. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
-  4. `pnpm install --frozen-lockfile --prefer-offline`.
-  5. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
+  5. `pnpm install --frozen-lockfile --prefer-offline`.
+  6. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
      restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstackhq/hoard@v1` once released.
   6. Rust (present in the plain `ci.yml`, guarded at runtime by
      `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
@@ -612,8 +615,9 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    tests select none. An unknown or missing base (first push, force-push) selects all.
 3. `node scripts/dogfood.mjs --combo <each>`: render into `$RUNNER_TEMP/combos/<name>`, then in
    sequence per combo `pnpm install --no-frozen-lockfile --prefer-offline` (shared pnpm store),
+   `node scripts/agents-index.mjs` (the dev renderer does not run `[[post]]`),
    `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
-   and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
+   `node scripts/agents-index.mjs --check`, and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
    selected combo contains rust-tool.
 4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
    on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs

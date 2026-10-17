@@ -62,7 +62,7 @@ crates.io publishing (hoist §9.3 covers it later), migrating `rust-tool` consum
 | `.claude/skills/verify/SKILL.md` | owned | Adds `node scripts/agents-index.mjs --check` |
 | `.claude/skills/add-piece/SKILL.md` | owned | Lists the new pieces; runs `pnpm agents:index` after `add` |
 | `scripts/agents-index.mjs` | owned | New (§3.5) |
-| `.github/workflows/ci.yml` | owned | Index check in the early-exit step; `cargo-deny` in the Rust tool install (§3.6, §4.1) |
+| `.github/workflows/ci.yml` | owned | Index check step before the early-exit step; `cargo-deny` in the Rust tool install (§3.6, §4.1) |
 | `.gitignore` | owned | Adds `.env*`, `!.env.example`, `.dev.vars` |
 | `package.json.jinja` | shared json | Script `agents:index` = `node scripts/agents-index.mjs` |
 | `piece.toml` | — | `owned` lists the new paths; `[[post]]` `node scripts/agents-index.mjs`, `when = ["new","add","update"]` |
@@ -179,7 +179,9 @@ plus each package's `AGENTS.md` and `README.md`, title = first `# ` heading else
 `docspack` in root devDependencies, one line: "library docs: `pnpm exec docspack ask "<q>" --json`".
 Budget 8192 bytes: only rows under `docs/` are dropped, deepest path first (ties: reverse sort
 order), and replaced by the last docs row "… N more under docs/ (ls docs)"; commands, packages and
-the packages' `AGENTS.md`/`README.md` rows are never dropped.
+the packages' `AGENTS.md`/`README.md` rows are never dropped. If commands and packages alone still
+exceed the budget, the script prints one warning on stderr and exits 0 (also with `--check`); the
+file is written as is.
 
 Where it runs: base `[[post]]` (splice), dogfood (the dev renderer does not run post), the
 `verify` skill, and CI (§3.6). Claude loads it through `@docs/agents/index.md`; other agents read it
@@ -187,8 +189,8 @@ via the `AGENTS.md` pointer.
 
 ### 3.6 CI changes (`ci.yml`, owned)
 
-In the early-exit step, before Node setup, using the runner's preinstalled `node` (as
-`affected.mjs` already does): `node scripts/agents-index.mjs --check`. It runs on every PR,
+A separate step after checkout and before the early-exit step, no `if`, using the runner's `node`
+(as `affected.mjs` already does): `node scripts/agents-index.mjs --check`. It runs on every PR,
 including docs-only ones, costs < 1 s, and is not a turbo task, so `CI_TASKS` and the parity test
 are unchanged. A failure fails `ci` with the fix command.
 

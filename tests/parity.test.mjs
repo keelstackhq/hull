@@ -44,3 +44,22 @@ test("comboSteps runs the rust-tool post hook (cargo generate-lockfile) before t
   assert.ok(lock < steps.findIndex((s) => s.startsWith("pnpm turbo run")));
   assert.ok(!comboSteps("/c", ["base"], "/d").some(([c]) => c === "cargo"));
 });
+
+test("dogfood and generated ci.yml both run `node scripts/agents-index.mjs --check`", async () => {
+  const ci = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
+  assert.match(ci, /^\s+run: node scripts\/agents-index\.mjs --check$/m);
+  const cmds = comboSteps("/c", ["base"], "/d").map(([c, a]) => [c, ...a].join(" "));
+  assert.ok(cmds.includes("node scripts/agents-index.mjs --check"));
+});
+
+test("comboSteps writes the index before turbo and checks it after", () => {
+  const cmds = comboSteps("/c", ["base", "preact-app:web"], "/d").map(([c, a]) =>
+    [c, ...a].join(" "),
+  );
+  const write = cmds.indexOf("node scripts/agents-index.mjs");
+  const turbo = cmds.findIndex((s) => s.startsWith("pnpm turbo run"));
+  const check = cmds.indexOf("node scripts/agents-index.mjs --check");
+  const vite = cmds.findIndex((s) => s.includes("check-single-vite.mjs"));
+  assert.ok(write > cmds.findIndex((s) => s.startsWith("pnpm install")));
+  assert.ok(write < turbo && turbo < check && check < vite);
+});

@@ -134,6 +134,24 @@ test("--check: exit 0 when current, 1 with the fix message when stale or missing
   assert.equal(stale.stderr, `${MSG}\n`);
 });
 
+test("commands alone over budget: one stderr warning, exit 0, file still written; --check stays 0 when current", async () => {
+  const d = await tmpCopy("small");
+  await put(d, "scripts/agents-index.mjs", readFileSync(SCRIPT, "utf8"));
+  const scripts = {};
+  for (let i = 0; i < 200; i++) scripts[`s${i}`] = `node scripts/very-long-script-name-${i}.mjs`;
+  await put(d, "package.json", JSON.stringify({ name: "acme", private: true, scripts }));
+  const run = (...a) =>
+    spawnSync("node", ["scripts/agents-index.mjs", ...a], { cwd: d, encoding: "utf8" });
+  const WARN = `docs/agents/index.md is over ${BUDGET} bytes: commands and packages alone exceed the budget; shorten root scripts or package scripts\n`;
+  const gen = run();
+  assert.equal(gen.status, 0);
+  assert.equal(gen.stderr, WARN);
+  assert.ok(Buffer.byteLength(await readFile(join(d, "docs/agents/index.md"), "utf8")) > BUDGET);
+  const chk = run("--check");
+  assert.equal(chk.status, 0);
+  assert.equal(chk.stderr, WARN);
+});
+
 for (const [name, pieces] of [
   ["base", ["base"]],
   ["web", ["base", "preact-app:web", "ui-storybook", "hono-worker:api"]],
