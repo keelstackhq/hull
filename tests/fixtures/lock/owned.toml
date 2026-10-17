@@ -1,0 +1,5 @@
+[files]
+"apps/web/vite.config.ts" = { class = "owned", sha256 = "0000" }
+"apps/web/package.json"   = { class = "shared", sha256 = "0000" }
+"README.md"               = { class = "seed", sha256 = "0000" }
+"apps/web/notes.ipynb"    = { class = "owned", sha256 = "0000" }

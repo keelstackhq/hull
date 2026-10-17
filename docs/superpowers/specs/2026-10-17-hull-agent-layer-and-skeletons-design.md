@@ -133,6 +133,11 @@ must not brick a session; the settings deny rules remain as the second layer.
 | lock | Edit, Write, MultiEdit, Bash (`>`/`sed -i` target) | `.splice/lock.toml` | deny: "only splice writes the lock" |
 | owned edit | Edit, Write, MultiEdit, NotebookEdit | normalised repo-relative `file_path` listed `class = "owned"` in the lock | ask: "owned by the template: `splice update` overwrites it; put local changes in seed files or docs/agents/project.md" |
 
+The path a file tool acts on is `targetPath(tool_input)` = `file_path ?? notebook_path ?? path`
+(NotebookEdit uses `notebook_path`, Grep and Glob use `path`). The secret check also looks at a
+Grep `glob` and a Glob `pattern`. The owned rule normalises `targetPath` relative to
+`projectDir`; owned paths come from the `[files]` lines of the lock (contract §6 shape).
+
 Bash parsing is a tokenizer, not a shell: split on `;`, `&&`, `||`, `|`, newlines; strip leading
 `VAR=x`, `env`, `sudo`, `command`, `time`, `pnpm exec`, `npx`; recurse once into `bash|sh -c '<s>'`;
 `git` global options (`-C <d>`, `-c k=v`, `--git-dir=…`) are skipped before the subcommand (the

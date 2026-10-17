@@ -80,6 +80,15 @@ test("settings.json is valid and wires hooks", async () => {
   assert.equal(s.hooks.SessionStart[0].hooks[0].type, "command");
   assert.match(s.hooks.SessionStart[0].hooks[0].command, /bash .*session-start\.sh/);
   assert.match(s.hooks.Stop[0].hooks[0].command, /bash .*stop-checks\.sh/);
+  assert.equal(
+    s.hooks.PreToolUse[0].matcher,
+    "Bash|Read|Grep|Glob|Edit|Write|MultiEdit|NotebookEdit",
+  );
+  assert.equal(
+    s.hooks.PreToolUse[0].hooks[0].command,
+    'node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs"',
+  );
+  assert.equal(s.hooks.PreToolUse[0].hooks[0].timeout, 10);
   assert.equal(s.enabledPlugins["superpowers@superpowers-marketplace"], true);
   assert.equal(s.enabledPlugins["caveman@akramsystems-plugins"], true);
   assert.deepEqual(s.extraKnownMarketplaces["superpowers-marketplace"].source, {
@@ -221,6 +230,12 @@ test("settings deny publish and force pushes, hooks have timeouts", async () => 
   assert.ok(!s.permissions.allow.some((a) => a.includes("splice")));
   assert.equal(s.hooks.SessionStart[0].hooks[0].timeout, 120);
   assert.equal(s.hooks.Stop[0].hooks[0].timeout, 120);
+});
+
+test("rendered .gitignore keeps secrets out but .env.example in", async () => {
+  const { dir } = await renderCombo(["base"]);
+  const lines = (await read(dir, ".gitignore")).split("\n");
+  for (const l of [".env*", "!.env.example", ".dev.vars"]) assert.ok(lines.includes(l), l);
 });
 
 test("statusline without jq does not fabricate model or cost", async () => {

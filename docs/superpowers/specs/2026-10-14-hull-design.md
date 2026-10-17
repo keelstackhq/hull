@@ -193,7 +193,8 @@ Root files (class in brackets):
   files hold only `pack`/`test` options. Root `vite.config.ts` and `tsconfig.base.json` are turbo
   `globalDependencies`, and a root `//#format:check` task checks root files (checked 2026-10-14).
 - `.node-version` [owned] `24`; `.gitignore` [owned] (node_modules, dist, .turbo, .astro,
-  .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
+  .wrangler, target, storybook-static, `.claude/settings.local.json`, `.env*` with
+  `!.env.example`, `.dev.vars`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
 - `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
@@ -392,6 +393,11 @@ files.
   `.claude/hooks/session-start.d/*.sh` (repo-local, not owned by the template; a failing one is
   reported and ignored), so a repo can add session-start work without editing owned files. Exits 0
   on any failure (never blocks a session), prints one status line plus whatever local hooks print.
+- `.claude/hooks/guard.mjs` (PreToolUse, Node built-ins only): denies publish commands, force and
+  tag pushes (also behind `git -C . push`), reads of `.env*`/`.dev.vars` (not `.env.example`) and
+  any write to `.splice/lock.toml`; asks the human before Edit/Write/MultiEdit/NotebookEdit on a
+  file the lock lists as `owned`. A tokenizer, not a shell; any internal error allows the call.
+  Rules and known gaps: agent-layer spec §3.4.
 - `.claude/hooks/stop-checks.sh` (opt-in): does nothing unless `HULL_STOP_CHECKS=1`; then runs
   `pnpm turbo run lint typecheck test --affected` and on failure exits 2 with the first error on
   stderr, which blocks stopping. Enable by setting the env var in `.claude/settings.local.json`.
@@ -404,7 +410,10 @@ files.
   read and commit commands, `gh run view`, `docspack`; `deny` force-push (`--force*`, `-f`, `+ref`
   anywhere after `git push`), `pnpm|npm|cargo publish` and reading `.env*` (deny rules match only
   commands starting with the literal program, so `git -C . push -f` is not caught; push is not
-  allowed, so it still prompts); hook entries carry `timeout: 120` (seconds);
+  allowed, so it still prompts); these deny rules are the second layer behind the guard hook
+  below; hook entries carry `timeout: 120` (seconds, 10 for the guard);
+  `hooks.PreToolUse` matcher `Bash|Read|Grep|Glob|Edit|Write|MultiEdit|NotebookEdit` →
+  `node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs"`;
   `hooks.SessionStart` matcher `startup|resume` → `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"`;
   `hooks.Stop` → stop-checks; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
   (`superpowers@superpowers-marketplace`, repo `obra/superpowers-marketplace`) and caveman
