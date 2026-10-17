@@ -123,7 +123,7 @@ test("rust steps are guarded by the decision step, which only runs when rust-aff
     ["Swatinem/rust-cache", "taiki-e/install-action"],
   );
   for (const s of rustSteps) assert.match(s.if, /steps\.rust\.outputs\.rust == 'true'/, s.uses);
-  assert.equal(rustSteps[1].with.tool, "cargo-nextest,cargo-deny@0.20.2");
+  assert.equal(rustSteps[1].with.tool, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
   const idx = (s) => steps.indexOf(s);
   const toolchain = steps.find((s) => s.id === "toolchain");
   assert.ok(idx(decision) < idx(toolchain) && idx(toolchain) < idx(rustSteps[0]));

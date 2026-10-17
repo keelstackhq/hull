@@ -103,9 +103,23 @@ test("cargo-deny pin equal in template ci.yml, release.yml and the renovate rege
     [true, true],
   );
   // a fixture in the shape Renovate sees: the same text, one pin
-  const fixture = "      tool: cargo-nextest,cargo-deny@0.20.2\n";
+  const fixture = "      tool: cargo-nextest@0.9.148,cargo-deny@0.20.2\n";
   assert.deepEqual(
     [...fixture.matchAll(regex)].map((m) => m.groups.currentValue),
     found,
   );
+});
+
+test("cargo-nextest pin equal in template ci.yml, hull ci.yml and the renovate regex", async () => {
+  const preset = JSON.parse(await readFile(new URL("../renovate/default.json", import.meta.url)));
+  const mgr = preset.customManagers.find((m) => m.depNameTemplate === "cargo-nextest");
+  assert.equal(mgr?.datasourceTemplate, "crate");
+  assert.deepEqual(mgr.managerFilePatterns, ["/^\\.github/workflows/.*\\.ya?ml$/"]);
+  const regex = new RegExp(mgr.matchStrings[0], "g");
+  const pins = (text) => [...text.matchAll(regex)].map((m) => m.groups.currentValue);
+  const tmpl = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
+  const hull = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.deepEqual(pins(tmpl), ["0.9.148"]);
+  assert.deepEqual(pins(hull), ["0.9.148"]);
+  assert.deepEqual(pins("      tool: cargo-nextest@0.9.148,cargo-deny@0.20.2\n"), ["0.9.148"]);
 });

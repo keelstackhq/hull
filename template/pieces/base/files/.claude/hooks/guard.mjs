@@ -1,6 +1,7 @@
-// PreToolUse guard: denies releases, force/tag pushes, secret reads and lock edits; asks before
-// editing files the template owns. A guard rail, not a sandbox. Known gaps: `eval`, `$(...)` and
-// backticks, scripts that publish, and editing owned files through Bash. Node built-ins only.
+// PreToolUse guard: denies releases, force/tag pushes, deleting main/master on the remote, secret
+// reads and lock edits; asks before editing files the template owns. A guard rail, not a sandbox.
+// Known gaps: `eval`, `$(...)` and backticks, scripts that publish, editing owned files through
+// Bash, and a default branch not named main or master. Node built-ins only.
 // Any internal error allows the call and prints one stderr line; settings deny rules stay as the
 // second layer.
 import { readFileSync } from "node:fs";
@@ -13,12 +14,18 @@ const SHELLS = new Set(["bash", "sh", "zsh"]);
 const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", ...EDIT_TOOLS]);
+const DEFAULT_BRANCH_RE = /^(refs\/heads\/)?(main|master)$/;
+
+/** Program name without its directory: `/usr/bin/npm` → `npm`. */
+const base = (prog) => String(prog).slice(String(prog).lastIndexOf("/") + 1);
 
 const REASON = {
   publish: "Releases run in CI from a tag a human pushes (release.yml); do not publish from here.",
   force:
     "Push without --force or +refspec; rebase onto the remote branch, or ask the human to rewrite history.",
   tag: "a tag push publishes: push branches only and ask the human to push release tags.",
+  deleteDefault:
+    "never delete the default branch on the remote: delete feature branches only, or ask the human.",
   secret:
     "Secret files are off limits: read .env.example for the variable names, or ask the human.",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
@@ -93,18 +100,40 @@ function split(cmd) {
 }
 
 function stripPrefixes(tokens) {
-  let t = tokens.map((x, i) => (i === 0 ? x.replace(/^[({]+/, "") : x)).filter((x) => x !== "");
+  let t = tokens
+    .map((x, i) => (i === 0 ? x.replace(/^[({]+/, "") : x).replace(/[)}]+$/, ""))
+    .filter((x) => x !== "");
   const skipOptions = (valueFlags = []) => {
     while (t[0]?.startsWith("-")) t = t.slice(valueFlags.includes(t[0]) ? 2 : 1);
   };
+  const skipEnvOptions = () => {
+    while (t[0]?.startsWith("-")) {
+      const o = t[0];
+      if (o === "-S" || o === "--split-string") {
+        t = [...split(t[1] ?? "").flat(), ...t.slice(2)];
+        return;
+      }
+      const inline = /^(?:-S|--split-string=)(.+)$/.exec(o);
+      if (inline) {
+        t = [...split(inline[1]).flat(), ...t.slice(1)];
+        return;
+      }
+      t = t.slice(["-u", "--unset", "-C", "--chdir"].includes(o) ? 2 : 1);
+    }
+  };
   for (;;) {
-    const [a, b] = t;
-    if (a === undefined) return t;
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(a)) t = t.slice(1);
+    const raw = t[0];
+    if (raw === undefined) return t;
+    const a = base(raw);
+    const b = t[1];
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(raw)) t = t.slice(1);
     else if (["then", "do", "else", "elif", "!", "exec", "command", "time", "nohup"].includes(a)) {
       t = t.slice(1);
       skipOptions();
-    } else if (a === "env" || a === "npx") {
+    } else if (a === "env") {
+      t = t.slice(1);
+      skipEnvOptions();
+    } else if (a === "npx") {
       t = t.slice(1);
       skipOptions();
     } else if (a === "sudo") {
@@ -134,7 +163,7 @@ export function commands(cmd) {
     const t = stripPrefixes(seg);
     if (!t.length) continue;
     out.push(t);
-    if (SHELLS.has(t[0])) {
+    if (SHELLS.has(base(t[0]))) {
       const i = t.findIndex((x, n) => n > 0 && /^-[a-z]*c$/.test(x));
       if (i > 0 && t[i + 1] !== undefined) {
         for (const inner of split(t[i + 1])) {
@@ -182,17 +211,23 @@ function gitSub(t) {
 
 function pushRule(args) {
   let tag = false;
+  let del = false;
+  const refs = [];
   for (const a of args) {
     if (a === "--mirror" || a === "--force" || a.startsWith("--force-") || a.startsWith("--force="))
       return "force";
     if (/^-[A-Za-z]*f[A-Za-z]*$/.test(a)) return "force";
     if (a.startsWith("+")) return "force";
     if (a === "--tags" || a === "--follow-tags") tag = true;
+    if (a === "--delete" || /^-[A-Za-z]*d[A-Za-z]*$/.test(a)) del = true;
     if (!a.startsWith("-")) {
+      refs.push(a);
       const dst = a.slice(a.lastIndexOf(":") + 1);
+      if (a.startsWith(":") && DEFAULT_BRANCH_RE.test(dst)) return "deleteDefault";
       if (dst.startsWith("refs/tags/") || /^[^/\s]*-v\d/.test(dst)) tag = true;
     }
   }
+  if (del && refs.some((r) => DEFAULT_BRANCH_RE.test(r))) return "deleteDefault";
   return tag ? "tag" : null;
 }
 
@@ -208,7 +243,8 @@ function writesLock(t, i) {
 }
 
 function bashRule(t) {
-  const [prog, ...args] = t;
+  const prog = base(t[0]);
+  const args = t.slice(1);
   if (
     MANAGERS.has(prog) &&
     args.some((a) => a === "publish" || a === "unpublish" || a === "dist-tag")

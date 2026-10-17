@@ -65,6 +65,24 @@ const DENY = [
   "sudo -u bob npm publish",
   "! npm publish",
   "git push --mirror",
+  "/usr/bin/npm publish",
+  "./node_modules/.bin/pnpm publish",
+  "(npm publish)",
+  "(git push -f)",
+  "{ git push -f;}",
+  "env -u FOO npm publish",
+  "env --unset=FOO npm publish",
+  "env --unset FOO npm publish",
+  "env -C /tmp npm publish",
+  "env --chdir /tmp npm publish",
+  "env --chdir=/tmp npm publish",
+  "env -S 'npm publish'",
+  "git push origin :main",
+  "git push origin :master",
+  "git push origin :refs/heads/main",
+  "git push --delete origin main",
+  "git push -d origin master",
+  "git push origin --delete main",
 ];
 const ALLOW = [
   "grep -r publish docs",
@@ -77,6 +95,10 @@ const ALLOW = [
   "echo .envrc-notes",
   "pnpm run ci",
   "cargo test",
+  "/usr/bin/git push origin main",
+  "git push origin :feature",
+  "git push --delete origin feature",
+  "env -u FOO pnpm test",
 ];
 for (const c of DENY) {
   test(`deny: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
@@ -155,6 +177,10 @@ test("every deny reason says what to do instead", () => {
   assert.match(decide(bash("git push -f"), ctx).reason, /without --force/);
   assert.match(decide(bash("git push --tags"), ctx).reason, /a tag push publishes/);
   assert.match(decide(bash("cat .env"), ctx).reason, /\.env\.example/);
+  assert.match(
+    decide(bash("git push origin :main"), ctx).reason,
+    /never delete the default branch/,
+  );
   assert.match(
     decide(bash("echo x > .splice/lock.toml"), ctx).reason,
     /only splice writes the lock/,

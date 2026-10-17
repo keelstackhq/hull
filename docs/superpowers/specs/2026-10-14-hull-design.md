@@ -422,7 +422,7 @@ files.
   reported and ignored), so a repo can add session-start work without editing owned files. Exits 0
   on any failure (never blocks a session), prints one status line plus whatever local hooks print.
 - `.claude/hooks/guard.mjs` (PreToolUse, Node built-ins only): denies publish commands, force and
-  tag pushes (also behind `git -C . push`), reads of `.env*`/`.dev.vars` (not `.env.example`) and
+  tag pushes (also behind `git -C . push`), deleting `main`/`master` on the remote, reads of `.env*`/`.dev.vars` (not `.env.example`) and
   any write to `.splice/lock.toml`; asks the human before Edit/Write/MultiEdit/NotebookEdit on a
   file the lock lists as `owned`. A tokenizer, not a shell; any internal error allows the call.
   Rules and known gaps: agent-layer spec §3.4.
@@ -618,7 +618,7 @@ upstream.
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
      `Cargo.toml`; then a `rustup toolchain install` step (installs the channel and components pinned in `rust-toolchain.toml`; `dtolnay/rust-toolchain@stable` would download a second toolchain once stable moves past the pin),
-     `Swatinem/rust-cache` (extra `key` = `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action` (`tool: cargo-nextest,cargo-deny@0.20.2`; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
+     `Swatinem/rust-cache` (extra `key` = `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action` (`tool: cargo-nextest@0.9.148,cargo-deny@0.20.2`, both tracked by Renovate regex managers; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
   8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
      step summary, timed from a first `Start timer` step.
@@ -709,6 +709,11 @@ publishing jobs.
   `-` prerelease suffix, else `latest`; npm refuses or would mark a prerelease `latest` otherwise),
   skipped when `npm view <name>@<version>` already answers.
 
+`github-release` and `npm` both need only `plan` and `binaries`, so they run in parallel: npm can
+publish while the GitHub release fails (and the reverse). A re-run of the failed job is safe
+(`gh release upload --clobber`, the `npm view` skip); required
+reviewers on the `release` environment (a human step, hull PROGRESS Blocked) gate both.
+
 Human steps (in the generated `docs/agents/project.md` Blocked section and the owned npm-cli /
 ts-lib `AGENTS.md`): the `release` environment with a tag rule; the first publish of each new npm
 name by hand; an npm trusted publisher (repo, `release.yml`, environment `release`) on each
@@ -783,7 +788,7 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    `node scripts/agents-index.mjs --check`, and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
    selected combo contains rust-tool or rust-cli (`cargo generate-lockfile` runs for both, standing in
    for the `[[post]]` hook); that step also adds `Swatinem/rust-cache@v2` (workspace `combos/cli -> target`)
-   and installs `cargo-nextest` and `cargo-deny@0.20.2`, which the cli combo's generated `ci` task list uses.
+   and installs `cargo-nextest@0.9.148` and `cargo-deny@0.20.2`, which the cli combo's generated `ci` task list uses.
 4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
    on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
    download time, never correctness.
@@ -848,7 +853,8 @@ Verified 2026-10-17 (ts-lib, agent-layer spec §9 item 8): `attw --pack . --prof
 
 Verified 2026-10-17 (agent-layer spec §9 items 1 and 3; a project `Explore` agent overrides the built-in one; Claude Code in this container): an `@docs/agents/index.md` import of a missing file loads without error; after `node scripts/agents-index.mjs` it loads; `@AGENTS.md` in a nested `CLAUDE.md` resolves relative to that file (`apps/web/AGENTS.md` content was loaded from `apps/web`).
 
-Still open: Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
+Still open: whether a PreToolUse `ask` still prompts under `acceptEdits` (agent-layer spec §9
+item 2; needs an interactive session, `claude -p` cannot show the prompt); Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
 (§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm manager bumps the
 `overrides.vite` `npm:@voidzero-dev/vite-plus-core@x` alias together with `vite-plus` (needs a live
 Renovate run); whether the empty `vars.SENTRY_DSN` is overridden by `wrangler secret put` on deploy

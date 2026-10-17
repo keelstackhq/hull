@@ -129,6 +129,7 @@ must not brick a session; the settings deny rules remain as the second layer.
 | publish | Bash | `npm\|pnpm\|yarn\|bun publish`, `npm unpublish\|dist-tag`, `cargo publish`, `changeset publish`, `gh release create\|upload` | deny: "Releases run in CI from a tag a human pushes (release.yml)." |
 | force push | Bash | `git [global opts] push` with `-f`, `--force`, `--force-with-lease`, `--force-if-includes`, or a `+refspec` | deny |
 | tag push | Bash | `git push` with `--tags`, `--follow-tags`, or a ref matching `*-v<digit>*` / `refs/tags/*` | deny: "a tag push publishes" |
+| delete default branch | Bash | `git push` with `:main`/`:master` (also `refs/heads/…`), or `--delete`/`-d` naming `main` or `master` | deny: "never delete the default branch on the remote" |
 | secret files | Read, Grep, Glob, Edit, Write, Bash | a path/pattern/token whose basename matches `.env`, `.env.*`, `.dev.vars` (allow `.env.example`, `.env.sample`, `.env.template`) | deny |
 | lock | Edit, Write, MultiEdit, Bash (`>`/`sed -i` target) | `.splice/lock.toml` | deny: "only splice writes the lock" |
 | owned edit | Edit, Write, MultiEdit, NotebookEdit | normalised repo-relative `file_path` listed `class = "owned"` in the lock | ask: "owned by the template: `splice update` overwrites it; put local changes in seed files or docs/agents/project.md" |
@@ -139,10 +140,13 @@ Grep `glob` and a Glob `pattern`. The owned rule normalises `targetPath` relativ
 `projectDir`; owned paths come from the `[files]` lines of the lock (contract §6 shape).
 
 Bash parsing is a tokenizer, not a shell: split on `;`, `&&`, `||`, `|`, newlines; strip leading
-`VAR=x`, `env`, `sudo`, `command`, `time`, `pnpm exec`, `npx`; recurse once into `bash|sh -c '<s>'`;
+`VAR=x`, `env` (and its `-u`/`--unset`, `-C`/`--chdir` options; `-S '<s>'` is split into words),
+`sudo`, `command`, `time`, `pnpm exec`, `npx`, a leading `(`/`{` and trailing `)`/`}`; programs
+match by basename (`/usr/bin/npm`, `./node_modules/.bin/pnpm`); recurse once into `bash|sh -c '<s>'`;
 `git` global options (`-C <d>`, `-c k=v`, `--git-dir=…`) are skipped before the subcommand (the
 settings deny rules miss `git -C . push -f`). Known gaps, documented in the hook header: `eval`,
-scripts that publish, editing owned files through Bash. The hook is a guard rail, not a sandbox.
+`$(…)` and backticks, scripts that publish, editing owned files through Bash, and a default branch
+not named `main` or `master`. The hook is a guard rail, not a sandbox.
 
 ### 3.5 Docs index `scripts/agents-index.mjs`
 
