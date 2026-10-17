@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template"]);
+const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template", ".dev.vars.example"]);
 const MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const SHELLS = new Set(["bash", "sh", "zsh"]);
 const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/;
@@ -93,21 +93,36 @@ function split(cmd) {
 }
 
 function stripPrefixes(tokens) {
-  let t = [...tokens];
-  if (t[0]) t[0] = t[0].replace(/^[({]+/, "");
+  let t = tokens.map((x, i) => (i === 0 ? x.replace(/^[({]+/, "") : x)).filter((x) => x !== "");
+  const skipOptions = (valueFlags = []) => {
+    while (t[0]?.startsWith("-")) t = t.slice(valueFlags.includes(t[0]) ? 2 : 1);
+  };
   for (;;) {
     const [a, b] = t;
     if (a === undefined) return t;
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(a)) t = t.slice(1);
-    else if (a === "env" || a === "sudo" || a === "command" || a === "time" || a === "nohup") {
+    else if (["then", "do", "else", "elif", "!", "exec", "command", "time", "nohup"].includes(a)) {
       t = t.slice(1);
-      while (t[0]?.startsWith("-")) t = t.slice(1);
-    } else if (a === "npx") {
+      skipOptions();
+    } else if (a === "env" || a === "npx") {
       t = t.slice(1);
-      while (t[0]?.startsWith("-")) t = t.slice(1);
+      skipOptions();
+    } else if (a === "sudo") {
+      t = t.slice(1);
+      skipOptions(["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U"]);
+    } else if (a === "nice") {
+      t = t.slice(1);
+      skipOptions(["-n", "--adjustment"]);
+    } else if (a === "xargs") {
+      t = t.slice(1);
+      skipOptions(["-n", "-I", "-L", "-P", "-s", "-d", "-E"]);
+    } else if (a === "timeout") {
+      t = t.slice(1);
+      skipOptions(["-s", "-k"]);
+      t = t.slice(1);
     } else if (a === "pnpm" && (b === "exec" || b === "dlx")) {
       t = t.slice(2);
-      while (t[0]?.startsWith("-")) t = t.slice(1);
+      skipOptions();
     } else return t;
   }
 }
@@ -168,7 +183,8 @@ function gitSub(t) {
 function pushRule(args) {
   let tag = false;
   for (const a of args) {
-    if (a === "--force" || a.startsWith("--force-") || a.startsWith("--force=")) return "force";
+    if (a === "--mirror" || a === "--force" || a.startsWith("--force-") || a.startsWith("--force="))
+      return "force";
     if (/^-[A-Za-z]*f[A-Za-z]*$/.test(a)) return "force";
     if (a.startsWith("+")) return "force";
     if (a === "--tags" || a === "--follow-tags") tag = true;
