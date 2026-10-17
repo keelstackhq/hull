@@ -8,9 +8,9 @@ target = "apps/{{ name }}"
 name = { prompt = "worker name", default = "api", pattern = "^[a-z][a-z0-9-]*$" }
 
 [files]
-owned = ["tsconfig.json", "CLAUDE.md", "src/hull/**"]
+owned = ["tsconfig.json", "AGENTS.md", "src/hull/**"]
 shared = ["package.json", "wrangler.jsonc"]
-seed = ["src/index.ts", "src/index.test.ts"]
+seed = ["src/index.ts", "src/index.test.ts", "CLAUDE.md"]
 
 [merge]
 "package.json" = "json"

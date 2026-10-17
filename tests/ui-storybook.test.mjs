@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -29,7 +29,8 @@ test("renders at packages/ui with classes", async () => {
   assert.equal(cls["packages/ui/src/button.test.tsx"], "seed");
   assert.equal(cls["packages/ui/src/index.ts"], "seed");
   assert.equal(cls["packages/ui/tsconfig.json"], "owned");
-  assert.equal(cls["packages/ui/CLAUDE.md"], "owned");
+  assert.equal(cls["packages/ui/AGENTS.md"], "owned");
+  assert.equal(cls["packages/ui/CLAUDE.md"], "seed");
 });
 
 test("main.ts names the Preact framework", async () => {
@@ -85,4 +86,9 @@ test("root AGENTS.md mentions packages/ui; AGENTS + CLAUDE stay ≤ 80 lines", a
   assert.match(text, /`packages\/ui\/AGENTS\.md`/);
   assert.ok(lineCount(text) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
   assert.ok(!/ui-storybook/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")));
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(["base", "ui-storybook"], "packages/ui");
+  assert.match(agents, /^# /);
 });

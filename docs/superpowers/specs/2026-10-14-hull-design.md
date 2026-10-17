@@ -86,9 +86,9 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
 
 | Class | What | Examples |
 |---|---|---|
-| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `CLAUDE.md`, `renovate.json` |
+| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `AGENTS.md`, `renovate.json` |
 | `shared` | files both sides edit | root and package `package.json` (json), `turbo.json` (json), `pnpm-workspace.yaml` (yaml), crate `Cargo.toml` (toml), `tauri.conf.json` (json), `wrangler.jsonc` (text: has comments), `docs/packs.json` (json) |
-| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, `docs/agents/project.md`, stories, tests |
+| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, `docs/agents/project.md`, `<target>/CLAUDE.md`, stories, tests |
 
 The AI layer is owned. Project-specific notes for agents go in the seed file
 `docs/agents/project.md`, which `CLAUDE.md` imports. Personal settings go in
@@ -110,7 +110,8 @@ The items below are the gaps as hull first found them.
    Proposed future contract addition: `or`.
 3. **Instance names are not in `pieces`.** Root files never list instances by name; they use globs
    (`apps/*`, `crates/*`) and turbo `--affected`. Per-instance agent notes live in
-   `<target>/CLAUDE.md`, which Claude Code loads on demand when it works in that directory.
+   `<target>/AGENTS.md` [owned], with a seed `<target>/CLAUDE.md` of `@AGENTS.md` that Claude Code loads
+   on demand when it works in that directory; local notes go in the seed `CLAUDE.md` below the import.
 4. **Lines holding only a block tag.** Settled: final newline kept, no trim/lstrip (§9.4). Such
    lines therefore leave an empty line in both engines; dogfood runs `vp fmt --check` on generated
    files, so a stray blank line that matters is caught.
@@ -225,7 +226,7 @@ present, so turbo sees the ui → app edge; dev: `@preact/preset-vite`, `vite-pl
 `wrangler`. `vite.config.ts` [owned] with `@preact/preset-vite`; `tsconfig.json` [owned] extends
 `../../tsconfig.base.json`; `wrangler.jsonc` [shared, text]: static assets from `./dist`,
 `not_found_handling: "single-page-application"`, `observability.enabled: true`;
-`index.html`, `src/main.tsx`, `src/app.tsx`, `src/app.test.tsx` [seed]; `CLAUDE.md` [owned].
+`index.html`, `src/main.tsx`, `src/app.tsx`, `src/app.test.tsx` [seed]; `AGENTS.md` [owned] and `CLAUDE.md` [seed] (`@AGENTS.md`).
 
 cascivo (decided 2026-10-14): the app uses the prebuilt components `@cascivo/react` 1.9.0 and
 `@cascivo/themes` 1.0.3 through `preact/compat`, following cascivo's "Using cascivo with Preact"
@@ -257,7 +258,7 @@ Astro 7 static site with `@astrojs/preact`. Scripts: `dev` `astro dev`, `build` 
 `@astrojs/compiler-rs`, so it stays off in v1), `typecheck` `tsc --noEmit` (`astro check` needs the
 TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test run`
 (the same in every piece), `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
-`wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `CLAUDE.md` [owned].
+`wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `AGENTS.md` [owned] and `CLAUDE.md` [seed] (`@AGENTS.md`).
 Astro runs through package scripts (`vp run` would add a second cache; not used).
 
 ### 6.5 `hono-worker`
@@ -310,7 +311,7 @@ cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `cargo generate-lockfile` on `new` and `cargo update --workspace` on `add` (adds the new member
 without bumping locked crates); dogfood runs the same command, because the dev renderer
 does not run `[[post]]`.
-`CLAUDE.md` [owned].
+`AGENTS.md` [owned] (≤ 20 lines; points a distributed CLI to `rust-cli`) and `CLAUDE.md` [seed] (`@AGENTS.md`).
 
 ### 6.7 `tauri-app`
 

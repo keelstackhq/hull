@@ -9,9 +9,9 @@ name = { prompt = "desktop app name", default = "desktop", pattern = "^[a-z][a-z
 frontend = { prompt = "preact-app instance to wrap", default = "web", pattern = "^[a-z][a-z0-9-]*$" }
 
 [files]
-owned = ["src-tauri/build.rs", "src-tauri/icons/**", "src-tauri/.gitignore", "CLAUDE.md"]
+owned = ["src-tauri/build.rs", "src-tauri/icons/**", "src-tauri/.gitignore", "AGENTS.md"]
 shared = ["package.json", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"]
-seed = ["src-tauri/src/**", "src-tauri/capabilities/**"]
+seed = ["src-tauri/src/**", "src-tauri/capabilities/**", "CLAUDE.md"]
 
 [merge]
 "package.json" = "json"

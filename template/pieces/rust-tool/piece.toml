@@ -8,9 +8,9 @@ target = "crates/{{ name }}"
 name = { prompt = "crate name", default = "tool", pattern = "^[a-z][a-z0-9-]*$" }
 
 [files]
-owned = ["turbo.json", "CLAUDE.md"]
+owned = ["turbo.json", "AGENTS.md"]
 shared = ["Cargo.toml", "package.json"]
-seed = ["src/main.rs"]
+seed = ["src/main.rs", "CLAUDE.md"]
 
 [merge]
 "Cargo.toml" = "toml"

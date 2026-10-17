@@ -4,9 +4,9 @@ requires = ["base"]
 target = "packages/ui"
 
 [files]
-owned = ["vite.config.ts", "tsconfig.json", ".storybook/main.ts", "CLAUDE.md"]
+owned = ["vite.config.ts", "tsconfig.json", ".storybook/main.ts", "AGENTS.md"]
 shared = ["package.json"]
-seed = ["src/**", ".storybook/preview.ts"]
+seed = ["src/**", ".storybook/preview.ts", "CLAUDE.md"]
 
 [merge]
 "package.json" = "json"

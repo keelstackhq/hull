@@ -22,7 +22,7 @@ Files (owned):
 
 - `astro.config.mjs`
 - `tsconfig.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -32,6 +32,7 @@ Files (shared):
 Files (seed):
 
 - `src/**`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -126,7 +127,7 @@ Variables:
 Files (owned):
 
 - `tsconfig.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 - `src/hull/**`
 
 Files (shared):
@@ -138,6 +139,7 @@ Files (seed):
 
 - `src/index.ts`
 - `src/index.test.ts`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -160,7 +162,7 @@ Files (owned):
 
 - `vite.config.ts`
 - `tsconfig.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -171,6 +173,7 @@ Files (seed):
 
 - `src/**`
 - `index.html`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -192,7 +195,7 @@ Variables:
 Files (owned):
 
 - `turbo.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -202,6 +205,7 @@ Files (shared):
 Files (seed):
 
 - `src/main.rs`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -226,7 +230,7 @@ Files (owned):
 - `src-tauri/build.rs`
 - `src-tauri/icons/**`
 - `src-tauri/.gitignore`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -238,6 +242,7 @@ Files (seed):
 
 - `src-tauri/src/**`
 - `src-tauri/capabilities/**`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -262,7 +267,7 @@ Files (owned):
 - `vite.config.ts`
 - `tsconfig.json`
 - `.storybook/main.ts`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -272,6 +277,7 @@ Files (seed):
 
 - `src/**`
 - `.storybook/preview.ts`
+- `CLAUDE.md`
 
 Merge strategies:
 

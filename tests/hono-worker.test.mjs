@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -24,7 +24,8 @@ test("renders at apps/<name> with classes", async () => {
   assert.equal(cls["apps/edge/package.json"], "shared");
   assert.equal(cls["apps/edge/wrangler.jsonc"], "shared");
   assert.equal(cls["apps/edge/tsconfig.json"], "owned");
-  assert.equal(cls["apps/edge/CLAUDE.md"], "owned");
+  assert.equal(cls["apps/edge/AGENTS.md"], "owned");
+  assert.equal(cls["apps/edge/CLAUDE.md"], "seed");
   assert.equal(cls["apps/edge/src/hull/logging.ts"], "owned");
   assert.equal(cls["apps/edge/src/hull/sentry.ts"], "owned");
   assert.equal(cls["apps/edge/src/hull/logging.test.ts"], "owned");
@@ -107,6 +108,11 @@ test("logging never logs err.message; sentry scrubs events and caches the import
   for (const k of ["query_string", "headers", "cookies", "data"])
     assert.match(sentry, new RegExp(`delete r\\.${k}`));
   assert.match(sentry, /wrapped \?\?= import\("@sentry\/cloudflare"\)/);
-  const doc = await read(dir, "apps/api/CLAUDE.md");
+  const doc = await read(dir, "apps/api/AGENTS.md");
   assert.match(doc, /about 1\.2 MB/);
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(["base", "hono-worker:api"], "apps/api");
+  assert.match(agents, /^# /);
 });

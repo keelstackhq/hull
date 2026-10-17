@@ -6,7 +6,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
-import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 import { assertSameBranches } from "./invariants.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -57,7 +57,8 @@ test("crate classes", async () => {
   assert.equal(cls["crates/tool/Cargo.toml"], "shared");
   assert.equal(cls["crates/tool/package.json"], "shared");
   assert.equal(cls["crates/tool/turbo.json"], "owned");
-  assert.equal(cls["crates/tool/CLAUDE.md"], "owned");
+  assert.equal(cls["crates/tool/AGENTS.md"], "owned");
+  assert.equal(cls["crates/tool/CLAUDE.md"], "seed");
   assert.equal(cls["crates/tool/src/main.rs"], "seed");
 });
 
@@ -200,4 +201,10 @@ test("root Cargo files are turbo globalDependencies only with a Rust piece", asy
   const plain = JSON.parse(await read((await renderCombo(["base"])).dir, "turbo.json"));
   for (const f of root) assert.ok(!plain.globalDependencies.includes(f), f);
   assert.ok(plain.globalDependencies.includes("vite.config.ts"));
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(["base", "rust-tool:tool"], "crates/tool");
+  assert.match(agents, /rust-cli/);
+  assert.match(agents, /^# /);
 });

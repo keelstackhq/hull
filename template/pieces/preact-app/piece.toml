@@ -8,9 +8,9 @@ target = "apps/{{ name }}"
 name = { prompt = "app name", default = "web", pattern = "^[a-z][a-z0-9-]*$" }
 
 [files]
-owned = ["vite.config.ts", "tsconfig.json", "CLAUDE.md"]
+owned = ["vite.config.ts", "tsconfig.json", "AGENTS.md"]
 shared = ["package.json", "wrangler.jsonc"]
-seed = ["src/**", "index.html"]
+seed = ["src/**", "index.html", "CLAUDE.md"]
 
 [merge]
 "package.json" = "json"

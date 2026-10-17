@@ -7,7 +7,7 @@ import YAML from "yaml";
 import { affectedCombos } from "../scripts/affected-combos.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -147,7 +147,7 @@ test("base AGENTS.md lists tauri-app; AGENTS + CLAUDE stay within 80 lines", asy
   assert.match(t, /\(tauri-app\)/);
   assert.match(t, /`apps\/<name>\/AGENTS\.md`/);
   assert.ok(lineCount(t) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
-  const doc = await read(dir, "apps/desktop/CLAUDE.md");
+  const doc = await read(dir, "apps/desktop/AGENTS.md");
   assert.match(doc, /webkit2gtk/);
   assert.match(doc, /bundle\.targets/);
 });
@@ -190,4 +190,12 @@ test("renovate tauri group covers the npm and cargo packages", async () => {
   for (const n of ["@tauri-apps/**", "tauri", "tauri-build"])
     assert.ok(rule.matchPackageNames.includes(n), n);
   assert.deepEqual(rule.matchManagers, ["npm", "cargo"]);
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(
+    ["base", "preact-app:web", "tauri-app:desktop"],
+    "apps/desktop",
+  );
+  assert.match(agents, /^# /);
 });

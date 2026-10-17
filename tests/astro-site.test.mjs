@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -25,7 +25,8 @@ test("renders at apps/<name> with classes", async () => {
   assert.equal(cls["apps/docs-site/wrangler.jsonc"], "shared");
   assert.equal(cls["apps/docs-site/astro.config.mjs"], "owned");
   assert.equal(cls["apps/docs-site/tsconfig.json"], "owned");
-  assert.equal(cls["apps/docs-site/CLAUDE.md"], "owned");
+  assert.equal(cls["apps/docs-site/AGENTS.md"], "owned");
+  assert.equal(cls["apps/docs-site/CLAUDE.md"], "seed");
   assert.equal(cls["apps/docs-site/src/pages/index.astro"], "seed");
   assert.equal(cls["apps/docs-site/src/components/hello.tsx"], "seed");
   assert.equal(cls["apps/docs-site/src/components/hello.test.tsx"], "seed");
@@ -65,9 +66,9 @@ test("astro.config.mjs uses the Preact integration and static output", async () 
   assert.match(text, /output: "static"/);
 });
 
-test("piece CLAUDE.md documents the .astro tooling limits", async () => {
+test("piece AGENTS.md documents the .astro tooling limits", async () => {
   const { dir } = await renderCombo(["base", "astro-site:site"]);
-  const text = await read(dir, "apps/site/CLAUDE.md");
+  const text = await read(dir, "apps/site/AGENTS.md");
   assert.match(text, /oxlint does not lint `\.astro`/);
   assert.match(text, /oxfmt `\.astro` support is experimental/);
 });
@@ -79,4 +80,9 @@ test("root AGENTS.md mentions astro-site; AGENTS + CLAUDE stay ≤ 80 lines", as
   assert.match(text, /`apps\/<name>\/AGENTS\.md`/);
   assert.ok(lineCount(text) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
   assert.ok(!/astro-site/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")));
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(["base", "astro-site:site"], "apps/site");
+  assert.match(agents, /^# /);
 });
