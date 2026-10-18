@@ -8,9 +8,9 @@ target = "apps/{{ name }}"
 name = { prompt = "site name", default = "site", pattern = "^[a-z][a-z0-9-]*$" }
 
 [files]
-owned = ["astro.config.mjs", "tsconfig.json", "CLAUDE.md"]
+owned = ["astro.config.mjs", "tsconfig.json", "AGENTS.md"]
 shared = ["package.json", "wrangler.jsonc"]
-seed = ["src/**"]
+seed = ["src/**", "CLAUDE.md"]
 
 [merge]
 "package.json" = "json"

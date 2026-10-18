@@ -1,6 +1,6 @@
 # hull — design
 
-Date: 2026-10-14 · Status: approved for build · Org `keelstackhq`, repo `keelstackhq/hull`
+Date: 2026-10-14 · Status: approved for build · amended by `2026-10-17-hull-agent-layer-and-skeletons-design.md` (agent layer v2, skeleton pieces) · Org `keelstackhq`, repo `keelstackhq/hull`
 
 hull is an opinionated, AI-native monorepo template. It owns structure, stack, tool versions and
 config, never app logic. Consumers render it with `splice` (`keelstackhq/splice`, Rust) from
@@ -15,7 +15,7 @@ Goals:
 1. Bootstrap a repo by choosing pieces: `splice new gh:keelstackhq/hull//template my-repo`.
 2. Keep generated repos current: owned files are replaced, shared files merged, seed files never touched.
 3. CI in seconds: ≤ 45 s for a typical PR, ≤ 15 s for a docs-only PR, on GitHub's own runners.
-4. AI-native for Claude Code first: lean CLAUDE.md, subagents with fixed models, skills, loops, hooks.
+4. AI-native for Claude Code first: canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, subagents with fixed models, skills, loops, hooks; hooks enforce the hard rules.
 5. hull's own CI is fast and dogfoods the template by rendering piece combinations and running their checks.
 
 Non-goals (v1): app logic, a hosted service, custom runners (documented only, §8.5), Playwright or
@@ -86,9 +86,9 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
 
 | Class | What | Examples |
 |---|---|---|
-| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `CLAUDE.md`, `renovate.json` |
+| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `AGENTS.md`, `renovate.json` |
 | `shared` | files both sides edit | root and package `package.json` (json), `turbo.json` (json), `pnpm-workspace.yaml` (yaml), crate `Cargo.toml` (toml), `tauri.conf.json` (json), `wrangler.jsonc` (text: has comments), `docs/packs.json` (json) |
-| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, `docs/agents/project.md`, stories, tests |
+| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, `docs/agents/project.md`, `<target>/CLAUDE.md`, stories, tests |
 
 The AI layer is owned. Project-specific notes for agents go in the seed file
 `docs/agents/project.md`, which `CLAUDE.md` imports. Personal settings go in
@@ -110,7 +110,8 @@ The items below are the gaps as hull first found them.
    Proposed future contract addition: `or`.
 3. **Instance names are not in `pieces`.** Root files never list instances by name; they use globs
    (`apps/*`, `crates/*`) and turbo `--affected`. Per-instance agent notes live in
-   `<target>/CLAUDE.md`, which Claude Code loads on demand when it works in that directory.
+   `<target>/AGENTS.md` [owned], with a seed `<target>/CLAUDE.md` of `@AGENTS.md` that Claude Code loads
+   on demand when it works in that directory; local notes go in the seed `CLAUDE.md` below the import.
 4. **Lines holding only a block tag.** Settled: final newline kept, no trim/lstrip (§9.4). Such
    lines therefore leave an empty line in both engines; dogfood runs `vp fmt --check` on generated
    files, so a stray blank line that matters is caught.
@@ -137,7 +138,8 @@ scope = { prompt = "npm scope without @", default = "acme", pattern = "^[a-z0-9-
 ```
 
 Piece variables: `name` for every multiple piece (pattern `^[a-z][a-z0-9-]*$`), plus `frontend`
-for `tauri-app` (§6.7). No other variables in v1; Cloudflare account, Sentry DSN and Axiom are
+for `tauri-app` (§6.7), `crate` for `npm-cli` (§6.11, the rust-cli instance it ships) and the optional
+`repository` for `ts-lib` (§6.12). No other variables in v1; Cloudflare account, Sentry DSN and Axiom are
 repo secrets or wrangler vars, not template vars.
 
 ## 6. Pieces
@@ -150,7 +152,10 @@ repo secrets or wrangler vars, not template vars.
 | `astro-site` | yes | `apps/{{ name }}` | base | `site` |
 | `hono-worker` | yes | `apps/{{ name }}` | base | `api` |
 | `rust-tool` | yes | `crates/{{ name }}` | base | `tool` |
+| `rust-cli` | yes | `crates/{{ name }}` | base | `cli` |
 | `tauri-app` | yes | `apps/{{ name }}` | base, preact-app | `desktop` |
+| `ts-lib` | yes | `packages/{{ name }}` | base | `lib` |
+| `npm-cli` | yes | `packages/{{ name }}` | base | `cli` |
 | `docs` | no | — (root) | base | — |
 
 Every JS package has the scripts the CI runs: `lint`, `format:check`, `typecheck`, `test`, `build`
@@ -165,6 +170,10 @@ Root files (class in brackets):
   `check` = `turbo run lint format:check typecheck test`, `build`, `test`, `lint`, `format` (`vp fmt`),
   `format:check`, `typecheck`; devDependencies `turbo`, `vite-plus`, `typescript` (all `catalog:`),
   plus `docspack` when `"docs" in pieces`.
+  Also script `agents:index` = `node scripts/agents-index.mjs`; root `format:check` and the
+  `//#format:check` inputs cover `scripts` (the owned `scripts/agents-index.mjs`, and `docs-packs.mjs`
+  with `docs`). `piece.toml` lists `scripts/agents-index.mjs` as owned and has a second `[[post]]`,
+  `node scripts/agents-index.mjs`, `when = ["new", "add", "update"]`, after the install post.
 - `pnpm-workspace.yaml` [shared, yaml]: `packages: [apps/*, packages/*, crates/*]`; `catalog:`
   with every version in §7 (unused entries are harmless, so the file does not depend on pieces);
   `overrides: { vite: "npm:@voidzero-dev/vite-plus-core@<vite-plus version>" }`;
@@ -178,8 +187,9 @@ Root files (class in brackets):
   for vitest/preset-vite/Storybook peers (`check-single-vite` still guards against a real second
   vite). Checked against pnpm 12.11.2 on 2026-10-14/15.
 - `turbo.json.jinja` [shared, json]: `globalDependencies` = root `vite.config.ts`, `tsconfig.base.json`, plus
-  `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` when rust-tool is present (otherwise turbo maps
-  root Cargo changes only to `//` and `--affected` would skip the crates); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
+  `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` when rust-tool or rust-cli is present (otherwise turbo maps
+  root Cargo changes only to `//` and `--affected` would skip the crates; the template keeps today's one-line layout without Rust and
+  the multi-line block with it, via a marked `rust-cli`/`rust-tool` chain plus an unmarked chain whose `else` is the one-line form); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
   `deploy:preview` and `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv` §8.2), `storybook:build` (outputs `storybook-static/**`),
   `build:desktop` (no cache). No `vp run` cache anywhere (Turbo caches, §7.1).
@@ -193,21 +203,30 @@ Root files (class in brackets):
   files hold only `pack`/`test` options. Root `vite.config.ts` and `tsconfig.base.json` are turbo
   `globalDependencies`, and a root `//#format:check` task checks root files (checked 2026-10-14).
 - `.node-version` [owned] `24`; `.gitignore` [owned] (node_modules, dist, .turbo, .astro,
-  .wrangler, target, storybook-static, `.claude/settings.local.json`, `.docspack`);
+  .wrangler, target, storybook-static, `.claude/settings.local.json`, `.env*` with
+  `!.env.example`, `.dev.vars`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
 - `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
-  `desktop.yml.jinja` [owned] (§8.3). The contract subset cannot emit GitHub's `${{ … }}` from a
+  `desktop.yml.jinja` [owned] (§8.3), `release.yml` [owned] with
+  `.github/scripts/release-plan.mjs` [owned] (§8.7; plain files, rendered in every repo, idle
+  without a rust-cli or ts-lib package). The contract subset cannot emit GitHub's `${{ … }}` from a
   `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
   piece conditions; see §4.3 item 8.
-- `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-tool or tauri-app:
-  `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-tool, `"apps/*/src-tauri"` only
-  with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
-  `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition, `stable`
-  with `clippy`, `rustfmt`.
+- `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-cli, rust-tool or tauri-app:
+  `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-cli or rust-tool, via a nested marked chain;
+  `"apps/*/src-tauri"` only with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
+  `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition: `channel = "1.99.1"` with
+  `clippy`, `rustfmt` when rust-cli is present (the crate's `rust-version` is the same number), otherwise `stable`
+  (`clippy` + `rustfmt` with rust-tool, `rustfmt` for tauri-app alone).
+  `.github/scripts/rust-affected.mjs.jinja` is a marked chain `rust-cli` / `rust-tool` with the body
+  duplicated per branch (the subset has no `or`), so it renders for either piece.
 - `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
   base-only repo runs every CI task.
-- `README.md.jinja` [seed], `docs/agents/project.md` [seed].
+- `README.md.jinja` [seed], `docs/agents/project.md.jinja` [seed]: with npm-cli or ts-lib (a
+  marked `npm-cli`/`ts-lib` chain) it adds a `## Blocked` section with the human release steps of
+  §8.7. A seed renders only on `new`, so the owned npm-cli and ts-lib `AGENTS.md` files carry the
+  same steps for a later `splice add`.
 - AI layer, §6.9.
 
 ### 6.2 `preact-app`
@@ -220,7 +239,7 @@ present, so turbo sees the ui → app edge; dev: `@preact/preset-vite`, `vite-pl
 `wrangler`. `vite.config.ts` [owned] with `@preact/preset-vite`; `tsconfig.json` [owned] extends
 `../../tsconfig.base.json`; `wrangler.jsonc` [shared, text]: static assets from `./dist`,
 `not_found_handling: "single-page-application"`, `observability.enabled: true`;
-`index.html`, `src/main.tsx`, `src/app.tsx`, `src/app.test.tsx` [seed]; `CLAUDE.md` [owned].
+`index.html`, `src/main.tsx`, `src/app.tsx`, `src/app.test.tsx` [seed]; `AGENTS.md` [owned] and `CLAUDE.md` [seed] (`@AGENTS.md`).
 
 cascivo (decided 2026-10-14): the app uses the prebuilt components `@cascivo/react` 1.9.0 and
 `@cascivo/themes` 1.0.3 through `preact/compat`, following cascivo's "Using cascivo with Preact"
@@ -252,7 +271,7 @@ Astro 7 static site with `@astrojs/preact`. Scripts: `dev` `astro dev`, `build` 
 `@astrojs/compiler-rs`, so it stays off in v1), `typecheck` `tsc --noEmit` (`astro check` needs the
 TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test run`
 (the same in every piece), `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
-`wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `CLAUDE.md` [owned].
+`wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `AGENTS.md` [owned] and `CLAUDE.md` [seed] (`@AGENTS.md`).
 Astro runs through package scripts (`vp run` would add a second cache; not used).
 
 ### 6.5 `hono-worker`
@@ -305,7 +324,7 @@ cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `cargo generate-lockfile` on `new` and `cargo update --workspace` on `add` (adds the new member
 without bumping locked crates); dogfood runs the same command, because the dev renderer
 does not run `[[post]]`.
-`CLAUDE.md` [owned].
+`AGENTS.md` [owned] (≤ 20 lines; points a distributed CLI to `rust-cli`, §6.10) and `CLAUDE.md` [seed] (`@AGENTS.md`).
 
 ### 6.7 `tauri-app`
 
@@ -362,19 +381,26 @@ files.
 
 ### 6.9 AI layer (owned, in `base`)
 
-- `CLAUDE.md.jinja` ≤ 80 rendered lines for every combo: what the repo is, commands (`pnpm check`,
-  `pnpm run ci`; `pnpm ci` is pnpm's built-in clean install), rules (test first, verify before claiming, small files), the subagent routing table,
-  a `## Pieces` section (rendered only when a piece is present, via a `same-branches` chain) with one
-  bullet per present piece kind (`{% if "hono-worker" in pieces %}`), `@docs/agents/project.md`,
-  and `@docs/agents/docs.md` when docs is present. Per-instance notes are `<target>/CLAUDE.md`
-  (loaded on demand; §4.3.3). `AGENTS.md`: one line pointing to `CLAUDE.md`.
+- `AGENTS.md.jinja` (canonical, ≤ 60 rendered lines) and `CLAUDE.md.jinja` (thin, ≤ 20 lines),
+  together ≤ 80 for every combo (`lineCount`, like `wc -l`). `AGENTS.md`: what the repo is,
+  commands (`pnpm install`, `check`, `run ci`, `format`, `agents:index`; `pnpm ci` is pnpm's
+  built-in clean install), rules (test first, verify before claiming, small files, catalog pins,
+  never read `.env*`/`.dev.vars`, releases are tag pushes by a human, at most 2-3 parallel
+  agents, a hook `ask` becomes a denial in `-p`/unattended runs), a `## Pieces` section
+  (rendered only when a piece is present, via a `same-branches` chain) with one bullet per present
+  piece kind pointing to `<dir>/AGENTS.md`, and `## Where to look` (plain pointers to
+  `docs/agents/project.md`, `docs/agents/index.md`, `docs/agents/docs.md` with docs). It has no
+  `@` import lines. `CLAUDE.md`: lines 1-3 are `@AGENTS.md`, `@docs/agents/project.md`,
+  `@docs/agents/index.md`, line 4 `@docs/agents/docs.md` only with docs, then `## Claude Code`
+  (subagent list, skills, hooks). Per-instance notes are `<target>/AGENTS.md` (loaded on demand;
+  §4.3.3) with a seed `<target>/CLAUDE.md` of `@AGENTS.md`.
 - `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`):
 
 | Agent | Model | Tools | Use |
 |---|---|---|---|
-| `explorer` | haiku | Read, Grep, Glob | "Use proactively" for search and reading; returns paths and ≤ 15-line summaries |
+| `Explore` | haiku | Read, Grep, Glob | "Use proactively" for search and reading; returns paths and ≤ 15-line summaries |
 | `implementer` | sonnet | Read, Edit, Write, Bash, Grep, Glob | one task, test first, runs `verify` |
-| `reviewer` | opus | Read, Grep, Glob, Bash | read-only review against task and CLAUDE.md; never edits |
+| `reviewer` | opus | Read, Grep, Glob, Bash | read-only review against task and AGENTS.md; never edits |
 | `ci-fixer` | sonnet | Read, Edit, Write, Bash, Grep, Glob | reads `gh run view --log-failed`, reproduces, fixes |
 
   Claude Code has no complexity-based routing; fixed models per agent are the convention, and
@@ -382,9 +408,12 @@ files.
 - `.claude/skills/verify/SKILL.md`: run `pnpm turbo run lint format:check typecheck test --affected
   --output-logs=errors-only`, report ≤ 10 lines (pass/fail per task, first error per failure).
 - `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstackhq/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
-  read the JSON `changes`, run `[[post]]`-equivalent install, then `verify`.
+  read the JSON `changes`, run `[[post]]`-equivalent install, run `pnpm agents:index`, then `verify`.
 - `.claude/skills/docs-lookup/SKILL.md` (only with docs): `pnpm exec docspack ask "<q>" --json`
   before any web search; web search only on exit 3/4.
+- `docs/agents/index.md`: generated by `scripts/agents-index.mjs` (`pnpm agents:index`, `--check`
+  for CI); never in the template. Commands, packages and docs rows in `text` fences, at most 8192
+  bytes; agent-layer spec §3.5.
 - `.claude/loop.md`: default `/loop` prompt — run `verify`; fix the first failure; repeat until
   green; then stop and summarise in ≤ 5 lines.
 - `.claude/hooks/session-start.sh`: `pnpm install --prefer-offline` (quiet), then
@@ -392,6 +421,11 @@ files.
   `.claude/hooks/session-start.d/*.sh` (repo-local, not owned by the template; a failing one is
   reported and ignored), so a repo can add session-start work without editing owned files. Exits 0
   on any failure (never blocks a session), prints one status line plus whatever local hooks print.
+- `.claude/hooks/guard.mjs` (PreToolUse, Node built-ins only): denies publish commands, force and
+  tag pushes (also behind `git -C . push`), deleting `main`/`master` on the remote, reads of `.env*`/`.dev.vars` (not `.env.example`) and
+  any write to `.splice/lock.toml`; asks the human before Edit/Write/MultiEdit/NotebookEdit on a
+  file the lock lists as `owned`. A tokenizer, not a shell; any internal error allows the call.
+  Rules and known gaps: agent-layer spec §3.4.
 - `.claude/hooks/stop-checks.sh` (opt-in): does nothing unless `HULL_STOP_CHECKS=1`; then runs
   `pnpm turbo run lint typecheck test --affected` and on failure exits 2 with the first error on
   stderr, which blocks stopping. Enable by setting the env var in `.claude/settings.local.json`.
@@ -404,7 +438,10 @@ files.
   read and commit commands, `gh run view`, `docspack`; `deny` force-push (`--force*`, `-f`, `+ref`
   anywhere after `git push`), `pnpm|npm|cargo publish` and reading `.env*` (deny rules match only
   commands starting with the literal program, so `git -C . push -f` is not caught; push is not
-  allowed, so it still prompts); hook entries carry `timeout: 120` (seconds);
+  allowed, so it still prompts); these deny rules are the second layer behind the guard hook
+  below; hook entries carry `timeout: 120` (seconds, 10 for the guard);
+  `hooks.PreToolUse` matcher `Bash|Read|Grep|Glob|Edit|Write|MultiEdit|NotebookEdit` →
+  `node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs"`;
   `hooks.SessionStart` matcher `startup|resume` → `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"`;
   `hooks.Stop` → stop-checks; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
   (`superpowers@superpowers-marketplace`, repo `obra/superpowers-marketplace`) and caveman
@@ -413,6 +450,87 @@ files.
   `<plugin>@<marketplace-key>`; repo-level `extraKnownMarketplaces` apply only after the user
   accepts the workspace trust dialog. The marketplace names inside those repos' manifests were not
   checked.
+
+### 6.10 `rust-cli`
+
+`crates/<name>` (default `cli`): a production Rust CLI skeleton (agent-layer spec §4.1). The private workspace
+package is `@<scope>/<name>-crate` (the published npm name belongs to `npm-cli`) with
+`hull.release = "rust-cli"`; the binary and the crate are named `<name>`, version `0.0.0`.
+`Cargo.toml.jinja` [shared, toml]: edition 2024, `rust-version = "1.99.1"` (equals the toolchain
+pin), `[[bin]]`, `[lints] workspace = true`, every dependency pinned `=x.y.z` (§7). Scripts, all with
+`-p <name>`, `--locked` where cargo reads the lockfile: `build` `cargo build -p <name> --locked` (a debug
+build: release binaries are built only by the release workflow), `lint` `cargo clippy -p <name>
+--all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans
+licenses sources`, `format:check`, `typecheck` `cargo check -p <name> --all-targets --locked`, `test`
+`cargo nextest run -p <name> --locked`. `turbo.json` [owned] extends `//`; every task's inputs name
+`src/**`, `Cargo.toml` and the three root files with `$TURBO_ROOT$` (`Cargo.toml`, `Cargo.lock`,
+`rust-toolchain.toml`), lint/typecheck/test/format also `tests/**`, lint also `deny.toml`; build outputs
+`$TURBO_ROOT$/target/debug/<name>`. `deny.toml` [owned]: bans `openssl`, `openssl-sys`, `native-tls`;
+license allow-list (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-3.0, Zlib),
+`private.ignore` (the seed has no license), `unused-allowed-license = "allow"` (the list is policy, not a
+usage report), crates.io only; `[advisories]` is configured but only `release.yml` checks it, so a new
+advisory never fails an unrelated PR. No Rust file contains the instance name.
+
+Sources are `seed`. The crate is binary-only: `src/main.rs` (parse, log init, dispatch, exit code),
+`src/run.rs` (`pub fn run(cli: Cli) -> Result<Report, Error>`), `cli.rs` (clap derive; global `--json`,
+`-C DIR`, `-v`, `-q`; `hello [--name N]`, `completions <shell>`, `man`), `exit.rs` (0 ok, 1 negative
+result, 2 usage, 3 config/environment/runtime), `error.rs` (thiserror), `output.rs` (the only writer of
+stdout: `--json` prints exactly one object and a newline, also for clap errors when `--json` is in argv),
+`log.rs` (tracing to stderr; `RUST_LOG`, else `-q`/`-v`). A `src/lib.rs` is not possible in a seed,
+because a plain file cannot name `my_cli` after an instance (agent-layer spec §4.1, amended).
+`tests/common/mod.rs` [seed, plain] builds the command with `assert_cmd::cargo::cargo_bin_cmd!()` (the
+package name is the binary name), `env_clear()` and only `PATH`, a temp `HOME`/`XDG_*` and `NO_COLOR=1`; no
+test sets process env (`set_var` is unsafe in edition 2024 and the workspace forbids unsafe), a test
+asserts on `get_envs()` of the built command instead. `tests/cli.rs` [seed] has inline insta snapshots
+(`--help` after `String::replace(env!("CARGO_PKG_NAME"), "[BIN]")`, since insta's `filters` feature would
+add `regex`; `hello --json`) and assertions for the JSON/exit/stderr contract, `RUST_LOG=trace`,
+`completions`, `man`. `AGENTS.md` [owned] (≤ 20 lines) states the contract; `CLAUDE.md` [seed]
+(`@AGENTS.md`). `[[post]]`: `cargo generate-lockfile` on `new`, `cargo update --workspace` on `add`.
+
+Verification of the cargo-deny invocation and the `$TURBO_ROOT$` inputs is recorded in §13.
+
+### 6.11 `npm-cli`
+
+`packages/<name>` (default `cli`, var `crate` default `cli`, both `^[a-z][a-z0-9-]*$`): the npm side
+of a `rust-cli` binary, package `@<scope>/<name>` with `hull.release = "npm-cli"`. `crate` names the
+rust-cli instance it ships; it is checked as a pattern only, so `requires` stays `["base"]` and the
+generated AGENTS.md, README.md and the version-sync test say "needs a rust-cli instance named
+`<crate>`" (a stricter `requires` is a follow-up decision). `package.json` [shared] has
+`bin: { "<crate>": "bin/launcher.js" }`, `files: ["bin"]`, provenance, a devDependency
+`@<scope>/<crate>-crate: workspace:*` (so `--affected` runs this package's tests after a crate change),
+and the scripts `lint`, `format:check`, `typecheck`, `test` only; it never carries `optionalDependencies`,
+`repository`, `postinstall` or `preinstall` (written by `scripts/stage.mjs` at release time).
+`turbo.json` [owned] sets `typecheck.dependsOn` and `test.dependsOn` to `[]`, so a launcher-only PR never
+builds the crate. `bin/launcher.js` (plain JS, `// @ts-check`) resolves `<name>-<platform>-<arch>` with
+`createRequire(import.meta.url)`, runs `bin/<crate>[.exe]` with inherited stdio, forwards the exit code,
+re-raises the child's signal; `<BIN>_BINARY` (`bin.toUpperCase().replaceAll("-", "_")`, so `my-cli`
+gives `MY_CLI_BINARY`) overrides the path; a missing platform package prints one stderr line with the
+platform and the build-from-source command, exit 3 (`cargo install --locked --git <repository.url> <crate>` when the launcher's `package.json` has `repository.url`, which `stage.mjs` writes; else `cargo install --locked --path crates/<crate>`; never plain `cargo install <crate>`, since the crate has `publish = false` and the name belongs to an unrelated crates.io crate). `scripts/stage.mjs` exports `TARGETS` (the five platforms,
+the single source for the release workflow) and `stage({ pkgDir, artifactsDir, outDir, repository })`;
+it fails on a missing artifact or a launcher version that differs from `crates/<crate>/Cargo.toml`.
+`test/*.test.js` [owned] read scope, name and bin from the package's own `package.json` at run time.
+`typecheck` is `node --check` on the five JavaScript files: `tsc --noEmit` with `checkJs` works under
+TypeScript 7 (verified 2026-10-17) but needs `@types/node`, which the catalog does not pin; adding it
+is a dependency decision (Blocked in PROGRESS). `tsconfig.json` [owned] keeps `checkJs`; editors show `node:*` errors until `@types/node` is installed.
+
+### 6.12 `ts-lib`
+
+`packages/<name>` (default `lib`): a publishable ESM TypeScript library, package `@<scope>/<name>`
+with `hull.release = "ts-lib"` (read by the release workflow). `vite.config.ts` [owned] packs
+`src/index.ts` as `format: ["esm"]` with `dts: true` into `dist/index.mjs` and `dist/index.d.mts`;
+`exports` has `types` first plus `./package.json`; `files: ["dist"]`, `sideEffects: false`,
+`publishConfig: { access: "public", provenance: true }`. `tsconfig.json` [owned] sets
+`declaration` (TS5069 requires it) and `isolatedDeclarations`, and includes only `src`: TypeScript 7
+rejects the default export of `vite.config.ts` under `isolatedDeclarations` (TS9037).
+`build` is `vp pack && publint && attw --pack . --profile esm-only`; the checks run on the built
+artifact (about 2 s extra locally: publint 0.2 s, attw 1.3 s). `src/index.ts`, `src/index.test.ts`,
+`pack.entries.ts` (the entry list `vite.config.ts` imports, so the owned config never needs edits),
+`README.md`, `CLAUDE.md` [seed]; `AGENTS.md` [owned]. Optional piece var `ts-lib.repository` (GitHub URL,
+default empty) renders `repository` in `package.json`; npm provenance fails with E422 without it, so
+`release.yml` sets it to the workflow's repository before `pnpm pack` (§8.7) and AGENTS.md says so;
+the README still tells a user who publishes by other means to set it (the file is shared). The var pattern is `https://github.com/<owner>/<repo>` with `[A-Za-z0-9._-]` segments
+(no quotes or backslashes, so no JSON injection); write the URL without `.git`. The catalog carries `publint` and
+`@arethetypeswrong/cli` (unused entries are harmless).
 
 ## 7. Versions (template pnpm catalog, exact pins)
 
@@ -439,7 +557,17 @@ Checked with `npm view` on 2026-10-14.
 | `react`, `react-dom` | 19.3.0 | dev-only cascivo peers, aliased to `preact/compat`; published 2026-09-09 |
 | `happy-dom` | 20.14.6 | DOM environment for component tests; published 2026-10-08 |
 | `docspack` | 1.5.0 | |
+| `publint` | 0.3.25 | ts-lib `build`; checked with `npm view` 2026-10-17 |
+| `@arethetypeswrong/cli` | 0.18.5 | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17 |
 | pnpm / Node | 12.11.2 / 24 | Node 24 is the active LTS |
+| crates `clap` / `clap_complete` / `clap_mangen` | 4.6.7 / 4.6.11 / 0.3.3 | rust-cli `Cargo.toml` (not in the pnpm catalog); crates.io publish dates 2026-09-14 / 2026-09-15 / 2026-08-12 |
+| crates `thiserror` / `serde` / `serde_json` | 2.0.21 / 1.0.229 / 1.0.154 | rust-cli; 2026-09-23 / 2026-07-18 / 2026-10-11 |
+| crates `tracing` / `tracing-subscriber` | 0.1.44 / 0.3.23 | rust-cli; 2025-12-18 / 2026-03-13 |
+| dev crates `assert_cmd` / `predicates` / `insta` / `tempfile` | 2.2.2 / 3.1.4 / 1.49.0 / 3.27.0 | rust-cli; `insta` with `json` only; 2026-05-11 / 2026-02-11 / 2026-10-03 / 2026-03-11 |
+| Rust toolchain | 1.99.1 | rust-cli `rust-toolchain.toml` and `rust-version`; stable manifest dated 2026-10-15 |
+| `cargo-deny` | 0.20.2 | `taiki-e/install-action` in `ci.yml` and `release.yml` (§8.7); Renovate tracks it with a regex manager; 2026-07-09 |
+| npm CLI (release) | Node 24's bundled npm | `release.yml` `setup-node` `node-version: 24` (Node 24.22.0 ships npm 11.19.1); trusted publishing needs npm ≥ 11.5.1, Node ≥ 22.14.0 (docs.npmjs.com/trusted-publishers, 2026-10-17); no separate pin |
+| Actions (release) | `actions/attest-build-provenance@v4`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `taiki-e/install-action@v2` | major tags (latest v4.2.2, v7.0.2, v8.0.2, v2.87.29 on 2026-10-17); Renovate pins digests; checkout/pnpm/setup-node as in `ci.yml` |
 
 ### 7.1 Turbo and Vite+
 
@@ -467,7 +595,10 @@ upstream.
 - Job `ci`, `ubuntu-latest`, `timeout-minutes: 15`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
   the PR base sha, `merge_group.base_sha`, or `github.event.before`:
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
-  2. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
+  2. Index check: a separate step with no `if`, using the runner's `node`:
+     `node scripts/agents-index.mjs --check` fails when `docs/agents/index.md` is stale (docs-only
+     cost < 1 s).
+  3. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
      `TURBO_VERSION` (= the catalog pin, tracked by the Renovate preset) from the npm registry with
      `curl` (~1 s; `npx` took ~5-7 s), then `turbo query affected --tasks lint format:check
      typecheck test build` writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
@@ -477,17 +608,17 @@ upstream.
      Root `format:check` covers every root-owned file, but docs-only changes (e.g. `CLAUDE.md`,
      `docs/**`) do not trigger it on PRs (§8.4).
      All later steps have `if: steps.affected.outputs.skip != 'true'`.
-  3. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
+  4. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
-  4. `pnpm install --frozen-lockfile --prefer-offline`.
-  5. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
+  5. `pnpm install --frozen-lockfile --prefer-offline`.
+  6. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
      restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstackhq/hoard@v1` once released.
   6. Rust (present in the plain `ci.yml`, guarded at runtime by
      `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
-     `Cargo.toml`; then `dtolnay/rust-toolchain@stable`,
-     `Swatinem/rust-cache`, `taiki-e/install-action` (`cargo-nextest`), all `if: rust == 'true'`.
+     `Cargo.toml`; then a `rustup toolchain install` step (installs the channel and components pinned in `rust-toolchain.toml`; `dtolnay/rust-toolchain@stable` would download a second toolchain once stable moves past the pin),
+     `Swatinem/rust-cache` (extra `key` = `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action` (`tool: cargo-nextest@0.9.148,cargo-deny@0.20.2`, both tracked by Renovate regex managers; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
   8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
      step summary, timed from a first `Start timer` step.
@@ -538,9 +669,59 @@ verify): `config:recommended`, `helpers:pinGitHubActionDigests`, `rangeStrategy:
 `minimumReleaseAge: "3 days"`, groups `vite-plus` (`vite-plus` + `@voidzero-dev/vite-plus-core`,
 which must move together), `storybook`, `astro`, `tauri`, `cloudflare` (wrangler + workers-types),
 `turbo`, `react` (react + react-dom), `cascivo` (`@cascivo/*`), `sentry` (`@sentry/*`), `preact`
-(preact + `@preact/*`); automerge for minor/patch and digests with `platformAutomerge`; weekly
+(preact + `@preact/*`), `clap` (`clap`, `clap_*`), `tracing` (`tracing`, `tracing-*`); a regex custom manager
+tracks `cargo-deny@x.y.z` in `.github/workflows/*.yml` (datasource `crate`); the native `rust-toolchain`
+manager bumps `rust-toolchain.toml`, so the toolchain needs no regex; automerge for minor/patch and digests with `platformAutomerge`; weekly
 `lockFileMaintenance`. Open question: once `splice update` runs as a bot, template-managed catalog
 entries move to `ignoreDeps` so Renovate and the template do not both bump them.
+
+### 8.7 `release.yml` (tag-driven)
+
+Plain owned file in every repo. A human pushes `<instance>-v<semver>`; trigger
+`on.push.tags: ["*-v[0-9]*"]`, top-level `permissions: contents: read`, `concurrency:
+release-${{ github.ref }}` without cancel, every checkout `fetch-depth: 0`. No npm token exists
+anywhere (no `NPM_TOKEN`, `NODE_AUTH_TOKEN` or npm secret); `id-token: write` only on the two
+publishing jobs.
+
+- `plan`: `.github/scripts/release-plan.mjs` (Node built-ins only; `plan(tag, fs)` exported for
+  hull's tests) reads `GITHUB_REF_NAME` and writes `kind`, `dir`, `package`, `bin`, `version`, `npm_dirs` to
+  `$GITHUB_OUTPUT`, or exits 1 with the reason (pairing rule and errors: new spec §4.4). For
+  rust-cli it installs the pinned toolchain and `cargo-deny@0.20.2` and runs
+  `cargo deny --manifest-path <dir>/Cargo.toml --config <dir>/deny.toml check advisories` (global
+  options before the subcommand; advisories run only here, never on PRs).
+- `binaries` (rust-cli): matrix over npm-cli's `TARGETS` (`linux-x64`/`linux-arm64` musl on
+  `ubuntu-latest`/`ubuntu-24.04-arm`, both darwin targets on `macos-latest`, `win32-x64` on
+  `windows-latest`); `cargo build --release --locked -p <package> --target <t>`; uploads
+  `<t>/<bin>[.exe]` (the layout `stage.mjs --artifacts` reads) and `<bin>-<t>.tar.gz` (`.zip` on
+  Windows); the `linux-x64` leg adds `completions/<bin>.{bash,zsh,fish,powershell}` and `<bin>.1`.
+- `github-release` (rust-cli; `environment: release`; `contents: write`, `id-token: write`, `attestations: write`):
+  `SHA256SUMS`, `actions/attest-build-provenance` on the archives, `gh release create <tag>
+  --verify-tag` (`--prerelease` when the version has a `-` suffix; `gh release upload --clobber`
+  when the release exists, so a re-run is safe).
+- `npm` (rust-cli with npm-cli companions, or ts-lib; `environment: release`, `contents: read`,
+  `id-token: write`): `setup-node` with `node-version: 24` and `registry-url` (the placeholder
+  token it exports is not a secret; npm exchanges the OIDC token). npm-cli: `stage.mjs` per
+  companion (it writes `repository` from `GITHUB_REPOSITORY`), platform packages first, launcher
+  last. ts-lib: `pnpm install --frozen-lockfile`, `pnpm turbo run build test --filter <name>`,
+  `npm pkg set repository.type=git repository.url=git+https://github.com/$GITHUB_REPOSITORY.git`,
+  `pnpm pack` (rewrites `catalog:`/`workspace:`). Every publish is
+  `npm publish <dir|tgz> --provenance --access public --tag <dist-tag>` (`next` for a version with a
+  `-` prerelease suffix, else `latest`; npm refuses or would mark a prerelease `latest` otherwise),
+  skipped when `npm view <name>@<version>` already answers.
+
+`github-release` and `npm` both need only `plan` and `binaries`, so they run in parallel: npm can
+publish while the GitHub release fails (and the reverse). A re-run of the failed job is safe
+(`gh release upload --clobber`, the `npm view` skip); required
+reviewers on the `release` environment (a human step, hull PROGRESS Blocked) gate both.
+
+Human steps (in the generated `docs/agents/project.md` Blocked section and the owned npm-cli /
+ts-lib `AGENTS.md`): the `release` environment with a tag rule; the first publish of each new npm
+name by hand; an npm trusted publisher (repo, `release.yml`, environment `release`) on each
+package (launcher and five platform packages, or the library), which must see its first publish
+within 2 days. Unverified until the first real release (hull PROGRESS Blocked): `npm publish` of a
+`pnpm pack` tarball with `--provenance`, private repos (npm makes no provenance for them;
+attestations need a public repo or GitHub Enterprise Cloud), `ubuntu-24.04-arm`, and
+`macos-latest` building `x86_64-apple-darwin`.
 
 ## 9. Dev renderer `scripts/render.mjs`
 
@@ -569,6 +750,10 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
   violation, with file, line and tag).
 - `--json` prints exactly one object `{ok, command: "new", changes, messages}`; without it, one
   line per file. Library entry `renderNew(options) → Result` for tests and `dogfood.mjs`.
+- A path that changes ownership class between template versions (for example `<target>/CLAUDE.md`,
+  owned before the agent-layer amendment, seed now) is handled by splice, not by hull: splice spec
+  §10 item 12 (owned to seed keeps the file and drops it from the lock; seed to owned creates it if
+  absent, else conflicts). Hull ships no migration for it before v0.1.0, because no lock exists yet.
 
 ## 10. hull's own CI
 
@@ -580,6 +765,8 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
 | `web` | base, preact-app:web, ui-storybook, hono-worker:api |
 | `site` | base, astro-site:site, rust-tool:tool (rust-tool from plan 03) |
 | `docs` | base, docs (from plan 03) |
+| `cli` | base, rust-cli:cli, npm-cli:cli |
+| `lib` | base, ts-lib:lib |
 | `desktop` | base, preact-app:web, tauri-app:desktop — scheduled/manual only |
 
 Template var `scope = "hullci"` for all.
@@ -596,9 +783,12 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    tests select none. An unknown or missing base (first push, force-push) selects all.
 3. `node scripts/dogfood.mjs --combo <each>`: render into `$RUNNER_TEMP/combos/<name>`, then in
    sequence per combo `pnpm install --no-frozen-lockfile --prefer-offline` (shared pnpm store),
+   `node scripts/agents-index.mjs` (the dev renderer does not run `[[post]]`),
    `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
-   and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
-   selected combo contains rust-tool.
+   `node scripts/agents-index.mjs --check`, and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
+   selected combo contains rust-tool or rust-cli (`cargo generate-lockfile` runs for both, standing in
+   for the `[[post]]` hook); that step also adds `Swatinem/rust-cache@v2` (workspace `combos/cli -> target`)
+   and installs `cargo-nextest@0.9.148` and `cargo-deny@0.20.2`, which the cli combo's generated `ci` task list uses.
 4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
    on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
    download time, never correctness.
@@ -607,6 +797,7 @@ Sequential in one job is the default. Plan 02 measures it; a matrix is adopted o
 measured sequential time exceeds 3 minutes warm and a matrix would cut it by more than half.
 Measured 2026-10-15 (cloud container, warm pnpm store): base+web+site cold 24–42 s, warm 4.5–6.8 s,
 so hull CI stays sequential. `scripts/check-single-vite.mjs` changes also select all combos.
+Local dogfood (2026-10-17, cloud container, shared `--cache-dir`): cold base 2.0 s, web 11.6, site 8.8, docs 1.9, cli 48.9 (Rust build), lib 4.7; warm 0.6 / 1.7 / 1.8 / 1.0 / 1.6 / 0.8. The GitHub `ci` time of the six combos is read after the first push.
 Budget for hull's own PR CI: ≤ 120 s warm when one piece changes, ≤ 20 s docs-only.
 
 ### 10.3 `desktop.yml` (hull)
@@ -637,14 +828,33 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 - Unit tests for every `scripts/lib` module (node:test, fixtures in `tests/fixtures/template/`).
 - Invariants over the real `template/`: manifests valid; every `files/` path classified by at most
   one class; `[merge]` keys are shared; every `.jinja` passes the subset check; no `{{` in
-  `files/` paths; elif-chain branches identical; rendered `CLAUDE.md` ≤ 80 lines per combo;
-  generated `ci.yml` structure (§8.1); settings and agent frontmatter shape.
+  `files/` paths; elif-chain branches identical; rendered `AGENTS.md` + `CLAUDE.md` ≤ 80 lines per combo;
+  generated `ci.yml` structure (§8.1, including the agents-index check and `cargo-deny`); settings
+  and agent frontmatter shape (`Explore` on haiku, read-only; no `explorer`); per-instance
+  `AGENTS.md` ≤ 20 lines with `CLAUDE.md` exactly `@AGENTS.md` (seed); `docs/agents/index.md`
+  ≤ 8192 bytes per combo.
+- Module tests for the hull-tested template scripts: `guard.mjs` (`decide()` table, one spawn
+  test), `agents-index.mjs` (exact output, determinism, `--check`, budget) and `release-plan.mjs`
+  (`plan()` on fixtures); `release.yml` shape (tag trigger, `contents: read`, `id-token: write`
+  only on publishing jobs, `--provenance`, no npm token).
+- Skeleton pieces: `rust-cli` (exact `=x.y.z` pins, no OpenSSL, `deny.toml`, debug `--locked`
+  build), `npm-cli` (no `optionalDependencies` or install scripts, `bin` = crate), `ts-lib`
+  (`exports` shape, publint and attw in `build`).
 - Dogfood: each combo installs, lints, formats, typechecks, tests and builds.
 - Timing: `ci-timing.mjs` against §8.4 and §10.2 budgets.
 
 ## 13. Unverified / to check during the build
 
-Still open: Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
+Verified 2026-10-17 (rust-cli, agent-layer spec §9 item 8; Rust 1.99.1, cargo-deny 0.20.2, cargo-nextest 0.9.148, turbo 2.11.8): (a) `cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources` works from `crates/cli` and exits 0 (`--manifest-path` and `--config` are global options and must precede `check`: the order `check --config …` from the plan draft fails with "unexpected argument '--config'"); with an added `native-tls` dependency it exits 2 with `banned` for `native-tls`, `openssl` and `openssl-sys`. (b) Touching the root `Cargo.lock` makes `turbo run test --filter=<crate>` miss the cache, also with `globalDependencies` reduced to the two JS files, so the `$TURBO_ROOT$` inputs work on their own. (c) A second `turbo run lint format:check typecheck test build` is 11/11 cached (1 s).
+
+Verified 2026-10-17 (npm-cli, agent-layer spec §9 item 8; TypeScript 7.0.2): `tsc --noEmit` with `allowJs` and `checkJs` type-checks the launcher, `stage.mjs` and the tests, but only with `@types/node` installed (without it TS2688 on `types: ["node"]`, and no `node:*` module types); the catalog does not pin it, so `typecheck` is `node --check` until that dependency is approved.
+
+Verified 2026-10-17 (ts-lib, agent-layer spec §9 item 8): `attw --pack . --profile esm-only` runs next to TypeScript 7.0.2 (it uses its bundled 5.6.1-rc) and passes; `vp pack` emits `index.d.mts` with `isolatedDeclarations`.
+
+Verified 2026-10-17 (agent-layer spec §9 items 1 and 3; a project `Explore` agent overrides the built-in one; Claude Code in this container): an `@docs/agents/index.md` import of a missing file loads without error; after `node scripts/agents-index.mjs` it loads; `@AGENTS.md` in a nested `CLAUDE.md` resolves relative to that file (`apps/web/AGENTS.md` content was loaded from `apps/web`).
+
+Still open: whether a PreToolUse `ask` still prompts under `acceptEdits` (agent-layer spec §9
+item 2; needs an interactive session, `claude -p` cannot show the prompt); Renovate preset path syntax; Cloudflare OTel destination syntax; splice CLI flags
 (§4.3.7); whether `add` re-renders other pieces (§4.3.1); whether Renovate's pnpm manager bumps the
 `overrides.vite` `npm:@voidzero-dev/vite-plus-core@x` alias together with `vite-plus` (needs a live
 Renovate run); whether the empty `vars.SENTRY_DSN` is overridden by `wrangler secret put` on deploy

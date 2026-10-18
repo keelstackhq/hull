@@ -1,0 +1,238 @@
+name: release
+
+# A human pushes `<instance>-v<version>` (e.g. `cli-v1.2.0`); release-plan.mjs decides what it
+# publishes. npm uses trusted publishing (OIDC) with provenance: no npm token exists anywhere.
+on:
+  push:
+    tags: ["*-v[0-9]*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      kind: ${{ steps.plan.outputs.kind }}
+      dir: ${{ steps.plan.outputs.dir }}
+      package: ${{ steps.plan.outputs.package }}
+      bin: ${{ steps.plan.outputs.bin }}
+      version: ${{ steps.plan.outputs.version }}
+      npm_dirs: ${{ steps.plan.outputs.npm_dirs }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Plan
+        id: plan
+        run: |
+          node .github/scripts/release-plan.mjs > "$RUNNER_TEMP/plan.txt"
+          cat "$RUNNER_TEMP/plan.txt"
+          cat "$RUNNER_TEMP/plan.txt" >> "$GITHUB_OUTPUT"
+      - name: Rust toolchain (from rust-toolchain.toml)
+        if: steps.plan.outputs.kind == 'rust-cli'
+        run: rustup toolchain install
+      - uses: taiki-e/install-action@v2
+        if: steps.plan.outputs.kind == 'rust-cli'
+        with:
+          tool: cargo-deny@0.20.2
+      - name: Advisories
+        if: steps.plan.outputs.kind == 'rust-cli'
+        env:
+          DIR: ${{ steps.plan.outputs.dir }}
+        run: |
+          cargo deny --manifest-path "$DIR/Cargo.toml" --config "$DIR/deny.toml" check advisories
+
+  binaries:
+    needs: plan
+    if: needs.plan.outputs.kind == 'rust-cli'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux-x64
+            target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - platform: linux-arm64
+            target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+          - platform: darwin-x64
+            target: x86_64-apple-darwin
+            os: macos-latest
+          - platform: darwin-arm64
+            target: aarch64-apple-darwin
+            os: macos-latest
+          - platform: win32-x64
+            target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      PACKAGE: ${{ needs.plan.outputs.package }}
+      BIN: ${{ needs.plan.outputs.bin }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Rust toolchain and target
+        run: |
+          rustup toolchain install
+          rustup target add "$TARGET"
+      - name: musl-tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build
+        run: |
+          cargo build --release --locked -p "$PACKAGE" --target "$TARGET"
+      - name: Archive
+        run: |
+          mkdir -p "out/$TARGET"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "target/$TARGET/release/$BIN.exe" "out/$TARGET/"
+            (cd "out/$TARGET" && 7z a "../$BIN-$TARGET.zip" "$BIN.exe" > /dev/null)
+          else
+            cp "target/$TARGET/release/$BIN" "out/$TARGET/"
+            tar -czf "out/$BIN-$TARGET.tar.gz" -C "out/$TARGET" "$BIN"
+          fi
+      - name: Shell completions and man page
+        if: matrix.platform == 'linux-x64'
+        run: |
+          mkdir -p out/completions
+          for shell in bash zsh fish powershell; do
+            "out/$TARGET/$BIN" completions "$shell" > "out/completions/$BIN.$shell"
+          done
+          "out/$TARGET/$BIN" man > "out/$BIN.1"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: out/
+          if-no-files-found: error
+
+  github-release:
+    needs: [plan, binaries]
+    if: needs.plan.outputs.kind == 'rust-cli'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: artifacts
+      - name: Checksums
+        working-directory: artifacts
+        run: sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
+      - name: GitHub release
+        working-directory: artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          BIN: ${{ needs.plan.outputs.bin }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          files=(./*.tar.gz ./*.zip SHA256SUMS completions/* "$BIN.1")
+          extra=()
+          case "$VERSION" in *-*) extra=(--prerelease) ;; esac
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
+              --generate-notes "${extra[@]}" "${files[@]}"
+          fi
+
+  npm:
+    needs: [plan, binaries]
+    if: >-
+      !cancelled() && needs.plan.result == 'success'
+      && (needs.binaries.result == 'success' || needs.binaries.result == 'skipped')
+      && (needs.plan.outputs.kind == 'ts-lib' || needs.plan.outputs.npm_dirs != '[]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      KIND: ${{ needs.plan.outputs.kind }}
+      DIR: ${{ needs.plan.outputs.dir }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      NPM_DIRS: ${{ needs.plan.outputs.npm_dirs }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        if: env.KIND == 'ts-lib'
+      # Node 24 bundles npm >= 11.5.1 (trusted publishing). registry-url writes .npmrc only.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v8
+        if: env.KIND == 'rust-cli'
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/artifacts
+      - name: Publish the npm-cli packages (platform packages first, launcher last)
+        if: env.KIND == 'rust-cli'
+        run: |
+          set -euo pipefail
+          dist_tag=latest
+          case "$VERSION" in *-*) dist_tag=next ;; esac
+          while read -r dir; do
+            node "$dir/scripts/stage.mjs" --artifacts "$RUNNER_TEMP/artifacts" \
+              --out "$RUNNER_TEMP/npm/$dir" > "$RUNNER_TEMP/staged.txt"
+            while read -r pkg; do
+              name=$(jq -r .name "$pkg/package.json")
+              ver=$(jq -r .version "$pkg/package.json")
+              if npm view "$name@$ver" version >/dev/null 2>&1; then
+                echo "skip $name@$ver: already published"
+              else
+                npm publish "$pkg" --provenance --access public --tag "$dist_tag"
+              fi
+            done < "$RUNNER_TEMP/staged.txt"
+          done < <(jq -r '.[]' <<< "$NPM_DIRS")
+      - name: Build and test the library
+        if: env.KIND == 'ts-lib'
+        run: |
+          pnpm install --frozen-lockfile
+          name=$(jq -r .name "$DIR/package.json")
+          pnpm turbo run build test --filter "$name"
+      - name: Publish the library
+        if: env.KIND == 'ts-lib'
+        working-directory: ${{ needs.plan.outputs.dir }}
+        run: |
+          set -euo pipefail
+          dist_tag=latest
+          case "$VERSION" in *-*) dist_tag=next ;; esac
+          name=$(jq -r .name package.json)
+          ver=$(jq -r .version package.json)
+          if npm view "$name@$ver" version >/dev/null 2>&1; then
+            echo "skip $name@$ver: already published"
+            exit 0
+          fi
+          npm pkg set repository.type=git "repository.url=git+https://github.com/$GITHUB_REPOSITORY.git"
+          mkdir -p "$RUNNER_TEMP/pack"
+          pnpm pack --pack-destination "$RUNNER_TEMP/pack"
+          tgz=$(ls "$RUNNER_TEMP"/pack/*.tgz)
+          npm publish "$tgz" --provenance --access public --tag "$dist_tag"

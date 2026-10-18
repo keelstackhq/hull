@@ -118,9 +118,12 @@ test("package.json name is the scope", async () => {
   for (const t of CI_TASKS) assert.ok(shared.scripts[t], t);
 });
 
-test("base piece runs pnpm install after new", async () => {
+test("base post: install after new, then agents-index after install on new/add/update", async () => {
   const { loadTemplate } = await import("../scripts/lib/manifest.mjs");
   const { REAL_TEMPLATE } = await import("./helpers.mjs");
   const base = (await loadTemplate(REAL_TEMPLATE)).pieces.get("base");
-  assert.deepEqual(base.post, [{ run: "pnpm install --no-frozen-lockfile", when: ["new"] }]);
+  assert.deepEqual(base.post, [
+    { run: "pnpm install --no-frozen-lockfile", when: ["new"] },
+    { run: "node scripts/agents-index.mjs", when: ["new", "add", "update"] },
+  ]);
 });

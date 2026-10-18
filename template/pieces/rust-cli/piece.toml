@@ -1,0 +1,25 @@
+id = "rust-cli"
+description = "A production Rust CLI crate: one JSON object per run, fixed exit codes, pinned toolchain, cargo-deny"
+multiple = true
+requires = ["base"]
+target = "crates/{{ name }}"
+
+[vars]
+name = { prompt = "crate and binary name", default = "cli", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["turbo.json", "deny.toml", "AGENTS.md"]
+shared = ["Cargo.toml", "package.json"]
+seed = ["src/**", "tests/**", "CLAUDE.md"]
+
+[merge]
+"Cargo.toml" = "toml"
+"package.json" = "json"
+
+[[post]]
+run = "cargo generate-lockfile"
+when = ["new"]
+
+[[post]]
+run = "cargo update --workspace"
+when = ["add"]

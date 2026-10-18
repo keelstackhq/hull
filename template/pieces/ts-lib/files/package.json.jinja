@@ -1,0 +1,40 @@
+{
+  "name": "@{{ scope }}/{{ name }}",
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "hull": {
+    "release": "ts-lib"
+  },{% if repository %}
+  "repository": {
+    "type": "git",
+    "url": "git+{{ repository }}.git"
+  },{% endif %}
+  "scripts": {
+    "build": "vp pack && publint && attw --pack . --profile esm-only",
+    "lint": "vp lint",
+    "format:check": "vp fmt --check",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
+    "publint": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

@@ -1,4 +1,39 @@
-{% if "rust-tool" in pieces %}// Decides whether the Rust steps of CI run. Reads `turbo query affected --packages` JSON on stdin
+{# same-branches #}{% if "rust-cli" in pieces %}// Decides whether the Rust steps of CI run. Reads `turbo query affected --packages` JSON on stdin
+// and prints `rust=true` or `rust=false`. Rust is needed when an affected package (other than the
+// root `//`) has a Cargo.toml, or when a root Cargo file changed (git diff BASE...HEAD).
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
+export const ROOT_CARGO_FILES = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"];
+
+/** True when Rust must run. `hasCargo(path)` says whether a package directory has a Cargo.toml. */
+export function decide(turboJson, changedFiles, hasCargo) {
+  const items = turboJson?.data?.affectedPackages?.items ?? [];
+  if (items.some((p) => p.name !== "//" && hasCargo(p.path))) return true;
+  return changedFiles.some((f) => ROOT_CARGO_FILES.includes(f));
+}
+
+function main() {
+  try {
+    const turbo = JSON.parse(readFileSync(0, "utf8"));
+    const base = process.env.TURBO_SCM_BASE;
+    const head = process.env.TURBO_SCM_HEAD || "HEAD";
+    const changed = execFileSync("git", ["diff", "--name-only", `${base}...${head}`], {
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean);
+    console.log(`rust=${decide(turbo, changed, (p) => existsSync(join(p, "Cargo.toml")))}`);
+  } catch (e) {
+    console.error(`::warning::rust-affected.mjs failed (${e.message}); running Rust steps`);
+    console.log("rust=true");
+  }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+{% elif "rust-tool" in pieces %}// Decides whether the Rust steps of CI run. Reads `turbo query affected --packages` JSON on stdin
 // and prints `rust=true` or `rust=false`. Rust is needed when an affected package (other than the
 // root `//`) has a Cargo.toml, or when a root Cargo file changed (git diff BASE...HEAD).
 import { execFileSync } from "node:child_process";

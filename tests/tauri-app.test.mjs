@@ -7,7 +7,7 @@ import YAML from "yaml";
 import { affectedCombos } from "../scripts/affected-combos.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -141,12 +141,13 @@ test("tauri-only repos get no Rust CI steps and no rust-affected script", async 
   assert.ok(!ci.includes("build:desktop"));
 });
 
-test("base CLAUDE.md lists tauri-app and stays within 80 lines", async () => {
+test("base AGENTS.md lists tauri-app; AGENTS + CLAUDE stay within 80 lines", async () => {
   const { dir } = await renderCombo(PIECES);
-  const t = await read(dir, "CLAUDE.md");
+  const t = await read(dir, "AGENTS.md");
   assert.match(t, /\(tauri-app\)/);
-  assert.ok(t.split("\n").length <= 80);
-  const doc = await read(dir, "apps/desktop/CLAUDE.md");
+  assert.match(t, /`apps\/<name>\/AGENTS\.md`/);
+  assert.ok(lineCount(t) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
+  const doc = await read(dir, "apps/desktop/AGENTS.md");
   assert.match(doc, /webkit2gtk/);
   assert.match(doc, /bundle\.targets/);
 });
@@ -189,4 +190,12 @@ test("renovate tauri group covers the npm and cargo packages", async () => {
   for (const n of ["@tauri-apps/**", "tauri", "tauri-build"])
     assert.ok(rule.matchPackageNames.includes(n), n);
   assert.deepEqual(rule.matchManagers, ["npm", "cargo"]);
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(
+    ["base", "preact-app:web", "tauri-app:desktop"],
+    "apps/desktop",
+  );
+  assert.match(agents, /^# /);
 });

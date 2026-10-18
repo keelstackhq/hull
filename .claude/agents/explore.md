@@ -1,5 +1,5 @@
 ---
-name: explorer
+name: Explore
 description: Use proactively for every search, "where is X" question and multi-file read. Returns file paths and a summary of at most 15 lines. Read-only.
 tools: Read, Grep, Glob
 model: haiku

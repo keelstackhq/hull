@@ -6,7 +6,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 import { assertSameBranches } from "./invariants.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -57,7 +57,8 @@ test("crate classes", async () => {
   assert.equal(cls["crates/tool/Cargo.toml"], "shared");
   assert.equal(cls["crates/tool/package.json"], "shared");
   assert.equal(cls["crates/tool/turbo.json"], "owned");
-  assert.equal(cls["crates/tool/CLAUDE.md"], "owned");
+  assert.equal(cls["crates/tool/AGENTS.md"], "owned");
+  assert.equal(cls["crates/tool/CLAUDE.md"], "seed");
   assert.equal(cls["crates/tool/src/main.rs"], "seed");
 });
 
@@ -116,15 +117,16 @@ test("rust steps are guarded by the decision step, which only runs when rust-aff
   assert.match(decision.run, /turbo query affected --packages/);
   assert.match(decision.run, /node \.github\/scripts\/rust-affected\.mjs/);
   assert.match(decision.run, /rust=true/);
-  const rustSteps = steps.filter((s) => /^(dtolnay|Swatinem|taiki-e)\//.test(s.uses ?? ""));
+  const rustSteps = steps.filter((s) => /^(Swatinem|taiki-e)\//.test(s.uses ?? ""));
   assert.deepEqual(
     rustSteps.map((s) => s.uses.split("@")[0]),
-    ["dtolnay/rust-toolchain", "Swatinem/rust-cache", "taiki-e/install-action"],
+    ["Swatinem/rust-cache", "taiki-e/install-action"],
   );
   for (const s of rustSteps) assert.match(s.if, /steps\.rust\.outputs\.rust == 'true'/, s.uses);
-  assert.equal(rustSteps[2].with.tool, "cargo-nextest");
+  assert.equal(rustSteps[1].with.tool, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
   const idx = (s) => steps.indexOf(s);
-  assert.ok(idx(decision) < idx(rustSteps[0]));
+  const toolchain = steps.find((s) => s.id === "toolchain");
+  assert.ok(idx(decision) < idx(toolchain) && idx(toolchain) < idx(rustSteps[0]));
   assert.ok(idx(rustSteps.at(-1)) < steps.length - 2);
   assert.match(steps.at(-2).run, /^pnpm turbo run /);
   assert.equal(byPath(result)[".github/scripts/rust-affected.mjs"], "owned");
@@ -178,11 +180,12 @@ test("rust-affected.mjs end to end: reads stdin JSON, prints rust=", async () =>
   assert.equal(run("not json"), "rust=true");
 });
 
-test("base CLAUDE.md lists rust-tool and stays within 80 lines", async () => {
+test("base AGENTS.md lists rust-tool; AGENTS + CLAUDE stay within 80 lines", async () => {
   const { dir } = await renderCombo(["base", "rust-tool:tool"]);
-  const t = await read(dir, "CLAUDE.md");
+  const t = await read(dir, "AGENTS.md");
   assert.match(t, /\(rust-tool\)/);
-  assert.ok(t.split("\n").length <= 80);
+  assert.match(t, /`crates\/<name>\/AGENTS\.md`/);
+  assert.ok(lineCount(t) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
 });
 
 test("site combo includes rust-tool", async () => {
@@ -199,4 +202,10 @@ test("root Cargo files are turbo globalDependencies only with a Rust piece", asy
   const plain = JSON.parse(await read((await renderCombo(["base"])).dir, "turbo.json"));
   for (const f of root) assert.ok(!plain.globalDependencies.includes(f), f);
   assert.ok(plain.globalDependencies.includes("vite.config.ts"));
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(["base", "rust-tool:tool"], "crates/tool");
+  assert.match(agents, /rust-cli/);
+  assert.match(agents, /^# /);
 });

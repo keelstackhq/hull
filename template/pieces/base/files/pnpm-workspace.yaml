@@ -4,6 +4,7 @@ packages:
   - crates/*
 
 catalog:
+  "@arethetypeswrong/cli": 0.18.5
   "@astrojs/preact": 6.0.6
   "@cascivo/react": 1.9.0
   "@cascivo/themes": 1.0.3
@@ -20,6 +21,7 @@ catalog:
   happy-dom: 20.14.6
   hono: 4.13.13
   preact: 10.29.8
+  publint: 0.3.25
   react: 19.3.0
   react-dom: 19.3.0
   storybook: 10.6.2

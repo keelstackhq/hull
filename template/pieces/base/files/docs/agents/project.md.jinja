@@ -1,0 +1,26 @@
+# Project notes
+
+Notes for AI agents that are specific to this repository. `CLAUDE.md` imports this file; edit it
+freely, template updates never touch it.
+
+- What this project is:
+- Commands beyond `pnpm check` and `pnpm run ci`:
+- Conventions and decisions:{# same-branches #}{% if "npm-cli" in pieces %}
+
+## Blocked
+
+Human steps before the first `<name>-v<version>` tag (`release.yml`):
+
+- Create the environment `release` with a tag rule `*-v*`.
+- First publish of each new npm name by hand.
+- npm trusted publisher (this repo, `release.yml`, environment `release`) on the launcher and all
+  five platform packages, or the library; then release within 2 days.{% elif "ts-lib" in pieces %}
+
+## Blocked
+
+Human steps before the first `<name>-v<version>` tag (`release.yml`):
+
+- Create the environment `release` with a tag rule `*-v*`.
+- First publish of each new npm name by hand.
+- npm trusted publisher (this repo, `release.yml`, environment `release`) on the launcher and all
+  five platform packages, or the library; then release within 2 days.{% endif %}

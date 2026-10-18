@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
 const byPath = (result) => Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
@@ -24,7 +24,8 @@ test("renders at apps/<name> with classes", async () => {
   assert.equal(cls["apps/edge/package.json"], "shared");
   assert.equal(cls["apps/edge/wrangler.jsonc"], "shared");
   assert.equal(cls["apps/edge/tsconfig.json"], "owned");
-  assert.equal(cls["apps/edge/CLAUDE.md"], "owned");
+  assert.equal(cls["apps/edge/AGENTS.md"], "owned");
+  assert.equal(cls["apps/edge/CLAUDE.md"], "seed");
   assert.equal(cls["apps/edge/src/hull/logging.ts"], "owned");
   assert.equal(cls["apps/edge/src/hull/sentry.ts"], "owned");
   assert.equal(cls["apps/edge/src/hull/logging.test.ts"], "owned");
@@ -89,11 +90,13 @@ test("sentry.ts imports Sentry dynamically only", async () => {
   assert.ok(!/^import (?!type ).*@sentry/m.test(text));
 });
 
-test("root CLAUDE.md mentions hono-worker and stays ≤ 80 lines", async () => {
-  const text = await read((await renderCombo(["base", "hono-worker:api"])).dir, "CLAUDE.md");
+test("root AGENTS.md mentions hono-worker; AGENTS + CLAUDE stay ≤ 80 lines", async () => {
+  const { dir } = await renderCombo(["base", "hono-worker:api"]);
+  const text = await read(dir, "AGENTS.md");
   assert.match(text, /hono-worker/);
-  assert.ok(text.split("\n").length <= 80);
-  assert.ok(!/hono-worker/.test(await read((await renderCombo(["base"])).dir, "CLAUDE.md")));
+  assert.match(text, /`apps\/<name>\/AGENTS\.md`/);
+  assert.ok(lineCount(text) + lineCount(await read(dir, "CLAUDE.md")) <= 80);
+  assert.ok(!/hono-worker/.test(await read((await renderCombo(["base"])).dir, "AGENTS.md")));
 });
 
 test("logging never logs err.message; sentry scrubs events and caches the import", async () => {
@@ -105,6 +108,11 @@ test("logging never logs err.message; sentry scrubs events and caches the import
   for (const k of ["query_string", "headers", "cookies", "data"])
     assert.match(sentry, new RegExp(`delete r\\.${k}`));
   assert.match(sentry, /wrapped \?\?= import\("@sentry\/cloudflare"\)/);
-  const doc = await read(dir, "apps/api/CLAUDE.md");
+  const doc = await read(dir, "apps/api/AGENTS.md");
   assert.match(doc, /about 1\.2 MB/);
+});
+
+test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", async () => {
+  const { agents } = await assertInstanceNotes(["base", "hono-worker:api"], "apps/api");
+  assert.match(agents, /^# /);
 });

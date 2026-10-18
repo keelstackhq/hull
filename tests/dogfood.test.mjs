@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dogfood } from "../scripts/dogfood.mjs";
+import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 
 test("a render failure fails that combo without throwing", async () => {
   const root = await mkdtemp(join(tmpdir(), "hull-df-"));
@@ -58,4 +59,22 @@ test("single-vite check runs for web and site, not base; failure fails the combo
     args.some((a) => a.endsWith("check-single-vite.mjs")) ? 1 : 0;
   const r = await dogfood({ combos: ["web"], root, run: failing });
   assert.equal(r[0].ok, false);
+});
+
+test("base combo runs git init, install, index write, turbo, index check in order", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(" "));
+    return 0;
+  };
+  await dogfood({ combos: ["base"], root, cacheDir: "/c", run });
+  assert.deepEqual(calls, [
+    "git init -q",
+    "pnpm install --no-frozen-lockfile --prefer-offline",
+    "node scripts/agents-index.mjs",
+    `pnpm turbo run ${CI_TASKS.join(" ")} --cache-dir=/c`,
+    "node scripts/agents-index.mjs --check",
+  ]);
 });

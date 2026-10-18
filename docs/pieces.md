@@ -22,7 +22,7 @@ Files (owned):
 
 - `astro.config.mjs`
 - `tsconfig.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -32,6 +32,7 @@ Files (shared):
 Files (seed):
 
 - `src/**`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -57,6 +58,9 @@ Files (owned):
 - `.github/workflows/desktop.yml`
 - `.github/scripts/affected.mjs`
 - `.github/scripts/rust-affected.mjs`
+- `.github/workflows/release.yml`
+- `.github/scripts/release-plan.mjs`
+- `scripts/agents-index.mjs`
 - `Cargo.toml`
 - `rust-toolchain.toml`
 - `renovate.json`
@@ -125,7 +129,7 @@ Variables:
 Files (owned):
 
 - `tsconfig.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 - `src/hull/**`
 
 Files (shared):
@@ -137,11 +141,48 @@ Files (seed):
 
 - `src/index.ts`
 - `src/index.test.ts`
+- `CLAUDE.md`
 
 Merge strategies:
 
 - `package.json`: json
 - `wrangler.jsonc`: text
+
+## npm-cli
+
+npm launcher and per-platform packages that ship a rust-cli binary, staged at release time
+
+- Multiple instances: yes
+- Target: `packages/{{ name }}`
+- Requires: `base`
+
+Variables:
+
+- `name`: npm package name; default `cli`; pattern `^[a-z][a-z0-9-]*$`
+- `crate`: rust-cli instance (crate and binary name) this package ships; default `cli`; pattern `^[a-z][a-z0-9-]*$`
+
+Files (owned):
+
+- `turbo.json`
+- `tsconfig.json`
+- `vite.config.ts`
+- `bin/**`
+- `scripts/**`
+- `test/**`
+- `AGENTS.md`
+
+Files (shared):
+
+- `package.json`
+
+Files (seed):
+
+- `README.md`
+- `CLAUDE.md`
+
+Merge strategies:
+
+- `package.json`: json
 
 ## preact-app
 
@@ -159,7 +200,7 @@ Files (owned):
 
 - `vite.config.ts`
 - `tsconfig.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -170,11 +211,46 @@ Files (seed):
 
 - `src/**`
 - `index.html`
+- `CLAUDE.md`
 
 Merge strategies:
 
 - `package.json`: json
 - `wrangler.jsonc`: text
+
+## rust-cli
+
+A production Rust CLI crate: one JSON object per run, fixed exit codes, pinned toolchain, cargo-deny
+
+- Multiple instances: yes
+- Target: `crates/{{ name }}`
+- Requires: `base`
+
+Variables:
+
+- `name`: crate and binary name; default `cli`; pattern `^[a-z][a-z0-9-]*$`
+
+Files (owned):
+
+- `turbo.json`
+- `deny.toml`
+- `AGENTS.md`
+
+Files (shared):
+
+- `Cargo.toml`
+- `package.json`
+
+Files (seed):
+
+- `src/**`
+- `tests/**`
+- `CLAUDE.md`
+
+Merge strategies:
+
+- `Cargo.toml`: toml
+- `package.json`: json
 
 ## rust-tool
 
@@ -191,7 +267,7 @@ Variables:
 Files (owned):
 
 - `turbo.json`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -201,6 +277,7 @@ Files (shared):
 Files (seed):
 
 - `src/main.rs`
+- `CLAUDE.md`
 
 Merge strategies:
 
@@ -225,7 +302,7 @@ Files (owned):
 - `src-tauri/build.rs`
 - `src-tauri/icons/**`
 - `src-tauri/.gitignore`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -237,12 +314,47 @@ Files (seed):
 
 - `src-tauri/src/**`
 - `src-tauri/capabilities/**`
+- `CLAUDE.md`
 
 Merge strategies:
 
 - `package.json`: json
 - `src-tauri/Cargo.toml`: toml
 - `src-tauri/tauri.conf.json`: json
+
+## ts-lib
+
+Publishable ESM TypeScript library with publint and attw checks
+
+- Multiple instances: yes
+- Target: `packages/{{ name }}`
+- Requires: `base`
+
+Variables:
+
+- `name`: library name; default `lib`; pattern `^[a-z][a-z0-9-]*$`
+- `repository`: GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional); default ``; pattern `^(https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?$`
+
+Files (owned):
+
+- `vite.config.ts`
+- `tsconfig.json`
+- `AGENTS.md`
+
+Files (shared):
+
+- `package.json`
+
+Files (seed):
+
+- `pack.entries.ts`
+- `src/**`
+- `README.md`
+- `CLAUDE.md`
+
+Merge strategies:
+
+- `package.json`: json
 
 ## ui-storybook
 
@@ -261,7 +373,7 @@ Files (owned):
 - `vite.config.ts`
 - `tsconfig.json`
 - `.storybook/main.ts`
-- `CLAUDE.md`
+- `AGENTS.md`
 
 Files (shared):
 
@@ -271,6 +383,7 @@ Files (seed):
 
 - `src/**`
 - `.storybook/preview.ts`
+- `CLAUDE.md`
 
 Merge strategies:
 

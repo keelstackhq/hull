@@ -296,3 +296,22 @@ test("Job duration step: always, non-fatal, budget in summary, no ${{ }}", () =>
   assert.match(last.run, /15 s/);
   assert.ok(!last.run.includes("${{") && !start.run.includes("${{"));
 });
+
+test("index check runs after checkout, before the early-exit step, with no if", () => {
+  const label = (s) => s.name ?? s.uses;
+  const names = steps.map(label);
+  const order = ["actions/checkout@v5", "Agents index current?", "Anything affected?"];
+  assert.deepEqual(
+    names.filter((n) => order.includes(n)),
+    order,
+  );
+  assert.ok(names.indexOf("Agents index current?") < names.indexOf("actions/setup-node@v5"));
+  const s = steps.find((x) => x.name === "Agents index current?");
+  assert.equal(s.run, "node scripts/agents-index.mjs --check");
+  assert.equal("if" in s, false);
+});
+
+test("generated ci.yml installs cargo-nextest@0.9.148 and cargo-deny@0.20.2", () => {
+  assert.equal(step("taiki-e/install-action").with.tool, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
+  assert.match(step("taiki-e/install-action").if, /steps\.rust\.outputs\.rust == 'true'/);
+});

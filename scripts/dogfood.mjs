@@ -15,6 +15,7 @@ const COMBOS = new URL("./combos.json", import.meta.url);
 export const ciCommand = () => ["pnpm", "turbo", "run", ...CI_TASKS];
 
 const CHECK_SINGLE_VITE = fileURLToPath(new URL("./check-single-vite.mjs", import.meta.url));
+const RUST_PIECES = new Set(["rust-tool", "rust-cli"]);
 const VITE_PIECES = new Set(["preact-app", "ui-storybook", "astro-site"]);
 
 /** Steps run in each rendered combo; `check-single-vite` for combos with Vite pieces. */
@@ -23,12 +24,15 @@ export function comboSteps(cacheDir, pieces = [], dir = ".") {
   const steps = [
     ["git", ["init", "-q"]],
     ["pnpm", ["install", "--no-frozen-lockfile", "--prefer-offline"]],
-    // the rust-tool [[post]] hook, which the dev renderer does not run; keeps Cargo.lock (a turbo
+    // the rust-tool and rust-cli [[post]] hooks, which the dev renderer does not run; keeps Cargo.lock (a turbo
     // input) stable, so a second run hits the cache
-    ...(pieces.some((p) => p.split(":")[0] === "rust-tool")
+    ...(pieces.some((p) => RUST_PIECES.has(p.split(":")[0]))
       ? [["cargo", ["generate-lockfile"]]]
       : []),
+    // the base [[post]] hook, which the dev renderer does not run
+    ["node", ["scripts/agents-index.mjs"]],
     [cmd, [...args, `--cache-dir=${cacheDir}`]],
+    ["node", ["scripts/agents-index.mjs", "--check"]],
   ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
     steps.push(["node", [CHECK_SINGLE_VITE, dir]]);

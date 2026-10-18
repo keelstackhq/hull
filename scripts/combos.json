@@ -23,6 +23,14 @@
     {
       "name": "docs",
       "pieces": ["base", "docs"]
+    },
+    {
+      "name": "cli",
+      "pieces": ["base", "rust-cli:cli", "npm-cli:cli"]
+    },
+    {
+      "name": "lib",
+      "pieces": ["base", "ts-lib:lib"]
     }
   ]
 }

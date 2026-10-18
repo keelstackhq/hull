@@ -1,0 +1,17 @@
+id = "ts-lib"
+description = "Publishable ESM TypeScript library with publint and attw checks"
+multiple = true
+requires = ["base"]
+target = "packages/{{ name }}"
+
+[vars]
+name = { prompt = "library name", default = "lib", pattern = "^[a-z][a-z0-9-]*$" }
+repository = { prompt = "GitHub URL for npm provenance, e.g. https://github.com/acme/lib (optional)", default = "", pattern = "^(https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?$" }
+
+[files]
+owned = ["vite.config.ts", "tsconfig.json", "AGENTS.md"]
+shared = ["package.json"]
+seed = ["pack.entries.ts", "src/**", "README.md", "CLAUDE.md"]
+
+[merge]
+"package.json" = "json"
