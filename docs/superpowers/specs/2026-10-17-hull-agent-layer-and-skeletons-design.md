@@ -1,6 +1,6 @@
 # hull — agent layer v2 and skeleton pieces (design)
 
-Date: 2026-10-17 · Status: approved, implemented by plan 04 (2026-10-17) · Amends `2026-10-14-hull-design.md` (the base spec). Evidence: `reports/Developer and agent DX ecosystem.md`, sections "Small, human-written, enforced
+Date: 2026-10-17 · Status: approved, implemented by plan 04 (2026-10-17) · Amends `2026-10-14-hull-design.md` (the base spec). Superseded in one point by base spec §14 (2026-10-18): the root `AGENTS.md` is seed, not owned. Evidence: `reports/Developer and agent DX ecosystem.md`, sections "Small, human-written, enforced
 context beats more agents" and "Hull's skeletons are stubs where agents most need depth".
 
 Two changes. (A) The generated AI layer: `AGENTS.md` becomes canonical, `CLAUDE.md` thin, the

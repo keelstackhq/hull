@@ -1,6 +1,6 @@
 # hull — design
 
-Date: 2026-10-14 · Status: approved for build · amended by `2026-10-17-hull-agent-layer-and-skeletons-design.md` (agent layer v2, skeleton pieces) · Org `keelstackhq`, repo `keelstackhq/hull`
+Date: 2026-10-14 · Status: approved for build · amended by `2026-10-17-hull-agent-layer-and-skeletons-design.md` (agent layer v2, skeleton pieces) and §14 (2026-10-18: `rigging/` channel, root `AGENTS.md` seed) · Org `keelstackhq`, repo `keelstackhq/hull`
 
 hull is an opinionated, AI-native monorepo template. It owns structure, stack, tool versions and
 config, never app logic. Consumers render it with `splice` (`keelstackhq/splice`, Rust) from
@@ -37,6 +37,8 @@ template/
   pieces/<id>/piece.toml
   pieces/<id>/files/...
   migrations/                  # empty in v0.1 (.gitkeep)
+rigging/                       # second template: the splice channel `rigging` (§14)
+  splice.toml  pieces/{core,claude,skills}/
 scripts/
   render.mjs                   # dev renderer CLI (§9)
   lib/errors.mjs manifest.mjs subset.mjs ownership.mjs plan.mjs render-file.mjs ci-tasks.mjs
@@ -86,11 +88,12 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
 
 | Class | What | Examples |
 |---|---|---|
-| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `AGENTS.md`, `renovate.json` |
+| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `CLAUDE.md`, `<target>/AGENTS.md`, `renovate.json` |
 | `shared` | files both sides edit | root and package `package.json` (json), `turbo.json` (json), `pnpm-workspace.yaml` (yaml), crate `Cargo.toml` (toml), `tauri.conf.json` (json), `wrangler.jsonc` (text: has comments), `docs/packs.json` (json) |
-| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, `docs/agents/project.md`, `<target>/CLAUDE.md`, stories, tests |
+| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, root `AGENTS.md` (§14), `docs/agents/project.md`, `<target>/CLAUDE.md`, stories, tests |
 
-The AI layer is owned. Project-specific notes for agents go in the seed file
+The AI layer is owned, except the root `AGENTS.md`, which is seed so that splice channels can
+add sections to it (§14). Project-specific notes for agents go in the seed file
 `docs/agents/project.md`, which `CLAUDE.md` imports. Personal settings go in
 `.claude/settings.local.json` (gitignored).
 
@@ -380,6 +383,8 @@ the docs piece) prints which listed packs are installed, missing, or unpublished
 files.
 
 ### 6.9 AI layer (owned, in `base`)
+
+The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed here is owned.
 
 - `AGENTS.md.jinja` (canonical, ≤ 60 rendered lines) and `CLAUDE.md.jinja` (thin, ≤ 20 lines),
   together ≤ 80 for every combo (`lineCount`, like `wc -l`). `AGENTS.md`: what the repo is,
@@ -864,3 +869,70 @@ Verified during the build (removed from this list): Vite+ shared lint/fmt config
 setting names; `$TURBO_ROOT$` in outputs; Claude Code settings and statusline shape; cascivo for
 Preact (`@cascivo/react` via `preact/compat`); `astro check` does not work with TypeScript 7
 (astro-site uses `tsc --noEmit`); `preview.yml`/`desktop.yml` use runtime guards, not `{% raw %}`.
+
+## 14. `rigging` channel (2026-10-18)
+
+Signed off by the hull owner on 2026-10-18 (splice task C2): hull ships a second template,
+`rigging/`, applied with `splice channel add gh:keelstackhq/hull//rigging` (splice channels spec
+§6-§7, splice 0.2.0), and the root `AGENTS.md` of `base` moves from owned to seed. Both stay
+inside contract format 1; `docs/template-format.md` is unchanged (D-003).
+
+**Layout.** `rigging/splice.toml`: `format = 1`, `name = "rigging"`, `base = "meta"`,
+`min_splice = "0.2.0"` (older splices refuse it). splice always renders a template's base, so the
+base is `meta`, an empty piece (only `id`, `description`, `multiple`; no files, sections, vars or
+post) and every real piece below is optional; `claude` and `skills` require `meta`, not `core`.
+
+| Piece | Content | Class |
+|---|---|---|
+| `core` | `[sections] "AGENTS.md" = "sections/rules.md.jinja"`: harness-neutral working rules (test first, verify with real output, one task per change, no secrets or `.env*` reads, releases by a human, ≤ 2-3 parallel agents); one bullet naming the subagents only with `"claude" in pieces`; ≤ 12 lines, no `@` imports, no files of its own | section |
+| `claude` | `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`, the §6.9 agents with the same names, models and tools, made stack-neutral ("the fast checks `AGENTS.md` or `CLAUDE.md` lists" instead of `pnpm turbo`); **no** `CLAUDE.md` section: hull owns `CLAUDE.md`, which imports `@AGENTS.md` | owned |
+| `skills` | `multiple = true`, `target = ".{{ dir }}/skills"`, var `dir` pattern `^(claude\|agents)$` (no default); `files/<skill>/SKILL.md` with `name` + `description` frontmatter; first skill `handoff` (write next steps and blockers to the progress notes, start fresh rather than compact) | owned |
+
+**Who adds which piece.** `core` is for repos not rendered from hull (splice, hoard, hoist,
+berth, …). A hull repo already carries these rules in its own `AGENTS.md` (§6.9), so it adds only
+`claude` and/or `skills` from rigging, never `core`: `--piece claude` and/or
+`--piece skills:claude --data dir=claude`; a non-hull repo adds `--piece core` as well.
+The generated `AGENTS.md` does not mention rigging: the cli combo is at 4,103 of 4,150
+always-loaded bytes.
+
+**Budget.** hull's AI-layer budget (`AGENTS.md` ≤ 60 lines, `CLAUDE.md` ≤ 20, ≤ 4,150
+always-loaded bytes, §6.9 and `tests/ai-layer.test.mjs`) covers what hull renders. Content an
+adopter adds through a channel is outside it. Measured 2026-10-18: the `core` section with its
+markers and the blank line before it adds 11 lines / 562 bytes, or 13 lines / 733 bytes with
+`claude`.
+
+One skill source serves two harnesses: `splice channel add … --piece skills:claude --data
+dir=claude`, then `splice add skills --channel rigging --name agents --data dir=agents`.
+Skill names must not collide with hull's own skills (`verify`, `add-piece`, `docs-lookup`), or a
+hull repo gets a claim conflict (splice channels spec §5).
+
+**Harness directories** (checked 2026-10-18): Claude Code loads project subagents from
+`.claude/agents/*.md` (frontmatter `name`, `description` required; `tools`, `model` optional) and
+skills from `.claude/skills/<name>/SKILL.md` (code.claude.com/docs/en/sub-agents, /skills; no
+mention of `.agents/skills`). Codex loads skills from `.agents/skills/<name>/SKILL.md` in every
+directory from the cwd up to the repo root, with `name` and `description` frontmatter
+(developers.openai.com/codex/skills, now learn.chatgpt.com/docs/build-skills), and reads
+`AGENTS.md`. A channel release fixes these for every repo if they move.
+
+**`AGENTS.md` → seed.** A channel may only add a section to a host that no lock lists in
+`[files]`, so the root `AGENTS.md` cannot stay owned. Consequence: like every seed it renders only
+on `new`; `splice add` no longer refreshes its `## Pieces` bullets (the generated
+`docs/agents/index.md` still lists every package), and later hull changes to the root `AGENTS.md`
+no longer reach existing repos: the file is frozen at `new`. The class change itself is safe for
+existing repos: splice main spec §10 item 12 (owned → seed keeps the file and drops it from the
+lock). Per-instance `<target>/AGENTS.md` and root
+`CLAUDE.md` stay owned.
+
+**Validation.** hull's dev renderer never renders channels: `loadTemplate` rejects `[sections]`
+as an unknown key, which `tests/rigging.test.mjs` asserts. That test checks the manifest shape,
+the subset on every `.jinja` including fragments, ownership classes, no symlinks, portable paths,
+agent and skill frontmatter, and the fragment's rendered output with and without `claude`.
+`tests/conformance.test.mjs` renders splice's subset corpus (`tests/fixtures/conformance/`, a
+byte-for-byte copy of splice `tests/fixtures/subset/`, including the `section-fragment` case) with
+hull's Nunjucks setup. Dogfooding `rigging/` with splice waits for splice 0.2.0.
+
+**Later (not in this change).** A hull release adds `migrations/<v>.toml` `[[remove]]` for the
+four `.claude/agents` files of `base` (until then a hull repo that adds `--piece claude` gets a
+claim conflict on them) and its README and generated `CLAUDE.md` say: run `splice update`, then
+`splice channel add gh:keelstackhq/hull//rigging --piece claude`. Not a post or step: those run
+before the main lock is written.

@@ -74,6 +74,7 @@ Files (shared):
 
 Files (seed):
 
+- `AGENTS.md`
 - `README.md`
 - `docs/agents/project.md`
 - `packages/shared/src/**`
