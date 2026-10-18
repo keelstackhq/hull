@@ -1,5 +1,5 @@
-# For repos not rendered from hull. A hull repo's AGENTS.md already carries these rules, so a
-# hull repo adds only `claude` and/or `skills` from rigging, never `core` (hull spec §14).
+# For repos not rendered from hull (`--piece core`). A hull repo's AGENTS.md already carries
+# these rules, so a hull repo adds only `claude` and/or `skills`, never `core` (hull spec §14).
 id = "core"
 description = "Harness-neutral working rules, as a section in AGENTS.md"
 multiple = false

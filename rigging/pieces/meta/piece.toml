@@ -1,0 +1,5 @@
+# Empty base piece: splice always renders a template's base, so it holds nothing and every
+# real piece (core, claude, skills) stays optional (hull spec §14).
+id = "meta"
+description = "Empty base; pick core, claude and/or skills"
+multiple = false

@@ -55,22 +55,35 @@ function frontmatter(text) {
   );
 }
 
-test("splice.toml: format 1, rigging, base core, needs splice 0.2.0", () => {
+test("splice.toml: format 1, rigging, empty base meta, needs splice 0.2.0", () => {
   assert.deepEqual(
     { ...toml("splice.toml") },
     {
       format: 1,
       name: "rigging",
       min_splice: "0.2.0",
-      base: "core",
+      base: "meta",
     },
   );
-  assert.deepEqual(pieceIds(), ["claude", "core", "skills"]);
+  assert.deepEqual(pieceIds(), ["claude", "core", "meta", "skills"]);
   for (const id of pieceIds()) assert.equal(piece(id).id, id);
 });
 
 test("hull's dev renderer refuses rigging: [sections] is splice 0.2.0 only", async () => {
   await assert.rejects(loadTemplate(RIGGING), /unknown key "sections"/);
+});
+
+test("meta: the base piece renders nothing (no files, sections, vars or post)", () => {
+  const meta = piece("meta");
+  assert.deepEqual(Object.keys(meta).sort(), ["description", "id", "multiple"]);
+  assert.equal(meta.multiple, false);
+  assert.deepEqual(filesOf("meta"), []);
+});
+
+test("core, claude and skills are optional: none is the base, none requires core", () => {
+  for (const id of ["core", "claude", "skills"]) {
+    assert.ok(!(piece(id).requires ?? []).includes("core"), id);
+  }
 });
 
 test("core: one AGENTS.md section, no files of its own", () => {
@@ -82,7 +95,7 @@ test("core: one AGENTS.md section, no files of its own", () => {
 
 test("claude: the four agent files owned, no CLAUDE.md section (hull owns CLAUDE.md)", () => {
   const claude = piece("claude");
-  assert.deepEqual(claude.requires, ["core"]);
+  assert.deepEqual(claude.requires, ["meta"]);
   assert.equal(claude.sections, undefined);
   assert.deepEqual(
     renderedFiles("claude").sort(),
@@ -119,7 +132,7 @@ test("claude agents: same file set as hull base, frontmatter name/description/to
 test("skills: multiple, target .{{ dir }}/skills, dir is claude or agents", () => {
   const skills = piece("skills");
   assert.equal(skills.multiple, true);
-  assert.deepEqual(skills.requires, ["core"]);
+  assert.deepEqual(skills.requires, ["meta"]);
   assert.equal(skills.target, ".{{ dir }}/skills");
   const re = new RegExp(skills.vars.dir.pattern);
   assert.equal(skills.vars.dir.pattern, "^(claude|agents)$");
@@ -187,8 +200,8 @@ test("core rules fragment: harness-neutral, names the agents only with claude", 
     piece: { id: "core", name: "core" },
     template: { name: "rigging", version: "0.0.0" },
   });
-  const plain = renderString(src, ctx(["core"]));
-  const claude = renderString(src, ctx(["core", "claude"]));
+  const plain = renderString(src, ctx(["meta", "core"]));
+  const claude = renderString(src, ctx(["meta", "core", "claude"]));
   for (const out of [plain, claude]) {
     assert.ok(out.endsWith("\n") && !out.endsWith("\n\n"), "ends in one newline");
     assert.ok(!/\n\n\n/.test(out));

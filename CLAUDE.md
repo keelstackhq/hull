@@ -18,7 +18,7 @@ versions and config, never app logic. Consumers render it with `splice` from
 template/splice.toml            template manifest (format 1)
 template/pieces/<id>/           piece.toml + files/ (base, preact-app, ui-storybook, astro-site,
                                 hono-worker, rust-tool, rust-cli, npm-cli, ts-lib, tauri-app, docs)
-rigging/                        splice channel template (core, claude, skills; spec §14)
+rigging/                        splice channel template (empty base meta; core, claude, skills; §14)
 scripts/render.mjs, lib/        dev renderer (contract §1-§4, §8, §9; `new` only)
 scripts/combos.json             piece combinations hull CI renders
 scripts/dogfood.mjs             render combos, run their CI command

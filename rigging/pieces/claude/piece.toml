@@ -1,7 +1,7 @@
 id = "claude"
 description = "Claude Code subagents (Explore, implementer, reviewer, ci-fixer)"
 multiple = false
-requires = ["core"]
+requires = ["meta"]
 
 [files]
 owned = [".claude/agents/*.md"]

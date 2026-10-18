@@ -1,7 +1,7 @@
 id = "skills"
 description = "Agent skills for one harness directory: claude (.claude/skills) or agents (.agents/skills, Codex)"
 multiple = true
-requires = ["core"]
+requires = ["meta"]
 target = ".{{ dir }}/skills"
 
 [vars]

@@ -877,8 +877,10 @@ Signed off by the hull owner on 2026-10-18 (splice task C2): hull ships a second
 §6-§7, splice 0.2.0), and the root `AGENTS.md` of `base` moves from owned to seed. Both stay
 inside contract format 1; `docs/template-format.md` is unchanged (D-003).
 
-**Layout.** `rigging/splice.toml`: `format = 1`, `name = "rigging"`, `base = "core"`,
-`min_splice = "0.2.0"` (older splices refuse it).
+**Layout.** `rigging/splice.toml`: `format = 1`, `name = "rigging"`, `base = "meta"`,
+`min_splice = "0.2.0"` (older splices refuse it). splice always renders a template's base, so the
+base is `meta`, an empty piece (only `id`, `description`, `multiple`; no files, sections, vars or
+post) and every real piece below is optional; `claude` and `skills` require `meta`, not `core`.
 
 | Piece | Content | Class |
 |---|---|---|
@@ -888,10 +890,9 @@ inside contract format 1; `docs/template-format.md` is unchanged (D-003).
 
 **Who adds which piece.** `core` is for repos not rendered from hull (splice, hoard, hoist,
 berth, …). A hull repo already carries these rules in its own `AGENTS.md` (§6.9), so it adds only
-`claude` and/or `skills` from rigging, never `core`. `core` is the channel's `base`, which splice
-always renders, so a hull repo passes `--exclude AGENTS.md` (splice channels spec §5: filters
-also match section hosts) to keep the section out;
-the generated `AGENTS.md` does not mention rigging because the cli combo is at 4,103 of 4,150
+`claude` and/or `skills` from rigging, never `core`: `--piece claude` and/or
+`--piece skills:claude --data dir=claude`; a non-hull repo adds `--piece core` as well.
+The generated `AGENTS.md` does not mention rigging: the cli combo is at 4,103 of 4,150
 always-loaded bytes.
 
 **Budget.** hull's AI-layer budget (`AGENTS.md` ≤ 60 lines, `CLAUDE.md` ≤ 20, ≤ 4,150
