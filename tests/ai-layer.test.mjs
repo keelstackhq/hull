@@ -52,6 +52,13 @@ test("per combo: AGENTS.md <= 60, CLAUDE.md <= 20, together <= 80, no triple new
   }
 });
 
+test("root AGENTS.md is seed (channels add sections to it); root CLAUDE.md stays owned", async () => {
+  const { result } = await renderCombo(["base", "docs"]);
+  const cls = Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
+  assert.equal(cls["AGENTS.md"], "seed");
+  assert.equal(cls["CLAUDE.md"], "owned");
+});
+
 test("CLAUDE.md lines 1-3 import AGENTS, project notes and index; docs.md is line 4 only with docs", async () => {
   for (const pieces of [["base"], ["base", "docs"]]) {
     const lines = (await read((await renderCombo(pieces)).dir, "CLAUDE.md")).split("\n");

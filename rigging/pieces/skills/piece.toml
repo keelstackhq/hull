@@ -1,0 +1,11 @@
+id = "skills"
+description = "Agent skills for one harness directory: claude (.claude/skills) or agents (.agents/skills, Codex)"
+multiple = true
+requires = ["core"]
+target = ".{{ dir }}/skills"
+
+[vars]
+dir = { prompt = "skills directory: claude or agents", pattern = "^(claude|agents)$" }
+
+[files]
+owned = ["*/SKILL.md"]

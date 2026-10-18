@@ -1,0 +1,10 @@
+## Working rules
+
+- Test first: write the failing test, watch it fail, implement, watch it pass.
+- Verify with real command output before saying a task is done or fixed.
+- One task per change; keep files small and focused; no drive-by refactors.
+- Never print or commit secrets; never read `.env*` files.
+- Releases and tag pushes are made by a human; never publish yourself.
+- At most 2-3 parallel agents, on files that barely overlap.{% if "claude" in pieces %}
+- Claude Code subagents in `.claude/agents`: `Explore` (search), `implementer` (one task),
+  `reviewer` (read-only review), `ci-fixer` (red CI). Keep their reports short.{% endif %}

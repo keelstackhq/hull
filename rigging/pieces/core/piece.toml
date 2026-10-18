@@ -1,0 +1,6 @@
+id = "core"
+description = "Harness-neutral working rules, as a section in AGENTS.md"
+multiple = false
+
+[sections]
+"AGENTS.md" = "sections/rules.md.jinja"
