@@ -886,6 +886,20 @@ inside contract format 1; `docs/template-format.md` is unchanged (D-003).
 | `claude` | `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`, the §6.9 agents with the same names, models and tools, made stack-neutral ("the fast checks `AGENTS.md` or `CLAUDE.md` lists" instead of `pnpm turbo`); **no** `CLAUDE.md` section: hull owns `CLAUDE.md`, which imports `@AGENTS.md` | owned |
 | `skills` | `multiple = true`, `target = ".{{ dir }}/skills"`, var `dir` pattern `^(claude\|agents)$` (no default); `files/<skill>/SKILL.md` with `name` + `description` frontmatter; first skill `handoff` (write next steps and blockers to the progress notes, start fresh rather than compact) | owned |
 
+**Who adds which piece.** `core` is for repos not rendered from hull (splice, hoard, hoist,
+berth, …). A hull repo already carries these rules in its own `AGENTS.md` (§6.9), so it adds only
+`claude` and/or `skills` from rigging, never `core`. `core` is the channel's `base`, which splice
+always renders, so a hull repo passes `--exclude AGENTS.md` (splice channels spec §5: filters
+also match section hosts) to keep the section out;
+the generated `AGENTS.md` does not mention rigging because the cli combo is at 4,103 of 4,150
+always-loaded bytes.
+
+**Budget.** hull's AI-layer budget (`AGENTS.md` ≤ 60 lines, `CLAUDE.md` ≤ 20, ≤ 4,150
+always-loaded bytes, §6.9 and `tests/ai-layer.test.mjs`) covers what hull renders. Content an
+adopter adds through a channel is outside it. Measured 2026-10-18: the `core` section with its
+markers and the blank line before it adds 11 lines / 562 bytes, or 13 lines / 733 bytes with
+`claude`.
+
 One skill source serves two harnesses: `splice channel add … --piece skills:claude --data
 dir=claude`, then `splice add skills --channel rigging --name agents --data dir=agents`.
 Skill names must not collide with hull's own skills (`verify`, `add-piece`, `docs-lookup`), or a
@@ -902,7 +916,10 @@ directory from the cwd up to the repo root, with `name` and `description` frontm
 **`AGENTS.md` → seed.** A channel may only add a section to a host that no lock lists in
 `[files]`, so the root `AGENTS.md` cannot stay owned. Consequence: like every seed it renders only
 on `new`; `splice add` no longer refreshes its `## Pieces` bullets (the generated
-`docs/agents/index.md` still lists every package). Per-instance `<target>/AGENTS.md` and root
+`docs/agents/index.md` still lists every package), and later hull changes to the root `AGENTS.md`
+no longer reach existing repos: the file is frozen at `new`. The class change itself is safe for
+existing repos: splice main spec §10 item 12 (owned → seed keeps the file and drops it from the
+lock). Per-instance `<target>/AGENTS.md` and root
 `CLAUDE.md` stay owned.
 
 **Validation.** hull's dev renderer never renders channels: `loadTemplate` rejects `[sections]`
