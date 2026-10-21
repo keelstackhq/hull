@@ -37,18 +37,9 @@ test("catalog pins exact versions from the spec", async () => {
   for (const [k, v] of Object.entries(ws.catalog)) assert.match(v, /^\d+\.\d+\.\d+$/, k);
   assert.deepEqual(ws.packages, ["apps/*", "packages/*", "crates/*"]);
   assert.equal(ws.minimumReleaseAge, 4320);
-  // Exact name@version entries only: a young pin must not bypass the gate for later versions.
-  for (const e of ws.minimumReleaseAgeExclude)
-    assert.match(e, /^(@[a-z0-9-]+\/)?[a-z0-9.-]+@\d+\.\d+\.\d+(-[a-z0-9.]+)?$/, e);
-  for (const e of [
-    "turbo@2.11.8",
-    "wrangler@4.151.0",
-    "miniflare@5.20261012.0-beta",
-    "storybook@10.6.2",
-    "@cloudflare/workers-types@5.20261014.1",
-    "@sentry/cloudflare@11.7.0",
-  ])
-    assert.ok(ws.minimumReleaseAgeExclude.includes(e), e);
+  // All pins are older than 3 days: no exclusions. A future young pin goes here as an exact
+  // name@version entry, so it never bypasses the gate for later versions.
+  assert.equal(ws.minimumReleaseAgeExclude, undefined);
   assert.deepEqual(ws.allowBuilds, { esbuild: true, workerd: true, sharp: true });
   assert.equal(ws.peerDependencyRules.allowedVersions["storybook>vite-plus"], "1");
   assert.equal(ws.peerDependencyRules.allowedVersions.vite, "1");
