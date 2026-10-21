@@ -69,21 +69,17 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Decision (npm-cli): (1) `requires = ["base"]` → raise to `["base","rust-cli"]`? Follow-up; today the AGENTS/README sentence and the version-sync message say "needs a rust-cli instance named `<crate>`". (2) Add `@types/node` (24.19.2, published 2026-10-09) to the catalog so npm-cli `typecheck` can be `tsc --noEmit` with `checkJs` (verified to pass under TS 7); until approved it is `node --check`.
 
-- Real CI timings (needs hull on GitHub + canary repo): push hull to `keelstackhq/hull` and run `node scripts/ci-timing.mjs --repo keelstackhq/hull --budget 120` after ~20 PR runs; create `keelstackhq/hull-canary` from the `web` combo (`node scripts/render.mjs new --template template --out hull-canary --piece base --piece preact-app:web --piece ui-storybook --piece hono-worker:api --data scope=<scope>`), open ~20 PRs, run `node scripts/ci-timing.mjs --repo keelstackhq/hull-canary --budget 45`.
-
 - Publish `@docspack-community/*` (needs npm scope + owner): create the `@docspack-community` npm scope with an owner, then for each recipe in `community-packs/` (vite-plus; hono and cloudflare listed in `docs/packs.json` once their recipes exist) run the README's `pnpm dlx docspack@1.5.0 build --from <docs dir> --name @docspack-community/<tool> --pkg-version <ver>` and `npm publish` the output. Until then `pnpm docs:packs --online` reports them as unpublished.
 
-- Desktop build verified only on GitHub: this container has no webkit2gtk-4.1. Action: once hull is on GitHub, run `.github/workflows/desktop.yml` via workflow_dispatch and confirm `pnpm turbo run build:desktop` produces a `.deb` for the `desktop` combo.
+- Desktop build verified only on GitHub: this container has no webkit2gtk-4.1. Action: run `.github/workflows/desktop.yml` via workflow_dispatch and confirm `pnpm turbo run build:desktop` produces a `.deb` for the `desktop` combo.
 
 - Cloudflare preview smoke test (needs account): in a repo rendered from the `web` combo, add repo secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts:Edit + Account Settings:Read) and `CLOUDFLARE_ACCOUNT_ID`, open a PR, and check that `preview.yml` uploads `pr-<n>` versions and lists the `*.workers.dev` URLs in the job summary.
 
 - Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
 
-- Time-gated (no human needed): drop each exact `name@version` entry from `minimumReleaseAgeExclude` in base `pnpm-workspace.yaml` (and the matching assertion in `tests/base.test.mjs`) once it is 3 days old: turbo/@turbo/* after 2026-10-16, storybook/@storybook/* and @sentry/* after 2026-10-15 ~18:30Z, wrangler/miniflare/@cloudflare/workers-types after 2026-10-17. Exact versions mean old renders never bypass the gate for newer versions.
-
 - Plan 03 Task 6 (hoard remote cache): `keelstackhq/hoard@v1` is not released (repo not publicly reachable on 2026-10-15). Action (keelstackhq/hoard owners): publish `v1` with a README documenting the GitHub-cache backend and the env it sets (`TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`); then rerun plan 03 Task 6.
 
-- Plan 03 Task 7 (render with splice + update test): `@keelstackhq/splice` 0.1 is not on npm (E404 on 2026-10-15). Action (keelstackhq/splice owners): publish 0.1 with `splice new|add|update|check --json` per contract §9.14; then rerun plan 03 Task 7 with `SPLICE_BIN` set.
+- Plan 03 Task 7 (render with splice + update test): `@keelstackhq/splice` is not on npm (E404 on 2026-10-15 and again on 2026-10-21; 0.2.0 needed). Action (keelstackhq/splice owners): publish 0.2.0 with `splice new|add|update|check --json` per contract §9.14; then rerun plan 03 Task 7 with `SPLICE_BIN` set.
 
 - Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
@@ -142,14 +138,12 @@ All timings are from this cloud container, not GitHub runners; they are not evid
 
 **Blocked — needs you or an upstream repo** (full actions in the Blocked section above)
 
-1. Put hull on GitHub (`keelstackhq/hull`), let CI run, then measure: `node scripts/ci-timing.mjs --repo keelstackhq/hull --budget 120`; create `keelstackhq/hull-canary` from the `web` combo and run it with `--budget 45`.
-2. Run `desktop.yml` once via workflow_dispatch to verify the Tauri `.deb` build (no webkit2gtk here).
-3. Cloudflare account: preview smoke test (secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) and the `vars.SENTRY_DSN` vs `wrangler secret put` check.
-4. ~~Contract: agree a `{% raw %}` addition with keelstackhq/splice~~ done 2026-10-21 (contract §4, §9.23; dev renderer implements it).
-5. npm scope `@docspack-community` + owner to publish the community doc packs.
-6. keelstackhq/hoard v1 release (plan 03 Task 6) and @keelstackhq/splice 0.1 release (plan 03 Task 7).
-7. Release v0.1.0 (plan 03 Task 8): merge to `main`, changelog, `git tag v0.1.0 && git push origin v0.1.0`.
-8. Time-gated, no human needed: drop exact-version `minimumReleaseAgeExclude` entries as they pass 3 days (turbo after 2026-10-16, storybook/sentry after 2026-10-15 ~18:30Z, wrangler/miniflare/workers-types after 2026-10-17).
+1. Run `desktop.yml` once via workflow_dispatch to verify the Tauri `.deb` build (no webkit2gtk here).
+2. Cloudflare account: preview smoke test (secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) and the `vars.SENTRY_DSN` vs `wrangler secret put` check.
+3. ~~Contract: agree a `{% raw %}` addition with keelstackhq/splice~~ done 2026-10-21 (contract §4, §9.23; dev renderer implements it).
+4. npm scope `@docspack-community` + owner to publish the community doc packs.
+5. keelstackhq/hoard v1 release (plan 03 Task 6) and @keelstackhq/splice 0.2.0 release (plan 03 Task 7).
+6. Release v0.1.0 (plan 03 Task 8): merge to `main`, changelog, `git tag v0.1.0 && git push origin v0.1.0`.
 
 Environment note: this container shipped Node 22 / pnpm 10; the build used Node 24.21 (nvm) and pnpm 12.11.2.
 A stray `/plan.bak` (a subagent backup written because `TMPDIR` is `/`) sits outside the repo; delete it if you like.
