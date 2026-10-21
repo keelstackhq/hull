@@ -38,16 +38,6 @@
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && [ -f package.json ] && pnpm install --prefer-offline --silent >/dev/null 2>&1; echo 'hull: deps ready (or install skipped)'; exit 0"
           }
         ]
-      },
-      {
-        "matcher": "startup|resume",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/sync-decisions.sh\"",
-            "timeout": 60
-          }
-        ]
       }
     ]
   },
