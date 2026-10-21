@@ -663,7 +663,9 @@ Trade-off for the docs-only budget: formatting of root docs is checked by local
 Measure with `scripts/ci-timing.mjs` (hull) or by hand:
 `gh run list -w ci.yml -L 20 --json databaseId` then `gh run view <id> --json jobs` and
 `completedAt − startedAt` of job `ci`. The script reports p50/p90 and exits 1 when p50 exceeds
-the budget. A canary repo rendered from the `web` combo is the reference (blocked: needs repo).
+the budget. Canary repos rendered from hull are the reference: `keelstackhq/example-app` (`web` combo; p50 29 s,
+p90 51 s, docs-only 7 s) and `keelstackhq/cli-canary` (`cli` combo, 2026-10-21: npm-cli-only PR 26 s,
+docs-only 9 s, crate PR 42 s warm; cold `main` 98 s).
 
 ### 8.5 Custom runners
 

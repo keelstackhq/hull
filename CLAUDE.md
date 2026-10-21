@@ -95,10 +95,11 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
 - pnpm 12 blocks dependency build scripts unless listed in `allowBuilds` (`onlyBuiltDependencies` is
   ignored). `minimumReleaseAge` is strict: a pin younger than 3 days needs `minimumReleaseAgeExclude`.
 
+<!-- splice:decisions:begin — managed by `splice update --channel decisions`; edit the source -->
 ## Org decisions
 
 Cross-repo decisions from keelstackhq/decisions; follow them. To change one, open a PR there.
-The hook refreshes this snapshot; commit an update alone as `chore: sync org decisions`.
-Hull's template does not ship them: generated repos belong to people outside the org.
+`splice update --channel decisions` refreshes this snapshot; commit it alone as `chore: sync org decisions`.
 
 @docs/agents/org-decisions.md
+<!-- splice:decisions:end -->
