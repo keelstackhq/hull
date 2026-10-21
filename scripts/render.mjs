@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { TemplateError, UsageError } from "./lib/errors.mjs";
 import { loadTemplate } from "./lib/manifest.mjs";
-import { buildPlan, resolveRequest } from "./lib/plan.mjs";
+import { buildPlan, checkMinSplice, resolveRequest } from "./lib/plan.mjs";
 import { renderString } from "./lib/render-file.mjs";
 import { checkSubset } from "./lib/subset.mjs";
 
@@ -59,6 +59,7 @@ export async function renderNew(opts) {
   await assertEmptyOut(out);
   const t = await loadTemplate(resolve(opts.template));
   const instances = resolveRequest(t, { pieces: opts.pieces, vars: opts.vars ?? {} });
+  await checkMinSplice(t);
   const plan = await buildPlan(t, instances, {
     templateVersion: opts.templateVersion ?? "0.0.0-dev",
   });

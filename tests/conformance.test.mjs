@@ -20,6 +20,10 @@ const CASES = [
   "blank-lines-around-blocks",
   "unicode",
   "section-fragment",
+  "raw-braces",
+  "raw-final-newline",
+  "raw-line-edges",
+  "raw-tags",
 ];
 const read = (name) => readFileSync(new URL(name, DIR), "utf8");
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkSubset } from "../scripts/lib/subset.mjs";
+import { checkSubset, referencedNames, usesRaw } from "../scripts/lib/subset.mjs";
 
 const ok = [
   "{{ scope }}",
@@ -13,6 +13,12 @@ const ok = [
   "{# note #}",
   "{{ piece.name }}",
   "{# c {{ x #}",
+  "{% raw %}{{ x }}{% endraw %}",
+  "{%raw%}{{ x }}{%endraw%}",
+  "{%\traw\n%}{% if %}{%\tendraw %}",
+  "a ${% raw %}{{ secrets.X }}{% endraw %}",
+  "{% raw %}#} {# {{ {% set %}{% endraw %}",
+  "{% if a %}{% raw %}{% else %}{% endraw %}{% endif %}",
 ];
 for (const s of ok) test(`allows ${s}`, () => assert.deepEqual(checkSubset(s, "f"), []));
 
@@ -67,3 +73,78 @@ test("flags stray endif and file name", () => {
   assert.equal(v.file, "g.jinja");
   assert.match(v.reason, /unexpected/);
 });
+
+// --- raw blocks (contract §4, §9.23)
+const rawBad = [
+  ["{% raw %}{% raw %}x{% endraw %}", /nested raw/],
+  ["{% raw %}{%raw%}x{% endraw %}", /nested raw/],
+  ["{% raw %}{%- raw %}x{% endraw %}", /nested raw/],
+  ["{% raw %}x{% endraw -%}", /endraw/],
+  ["{% raw %}x{%- endraw %}", /endraw/],
+  ["{% raw %}x{% endraw+ %}", /endraw/],
+  ["{% raw %}x{%\vendraw %}", /endraw/],
+  ["{% raw %}x{%\u00a0endraw %}", /endraw/],
+  ["{%- raw %}x{% endraw %}", /raw/],
+  ["{% raw -%}x{% endraw %}", /raw/],
+  ["{% raw %}x", /unterminated raw/],
+  ["a\n{% raw %}x", /unterminated raw/],
+  ["{% endraw %}", /stray endraw/],
+  ["x {% endraw %} {% raw %}y{% endraw %}", /stray endraw/],
+];
+for (const [s, re] of rawBad)
+  test(`rejects raw misuse ${JSON.stringify(s)}`, () => {
+    const v = checkSubset(s, "f");
+    assert.ok(v.length > 0, "expected a violation");
+    assert.ok(
+      v.some((x) => re.test(x.reason)),
+      JSON.stringify(v),
+    );
+  });
+test("raw error names file and line", () => {
+  const v = checkSubset("a\nb\n{% raw %}x", "g.jinja")[0];
+  assert.equal(v.file, "g.jinja");
+  assert.equal(v.line, 3);
+});
+test("stray endraw reports its line", () =>
+  assert.equal(checkSubset("a\n{% endraw %}", "f")[0].line, 2));
+test("raw is not allowed in a path segment", () => {
+  const v = checkSubset("a{% raw %}b{% endraw %}", "f", { path: true });
+  assert.match(v[0].reason, /raw.*path/);
+});
+test("raw bodies are masked from undefined-variable detection", () =>
+  assert.deepEqual(referencedNames("{% raw %}{{ nope }}{% endraw %}{{ v }}"), [
+    { name: "v", line: 1, loop: false },
+  ]));
+test("raw bodies are masked from the unterminated-opener check", () =>
+  assert.deepEqual(checkSubset("{% raw %}{{ a {% if{% endraw %}", "f"), []));
+test("usesRaw detects raw blocks", () => {
+  assert.equal(usesRaw("a {% raw %}x{% endraw %}"), true);
+  assert.equal(usesRaw("{# {% raw %} #}{{ a }}"), false);
+});
+
+// --- stray #} (§9.24)
+test("stray #} in plain text is rejected with its line", () => {
+  const v = checkSubset("a\nb #} c", "g.jinja");
+  assert.equal(v.length, 1);
+  assert.equal(v[0].line, 2);
+  assert.equal(v[0].file, "g.jinja");
+  assert.match(v[0].reason, /stray "#\}"/);
+});
+test("stray #} in a path segment is rejected", () =>
+  assert.match(checkSubset("a#}b", "f", { path: true })[0].reason, /stray/));
+
+// --- whitespace inside tags is [ \t\r\n] only (§9.19)
+for (const [name, s] of [
+  ["NBSP in output", "{{\u00a0a }}"],
+  ["NBSP before the name", "{{ \u00a0a}}"],
+  ["NBSP around a filter", "{{ a |\u00a0lower }}"],
+  ["vertical tab", "{{\va}}"],
+  ["form feed in if", "{% if\fa %}{% endif %}"],
+  ["ideographic space in for", "{% for p\u3000in pieces %}{% endfor %}"],
+  ["NBSP in tag keyword gap", "{%\u00a0if a %}{% endif %}"],
+  ["NBSP in piece test", '{% if "x"\u00a0in pieces %}{% endif %}'],
+])
+  test(`rejects ${name}`, () => assert.ok(checkSubset(s, "f").length > 0));
+for (const s of ["{{\ta\r\n}}", "{{a|lower}}", "{% if\ta\n%}{% endif %}"])
+  test(`allows ASCII whitespace ${JSON.stringify(s)}`, () =>
+    assert.deepEqual(checkSubset(s, "f"), []));

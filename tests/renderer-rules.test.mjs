@@ -238,3 +238,41 @@ test("subset: piece ids in conditions follow the segment rule", () => {
   assert.ok(checkSubset('{% if "con" in pieces %}x{% endif %}', "f").length > 0);
   assert.ok(checkSubset('{% if "a/b" in pieces %}x{% endif %}', "f").length > 0);
 });
+
+// --- raw blocks need min_splice >= 0.2.0 (contract §9.23)
+const withMinSplice = async (v, files) => {
+  const t = await addFiles(files);
+  const st = join(t, "splice.toml");
+  await writeFile(
+    st,
+    (await readFile(st, "utf8")).replace(/^min_splice = .*$/m, `min_splice = "${v}"`),
+  );
+  return t;
+};
+test("raw with min_splice 0.1.0 → TemplateError", async () => {
+  const t = await withMinSplice("0.1.0", { "r.txt.jinja": "a {% raw %}{{ x }}{% endraw %}\n" });
+  await rejects(TemplateError, /min_splice.*0\.2\.0/, render(t));
+});
+test("raw in an unselected piece still needs min_splice 0.2.0", async () => {
+  const t = await withMinSplice("0.1.9", {});
+  const dir = join(t, "pieces/base/files");
+  await writeFile(join(dir, "r.txt.jinja"), "{% raw %}x{% endraw %}\n");
+  await rejects(TemplateError, /min_splice/, render(t));
+});
+test("raw with min_splice 0.2.0 renders verbatim", async () => {
+  const t = await withMinSplice("0.2.0", { "r.txt.jinja": "a ${% raw %}{{ x }}{% endraw %}\n" });
+  const { out } = await render(t);
+  assert.equal(await readFile(join(out, "r.txt"), "utf8"), "a ${{ x }}\n");
+});
+test("raw with min_splice 1.0.0 is fine", async () => {
+  const t = await withMinSplice("1.0.0", { "r.txt.jinja": "{% raw %}x{% endraw %}\n" });
+  await render(t);
+});
+test("min_splice 0.10.0 compares numerically", async () => {
+  const t = await withMinSplice("0.10.0", { "r.txt.jinja": "{% raw %}x{% endraw %}\n" });
+  await render(t);
+});
+test("raw in a file path → TemplateError", async () => {
+  const t = await withMinSplice("0.2.0", { "a{% raw %}b{% endraw %}.txt": "x\n" });
+  await rejects(TemplateError, /raw.*path/, render(t));
+});
