@@ -153,7 +153,9 @@ export function checkSubset(source, file, opts = {}) {
     const tag = m[0];
     const line = source.slice(0, m.index).split("\n").length;
     const inner = m[1] ?? m[2] ?? m[3];
-    if (/^[-+~]/.test(inner) || /[-+~]$/.test(inner)) {
+    // Contract §9.18: a comment may not start or end with "-" or "+"; "~" is allowed there.
+    const ctl = m[3] !== undefined ? /^[-+]|[-+]$/ : /^[-+~]|[-+~]$/;
+    if (ctl.test(inner)) {
       report(line, tag, "whitespace control is not allowed");
       continue;
     }

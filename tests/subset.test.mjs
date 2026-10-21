@@ -13,6 +13,7 @@ const ok = [
   "{# note #}",
   "{{ piece.name }}",
   "{# c {{ x #}",
+  "{#~ x ~#}",
   "{% raw %}{{ x }}{% endraw %}",
   "{%raw%}{{ x }}{%endraw%}",
   "{%\traw\n%}{% if %}{%\tendraw %}",
