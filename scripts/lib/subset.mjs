@@ -16,7 +16,8 @@ const DOTTED = new Set(["piece.id", "piece.name", "template.name", "template.ver
 
 // --- raw blocks (contract §4, §9.23) ---------------------------------------------------------
 // Loose: any spelling of a raw/endraw tag (whitespace control, Unicode spaces), so misuse is seen.
-const RAW_TAG = "\\{%[-+~]?[\\s\\u0085]*(end)?raw[\\s\\u0085]*[-+~]?%\\}";
+// Mirrors splice's lax_tag: any mix of whitespace, "-" and "+" around the name ("~" is not control).
+const RAW_TAG = "\\{%[-+\\s\\u0085]*(end)?raw[-+\\s\\u0085]*%\\}";
 const RAW_OUTSIDE_RE = new RegExp(`\\{#[\\s\\S]*?#\\}|${RAW_TAG}`, "g"); // comments hide raw tags
 const RAW_INSIDE_RE = new RegExp(RAW_TAG, "g"); // inside a body "{#" is plain text
 const RAW_STRICT_RE = new RegExp(`^\\{%${WS}*(end)?raw${WS}*%\\}$`);
@@ -208,13 +209,20 @@ export function checkSubset(source, file, opts = {}) {
   }
 
   const ranges = [...source.matchAll(TAG_RE)].map((m) => [m.index, m.index + m[0].length]);
+  // ranges are sorted and disjoint; matches come in order, so one cursor keeps this linear.
+  let cursor = 0;
+  const inTag = (i) => {
+    while (cursor < ranges.length && ranges[cursor][1] <= i) cursor++;
+    return cursor < ranges.length && i >= ranges[cursor][0];
+  };
   for (const m of source.matchAll(/\{[{%#]/g)) {
-    if (ranges.some(([a, b]) => m.index >= a && m.index < b)) continue;
+    if (inTag(m.index)) continue;
     const line = source.slice(0, m.index).split("\n").length;
     report(line, m[0], `unterminated tag "${m[0]}"`);
   }
+  cursor = 0;
   for (const m of source.matchAll(/#\}/g)) {
-    if (ranges.some(([a, b]) => m.index >= a && m.index < b)) continue;
+    if (inTag(m.index)) continue;
     report(
       lineAt(source, m.index),
       m[0],

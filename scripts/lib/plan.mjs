@@ -130,12 +130,12 @@ async function walk(dir, prefix = "") {
 
 const RAW_MIN_SPLICE = [0, 2, 0];
 
-/** True when semver `v` (major.minor.patch, any suffix ignored) is >= `min`. */
+/** True when semver `v` is >= `min` (major.minor.patch); a prerelease sorts below its release. */
 function atLeast(v, min) {
-  const parts = /^(\d+)\.(\d+)\.(\d+)/.exec(v)?.slice(1).map(Number);
-  if (!parts) return false;
-  for (let i = 0; i < 3; i++) if (parts[i] !== min[i]) return parts[i] > min[i];
-  return true;
+  const m = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?(?:\+.*)?$/.exec(v);
+  if (!m) return false;
+  for (let i = 0; i < 3; i++) if (Number(m[i + 1]) !== min[i]) return Number(m[i + 1]) > min[i];
+  return m[4] === undefined;
 }
 
 /**

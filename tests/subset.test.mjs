@@ -86,6 +86,11 @@ const rawBad = [
   ["{% raw %}x{%\u00a0endraw %}", /endraw/],
   ["{%- raw %}x{% endraw %}", /raw/],
   ["{% raw -%}x{% endraw %}", /raw/],
+  ["{% raw %}x{% - endraw %}", /must be exactly/],
+  ["{% raw %}x{% endraw - %}", /must be exactly/],
+  ["{% raw %}x{%-- endraw %}", /must be exactly/],
+  ["{% raw %}x{%+- endraw %}", /must be exactly/],
+  ["{% raw %}{% - raw %}x{% endraw %}", /nested raw/],
   ["{% raw %}x", /unterminated raw/],
   ["a\n{% raw %}x", /unterminated raw/],
   ["{% endraw %}", /stray endraw/],
@@ -148,3 +153,6 @@ for (const [name, s] of [
 for (const s of ["{{\ta\r\n}}", "{{a|lower}}", "{% if\ta\n%}{% endif %}"])
   test(`allows ASCII whitespace ${JSON.stringify(s)}`, () =>
     assert.deepEqual(checkSubset(s, "f"), []));
+
+test("{%~ endraw %} inside a raw body is plain text, like splice", () =>
+  assert.deepEqual(checkSubset("{% raw %}a{%~ endraw %}b{% endraw %}", "f"), []));

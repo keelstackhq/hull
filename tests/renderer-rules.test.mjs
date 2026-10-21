@@ -276,3 +276,11 @@ test("raw in a file path → TemplateError", async () => {
   const t = await withMinSplice("0.2.0", { "a{% raw %}b{% endraw %}.txt": "x\n" });
   await rejects(TemplateError, /raw.*path/, render(t));
 });
+test("min_splice 0.2.0-rc.1 is below 0.2.0 (semver prerelease)", async () => {
+  const t = await withMinSplice("0.2.0-rc.1", { "r.txt.jinja": "{% raw %}x{% endraw %}\n" });
+  await rejects(TemplateError, /min_splice/, render(t));
+});
+test("min_splice 0.3.0-rc.1 is above 0.2.0", async () => {
+  const t = await withMinSplice("0.3.0-rc.1", { "r.txt.jinja": "{% raw %}x{% endraw %}\n" });
+  await render(t);
+});
