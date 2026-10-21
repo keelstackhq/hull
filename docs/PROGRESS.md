@@ -61,6 +61,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Blocked
 
+- Contract §9.15–26 (raw blocks, stray `#}`, portable paths, POSIX sh, `[sections]`, rename): merge this hull PR and the splice PR from `claude/friendly-hamilton-mn95h1` to `main` in the same week (D-003); the two `docs/template-format.md` copies are byte-identical.
 - Dogfood `rigging/` with splice once `@keelstackhq/splice` 0.2.0 is on npm (after splice plan 03): `splice channel add <hull>/rigging --piece claude`, then `splice add skills --channel rigging --name agents --data dir=agents`, in a rendered combo; until then hull tests validate rigging (spec §14).
 - Hull release removing the four agent files: `template/migrations/<v>.toml` `[[remove]]` for `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`, README + generated `CLAUDE.md` say: run `splice update`, then `splice channel add gh:keelstackhq/hull//rigging --piece claude` (needs splice 0.2.0; not a post/step).
 
