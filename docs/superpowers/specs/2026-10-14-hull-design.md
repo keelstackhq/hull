@@ -71,7 +71,10 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
   `var` or `"id" in pieces` (§9.2); `{% if pieces %}` is rejected; dotted access is limited to
   `piece.id`, `piece.name`, `template.name`, `template.version` (§9.3); no whitespace control
   (`{%-`, `-%}`), no `set`, no comparisons, no `not`/`and`/`or`, no filters other than
-  `lower`/`upper`. The dev renderer and the invariant tests both enforce this.
+  `lower`/`upper`. `{% raw %}…{% endraw %}` is allowed (§9.23: exact tags without whitespace
+  control, no nested raw, never in a path, template needs `min_splice` >= 0.2.0), a `#}` outside a
+  comment or raw body is an error (§9.24), and whitespace inside tags is only space, tab, CR or LF
+  (§9.19). The dev renderer and the invariant tests both enforce this.
 - Final newline kept exactly as in the source; no auto-escaping (§9.4). All vars are strings.
 - `pieces` = unique ids in add order; a `multiple = false` piece has `name` = its `id` (§9.5).
 - Dev-renderer rules (agreed with splice, contract change pending): identifiers are ASCII `[a-z_][a-z0-9_]*` and
@@ -126,10 +129,10 @@ The items below are the gaps as hull first found them.
    `splice new <source> <dest> --piece <id>[:<name>]... --data <key>=<value>... --yes --json`
    and adapts in plan 03 when splice publishes its CLI.
 8. **Literal `{{` in `.jinja` output.** GitHub Actions expressions (`${{ … }}`) collide with the
-   subset, which has no `{% raw %}` and no string-literal output. Workflows without piece
-   conditions are plain files (`ci.yml`). Piece-dependent workflows need a contract addition
-   (proposed: `{% raw %}…{% endraw %}` in §4) or a runtime guard instead of a template condition.
-   Raised with keelstackhq/splice (Blocked in `docs/PROGRESS.md`).
+   subset, which has no string-literal output. The contract now has `{% raw %}…{% endraw %}` (§4,
+   §9.23), so a piece-dependent workflow can be a `.jinja` file with `${% raw %}{{ … }}{% endraw %}`.
+   It needs `min_splice = "0.2.0"` or later in `splice.toml`; hull's template uses no raw today and
+   keeps `0.1.0`. Existing plain workflows (`ci.yml`, `preview.yml`) stay plain files.
 
 ## 5. Template variables
 
@@ -213,8 +216,8 @@ Root files (class in brackets):
 - `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
   `desktop.yml.jinja` [owned] (§8.3), `release.yml` [owned] with
   `.github/scripts/release-plan.mjs` [owned] (§8.7; plain files, rendered in every repo, idle
-  without a rust-cli or ts-lib package). The contract subset cannot emit GitHub's `${{ … }}` from a
-  `.jinja` file (no `{% raw %}`, no string literals), so a workflow is a plain file unless it needs
+  without a rust-cli or ts-lib package). A `.jinja` workflow can emit GitHub's `${{ … }}` only with
+  `{% raw %}` (needs `min_splice` 0.2.0); today every workflow is a plain file unless it needs
   piece conditions; see §4.3 item 8.
 - `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-cli, rust-tool or tauri-app:
   `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-cli or rust-tool, via a nested marked chain;

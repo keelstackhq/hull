@@ -1,13 +1,13 @@
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { TemplateError, UsageError } from "./errors.mjs";
 import { classify, outputPath } from "./ownership.mjs";
 import { pathProblem, segmentProblem } from "./segment.mjs";
 import { renderString } from "./render-file.mjs";
-import { checkSubset } from "./subset.mjs";
+import { checkSubset, usesRaw } from "./subset.mjs";
 
-function renderChecked(source, context, where) {
-  const violations = checkSubset(source, where);
+function renderChecked(source, context, where, opts = {}) {
+  const violations = checkSubset(source, where, opts);
   if (violations.length > 0) {
     throw new TemplateError(
       violations.map((v) => `${v.file}:${v.line}: ${v.tag}: ${v.reason}`).join("\n"),
@@ -128,6 +128,35 @@ async function walk(dir, prefix = "") {
   return out;
 }
 
+const RAW_MIN_SPLICE = [0, 2, 0];
+
+/** True when semver `v` is >= `min` (major.minor.patch); a prerelease sorts below its release. */
+function atLeast(v, min) {
+  const m = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?(?:\+.*)?$/.exec(v);
+  if (!m) return false;
+  for (let i = 0; i < 3; i++) if (Number(m[i + 1]) !== min[i]) return Number(m[i + 1]) > min[i];
+  return m[4] === undefined;
+}
+
+/**
+ * Contract §9.23: a template with a raw block in any `.jinja` file sets min_splice >= 0.2.0.
+ * Scans every piece, selected or not.
+ */
+export async function checkMinSplice(t) {
+  if (atLeast(t.minSplice, RAW_MIN_SPLICE)) return;
+  for (const piece of t.pieces.values()) {
+    for (const rel of await walk(piece.filesDir)) {
+      if (!rel.endsWith(".jinja")) continue;
+      const src = join(piece.filesDir, rel);
+      if (usesRaw(await readFile(src, "utf8"))) {
+        throw new TemplateError(
+          `${src}: uses {% raw %}, which needs min_splice = "0.2.0" or later (splice.toml has "${t.minSplice}")`,
+        );
+      }
+    }
+  }
+}
+
 export async function buildPlan(t, instances, opts) {
   const pieces = [...new Set(instances.map((i) => i.piece.id))];
   const plan = [];
@@ -142,7 +171,9 @@ export async function buildPlan(t, instances, opts) {
     const target =
       inst.piece.target === undefined
         ? null
-        : renderChecked(inst.piece.target, context, `piece ${inst.piece.id}: piece.toml target`);
+        : renderChecked(inst.piece.target, context, `piece ${inst.piece.id}: piece.toml target`, {
+            path: true,
+          });
     const targetProblem = target === null ? null : pathProblem(target);
     if (targetProblem) {
       throw new TemplateError(
@@ -155,6 +186,7 @@ export async function buildPlan(t, instances, opts) {
         outputPath(rel),
         context,
         `piece ${inst.piece.id}: path ${rel}`,
+        { path: true },
       );
       const path = target ? `${target}/${rendered}` : rendered;
       const problem = pathProblem(path);

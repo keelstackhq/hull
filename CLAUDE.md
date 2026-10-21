@@ -45,7 +45,8 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
 ## Rules that must never break
 
 - **Template stays inside the contract.** `.jinja` uses only the subset: `{{ var }}`, `| lower`,
-  `| upper`, `if/elif/else` on `var` or `"id" in pieces`, `for p in pieces`, comments. No
+  `| upper`, `if/elif/else` on `var` or `"id" in pieces`, `for p in pieces`, comments, and
+  `{% raw %}…{% endraw %}` (exact tags, no `-`; needs `min_splice` ≥ 0.2.0; never in paths). No
   `not/and/or`, comparisons, `set`, `{%-`, macros, includes, other filters, `{% if pieces %}`.
 - **No app logic in the template.** App source is `seed`; configs/workflows/AI layer are `owned`;
   `package.json`, `turbo.json`, `pnpm-workspace.yaml`, crate `Cargo.toml`, `tauri.conf.json`,
