@@ -106,11 +106,10 @@ test("claude: the four agent files owned, no CLAUDE.md section (hull owns CLAUDE
   }
 });
 
-test("claude agents: same file set as hull base, frontmatter name/description/tools/model", () => {
-  assert.deepEqual(
-    readdirSync(join(REAL_TEMPLATE, "pieces/base/files/.claude/agents")).sort(),
-    AGENT_FILES,
-  );
+test("claude agents: the files base dropped in 0.2.0, frontmatter name/description/tools/model", () => {
+  assert.ok(!existsSync(join(REAL_TEMPLATE, "pieces/base/files/.claude/agents")));
+  const removed = readFileSync(join(REAL_TEMPLATE, "migrations/0.2.0.toml"), "utf8");
+  for (const f of AGENT_FILES) assert.ok(removed.includes(`".claude/agents/${f}"`), f);
   const want = {
     "explore.md": ["Explore", "haiku", "Read, Grep, Glob"],
     "implementer.md": ["implementer", "sonnet", "Read, Edit, Write, Bash, Grep, Glob"],

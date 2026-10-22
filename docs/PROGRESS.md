@@ -51,6 +51,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-22 · migrations names · `fix: migrations/ holds only <semver>.toml files` · splice 0.2.0 refused hull's template (also tag v0.1.0) with `template/migrations/.gitkeep: migration files must be named <semver>.toml`; dropped the `.gitkeep`s (fixture keeps `migrations/1.0.0.toml`), dev renderer now rejects non-`<semver>.toml` entries, invalid TOML and `[[step]]`/`[[remove]]` without `run`/`path` like splice; 9 tests RED first; 676/676, lint+fmt clean; `splice new /home/user/hull//template --ref HEAD` ok; dogfood base, web, docs, lib, site, cli ok
 - 2026-10-22 · 03/7 · `ci: render combos with splice and test template updates` · dogfood `--renderer splice|dev` (default splice: commits a snapshot of `template/` to a scratch repo, `splice new <snap>//template --ref HEAD`, splice runs the `[[post]]` hooks; dev path unchanged), `scripts/lib/splice.mjs` (`SPLICE_VERSION` 0.2.0, `SPLICE_BIN` else `pnpm dlx`), hull CI installs splice before Test; `tests/splice-parity.test.mjs` (every combo identical to the dev renderer, excluding `.splice/` and `.git/`; §8 JSON shape) and `tests/splice-update.test.mjs` (web combo from v0.1.0 → working tree: check exit 1 on the owned edit, update refused without `--force`, seed kept, `left-pad` kept, owned replaced, check exit 0). RED first: dogfood renderer tests (3) and CI step test; parity first failed on `.git/` (splice `new` runs `git init`). Splice flags: `base` is implicit (listing it is exit 2), local sources must be git repos. Reviewer (sonnet): approve with minor changes, all applied (no redundant `git init`, splice output labelled by combo, update test fails instead of skipping on CI without a tag). Cost here: the two splice test files 2.6 s, `npm i -g @keelstackhq/splice@0.2.0` 1.4 s; dogfood base/web/site/docs/cli/lib with splice ok. Not done: `add rust-tool:b` keeps locked crates (needs cargo in the test).
 - 2026-10-22 · 03/6 · `ci: use hoard as the Turborepo remote cache` · hoard 0.1.0 is published (tags `v0.1.0` and `v0` on 5c32424, release asset `hoard-x86_64-unknown-linux-musl.tar.gz` downloads; the releases API was not reachable from this session); generated `ci.yml` and hull's `ci.yml` replace the `actions/cache` turbo step with `keelstackhq/hoard@v0` (guarded like their neighbours, after install, before turbo); dogfood passes `--cache-dir` only without `TURBO_API`; RED first (3 tests); 686/686 with `SPLICE_BIN`, lint+fmt clean. Step 4 (ci-timing p50 before/after) not measured yet
+- 2026-10-22 · base agents → rigging · `feat(base)!: subagents move to the rigging channel` · base drops `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`; `template/migrations/0.2.0.toml` `[[remove]]`s them (piece base, no step); generated `CLAUDE.md` and README say `splice update`, then `splice channel add gh:keelstackhq/hull//rigging --piece claude`; spec §6.9, §14. PROGRESS:86 condition checked first: splice 0.2.0 ships the class-change rules (splice spec §10.12), so no migration for the pre-0.1.0 class changes. RED first: 5 tests (base ships no agents, migration list, CLAUDE.md order, rigging file set, update from v0.1.0 deletes the four files); 686/686 with `SPLICE_BIN`, lint+fmt clean; e2e: render v0.1.0, `channel add --piece claude` refused, `update` deletes the four, `channel add` creates them, `check` clean
 
 ## Measurements
 
@@ -68,8 +69,6 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Blocked
 
-- Hull release removing the four agent files: `template/migrations/<v>.toml` `[[remove]]` for `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`, README + generated `CLAUDE.md` say: run `splice update`, then `splice channel add gh:keelstackhq/hull//rigging --piece claude` (needs splice 0.2.0; not a post/step). Required order: the dogfood (2026-10-21) showed `channel add --piece claude` refuses while base's agent files are present, because 3 of 4 differ from `rigging/` (harness-neutral wording).
-
 - First real release of a keelstackhq tool (needs a public npm scope + repo settings): verify `npm publish <pnpm-pack tgz> --provenance`, private-repo behaviour (npm generates no provenance for private repos; artifact attestations need a public repo or GitHub Enterprise Cloud), `ubuntu-24.04-arm`, `macos-latest` cross-building `x86_64-apple-darwin`, and that the `npm view <name>@<version> || npm publish` skip works with setup-node's placeholder `NODE_AUTH_TOKEN` (a 401 on the read would make a re-run try to republish). Before it, per repo: create the GitHub environment `release` with a tag rule `*-v*` and required reviewers (npm and github-release run in parallel, so the reviewers are the only gate before publishing); publish each new npm name once by hand; add an npm trusted publisher (repo, `release.yml`, environment `release`) to the launcher and all five platform packages, or the library, then release within 2 days.
 
 - Publish `@docspack-community/*` (needs npm scope + owner): create the `@docspack-community` npm scope with an owner, then for each recipe in `community-packs/` (vite-plus; hono and cloudflare listed in `docs/packs.json` once their recipes exist) run the README's `pnpm dlx docspack@1.5.0 build --from <docs dir> --name @docspack-community/<tool> --pkg-version <ver>` and `npm publish` the output. Until then `pnpm docs:packs --online` reports them as unpublished.
@@ -82,8 +81,6 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
-- Tag hull v0.1.0 only after splice M2 (class-change rules, splice spec §10 item 12) is released: `<target>/CLAUDE.md` changed from owned to seed and `explorer.md` was removed, and no migration exists because no lock exists yet. If v0.1.0 is tagged first, add the migration first.
-
 ## Status
 
 Written 2026-10-15 when the build loop stopped. Plans 01 and 02 are fully checked. Plan 03 Tasks 1–5
@@ -94,7 +91,7 @@ Milestones 1, 2 and 3 are reviewed (lines above). Updated 2026-10-17 after the m
 
 **Open items after milestone 4**
 
-- Release Blocked items: first real release of a keelstackhq tool, and tagging v0.1.0 only after splice M2.
+- Release Blocked items: first real release of a keelstackhq tool. (Tagging after splice M2: done, splice 0.2.0 ships the class-change rules; v0.1.0 was tagged 2026-10-22.)
 - ~~Human decisions: `@types/node` in the catalog; npm-cli `requires` = `["base", "rust-cli"]`~~ settled by the owner 2026-10-22 (YES to both) and implemented (Done line `owner decisions (npm-cli)`).
 
 **What works**

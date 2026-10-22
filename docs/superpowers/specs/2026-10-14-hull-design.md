@@ -402,9 +402,12 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `docs/agents/project.md`, `docs/agents/index.md`, `docs/agents/docs.md` with docs). It has no
   `@` import lines. `CLAUDE.md`: lines 1-3 are `@AGENTS.md`, `@docs/agents/project.md`,
   `@docs/agents/index.md`, line 4 `@docs/agents/docs.md` only with docs, then `## Claude Code`
-  (subagent list, skills, hooks). Per-instance notes are `<target>/AGENTS.md` (loaded on demand;
+  (subagent line, skills, hooks). Per-instance notes are `<target>/AGENTS.md` (loaded on demand;
   §4.3.3) with a seed `<target>/CLAUDE.md` of `@AGENTS.md`.
-- `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`):
+- `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`). Since 0.2.0 they
+  are not in `base`: rigging's `claude` piece ships them (§14); `migrations/0.2.0.toml` removes
+  base's copies and the generated `CLAUDE.md` says to run `splice update`, then
+  `splice channel add gh:keelstackhq/hull//rigging --piece claude`:
 
 | Agent | Model | Tools | Use |
 |---|---|---|---|
@@ -946,8 +949,11 @@ agent and skill frontmatter, and the fragment's rendered output with and without
 byte-for-byte copy of splice `tests/fixtures/subset/`, including the `section-fragment` case) with
 hull's Nunjucks setup. Dogfooding `rigging/` with splice waits for splice 0.2.0.
 
-**Later (not in this change).** A hull release adds `migrations/<v>.toml` `[[remove]]` for the
-four `.claude/agents` files of `base` (until then a hull repo that adds `--piece claude` gets a
-claim conflict on them) and its README and generated `CLAUDE.md` say: run `splice update`, then
+**hull 0.2.0 (2026-10-22).** `base` no longer ships the four `.claude/agents` files;
+`migrations/0.2.0.toml` `[[remove]]`s them (deleted when unedited, else kept and reported; before
+this, a hull repo that added `--piece claude` got a claim conflict on them), and the README and
+generated `CLAUDE.md` say: run `splice update`, then
 `splice channel add gh:keelstackhq/hull//rigging --piece claude`. Not a post or step: those run
-before the main lock is written.
+before the main lock is written. Class changes made before v0.1.0 (`<target>/CLAUDE.md` owned →
+seed, `explorer.md` removed) need no migration: splice 0.2.0 applies the class-change rules
+(splice spec §10 item 12).
