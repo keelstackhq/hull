@@ -33,6 +33,7 @@ test("catalog pins exact versions from the spec", async () => {
   assert.equal(ws.catalog["vite-plus"], "1.1.0");
   assert.equal(ws.catalog.turbo, "2.11.8");
   assert.equal(ws.catalog.typescript, "7.0.2");
+  assert.equal(ws.catalog["@types/node"], "24.19.2");
   assert.equal(ws.overrides.vite, "npm:@voidzero-dev/vite-plus-core@1.1.0");
   for (const [k, v] of Object.entries(ws.catalog)) assert.match(v, /^\d+\.\d+\.\d+$/, k);
   assert.deepEqual(ws.packages, ["apps/*", "packages/*", "crates/*"]);

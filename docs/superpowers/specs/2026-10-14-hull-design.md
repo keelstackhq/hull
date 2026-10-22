@@ -161,7 +161,7 @@ repo secrets or wrangler vars, not template vars.
 | `rust-cli` | yes | `crates/{{ name }}` | base | `cli` |
 | `tauri-app` | yes | `apps/{{ name }}` | base, preact-app | `desktop` |
 | `ts-lib` | yes | `packages/{{ name }}` | base | `lib` |
-| `npm-cli` | yes | `packages/{{ name }}` | base | `cli` |
+| `npm-cli` | yes | `packages/{{ name }}` | base, rust-cli | `cli` |
 | `docs` | no | — (root) | base | — |
 
 Every JS package has the scripts the CI runs: `lint`, `format:check`, `typecheck`, `test`, `build`
@@ -501,9 +501,9 @@ Verification of the cargo-deny invocation and the `$TURBO_ROOT$` inputs is recor
 
 `packages/<name>` (default `cli`, var `crate` default `cli`, both `^[a-z][a-z0-9-]*$`): the npm side
 of a `rust-cli` binary, package `@<scope>/<name>` with `hull.release = "npm-cli"`. `crate` names the
-rust-cli instance it ships; it is checked as a pattern only, so `requires` stays `["base"]` and the
-generated AGENTS.md, README.md and the version-sync test say "needs a rust-cli instance named
-`<crate>`" (a stricter `requires` is a follow-up decision). `package.json` [shared] has
+rust-cli instance it ships. `requires = ["base", "rust-cli"]` (owner decision 2026-10-22) refuses
+npm-cli without any rust-cli; `crate` itself is checked as a pattern only, so the generated AGENTS.md,
+README.md and the version-sync test say "needs a rust-cli instance named `<crate>`". `package.json` [shared] has
 `bin: { "<crate>": "bin/launcher.js" }`, `files: ["bin"]`, provenance, a devDependency
 `@<scope>/<crate>-crate: workspace:*` (so `--affected` runs this package's tests after a crate change),
 and the scripts `lint`, `format:check`, `typecheck`, `test` only; it never carries `optionalDependencies`,
@@ -517,9 +517,9 @@ platform and the build-from-source command, exit 3 (`cargo install --locked --gi
 the single source for the release workflow) and `stage({ pkgDir, artifactsDir, outDir, repository })`;
 it fails on a missing artifact or a launcher version that differs from `crates/<crate>/Cargo.toml`.
 `test/*.test.js` [owned] read scope, name and bin from the package's own `package.json` at run time.
-`typecheck` is `node --check` on the five JavaScript files: `tsc --noEmit` with `checkJs` works under
-TypeScript 7 (verified 2026-10-17) but needs `@types/node`, which the catalog does not pin; adding it
-is a dependency decision (Blocked in PROGRESS). `tsconfig.json` [owned] keeps `checkJs`; editors show `node:*` errors until `@types/node` is installed.
+`typecheck` is `tsc --noEmit`: `tsconfig.json` [owned] sets `allowJs`, `checkJs` and `types: ["node"]`
+over the five JavaScript files, with devDependencies `typescript` and `@types/node` from the catalog
+(owner decision 2026-10-22; verified under TypeScript 7, §13).
 
 ### 6.12 `ts-lib`
 
@@ -550,6 +550,7 @@ Checked with `npm view` on 2026-10-14.
 | `@voidzero-dev/vite-plus-core` | 1.1.0 | via the `vite` override; always the same version as vite-plus |
 | `turbo` | 2.11.8 | |
 | `typescript` | 7.0.2 | native compiler, binary `tsc` |
+| `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |
 | `preact` | 10.29.8 | 11.0.1 exists, but `@astrojs/preact` peers `^10.6.5` |
 | `@preact/preset-vite` | 2.10.6 | |
 | `astro` | 7.3.8 | depends on `vite ^8.3.1` |
@@ -857,7 +858,7 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 
 Verified 2026-10-17 (rust-cli, agent-layer spec §9 item 8; Rust 1.99.1, cargo-deny 0.20.2, cargo-nextest 0.9.148, turbo 2.11.8): (a) `cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources` works from `crates/cli` and exits 0 (`--manifest-path` and `--config` are global options and must precede `check`: the order `check --config …` from the plan draft fails with "unexpected argument '--config'"); with an added `native-tls` dependency it exits 2 with `banned` for `native-tls`, `openssl` and `openssl-sys`. (b) Touching the root `Cargo.lock` makes `turbo run test --filter=<crate>` miss the cache, also with `globalDependencies` reduced to the two JS files, so the `$TURBO_ROOT$` inputs work on their own. (c) A second `turbo run lint format:check typecheck test build` is 11/11 cached (1 s).
 
-Verified 2026-10-17 (npm-cli, agent-layer spec §9 item 8; TypeScript 7.0.2): `tsc --noEmit` with `allowJs` and `checkJs` type-checks the launcher, `stage.mjs` and the tests, but only with `@types/node` installed (without it TS2688 on `types: ["node"]`, and no `node:*` module types); the catalog does not pin it, so `typecheck` is `node --check` until that dependency is approved.
+Verified 2026-10-17 (npm-cli, agent-layer spec §9 item 8; TypeScript 7.0.2): `tsc --noEmit` with `allowJs` and `checkJs` type-checks the launcher, `stage.mjs` and the tests, but only with `@types/node` installed (without it TS2688 on `types: ["node"]`, and no `node:*` module types); 2026-10-22 the catalog pins `@types/node` 24.19.2 and `typecheck` is `tsc --noEmit` (it was `node --check` until then).
 
 Verified 2026-10-17 (ts-lib, agent-layer spec §9 item 8): `attw --pack . --profile esm-only` runs next to TypeScript 7.0.2 (it uses its bundled 5.6.1-rc) and passes; `vp pack` emits `index.d.mts` with `isolatedDeclarations`.
 
