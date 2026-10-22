@@ -27,13 +27,17 @@ const skip = !BIN
   ? "SPLICE_BIN is unset (hull CI sets it; see scripts/lib/splice.mjs)"
   : !prev && !process.env.CI && "no v<semver> tag reachable from HEAD (fetch tags)";
 
-/** A template repo with tag `v<prev>` (that tag's template/) and `v<next>` (the working tree). */
-async function templateRepo(root) {
-  assert.ok(prev, "no v<semver> tag reachable from HEAD; CI must fetch tags (fetch-depth: 0)");
+/**
+ * A template repo with tag `from` (that tag's template/) and `v<next>` (the working tree).
+ * @param {string} root
+ * @param {string} [from] a `v<semver>` tag of this repo; defaults to the latest one
+ */
+async function templateRepo(root, from = prev) {
+  assert.ok(from, "no v<semver> tag reachable from HEAD; CI must fetch tags (fetch-depth: 0)");
   const repo = join(root, "tpl");
   await mkdir(repo, { recursive: true });
   git(repo, "init", "-q");
-  const tar = spawnSync("git", ["archive", prev, "template"], { cwd: HULL });
+  const tar = spawnSync("git", ["archive", from, "template"], { cwd: HULL });
   assert.equal(tar.status, 0, String(tar.stderr));
   const x = spawnSync("tar", ["-x", "-C", repo], { input: tar.stdout });
   assert.equal(x.status, 0, String(x.stderr));
@@ -41,13 +45,13 @@ async function templateRepo(root) {
   // Drop this line once the previous tag is newer than v0.1.0.
   await rm(join(repo, "template/migrations/.gitkeep"), { force: true });
   git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", prev);
-  git(repo, "tag", prev);
+  git(repo, "commit", "-q", "-m", from);
+  git(repo, "tag", from);
   await rm(join(repo, "template"), { recursive: true });
   await cp(TEMPLATE, join(repo, "template"), { recursive: true });
   git(repo, "add", "-A");
   git(repo, "commit", "-q", "--allow-empty", "-m", "next");
-  const [maj, min] = prev.slice(1).split(".").map(Number);
+  const [maj, min] = from.slice(1).split(".").map(Number);
   const next = `v${maj}.${min + 1}.0`;
   git(repo, "tag", next);
   return { source: `${repo}//template`, next };
@@ -107,14 +111,16 @@ test("update keeps seed, merges shared, guards owned", { skip }, async (t) => {
 });
 
 // Repos first rendered before v0.1.0 (dev renderer) and later adopted with `splice new --force`
-// still carry `.claude/agents/explorer.md`, which no lock tracks (migrations/0.2.1.toml).
+// still carry `.claude/agents/explorer.md`, which no lock tracks (migrations/0.2.1.toml). The
+// update starts at v0.2.0 so that migration is in range whatever the latest tag is.
+const FROM_EXPLORER = "v0.2.0";
 test(
   "update deletes an unedited pre-0.1.0 explorer.md, keeps an edited one",
   { skip },
   async (t) => {
     const root = await mkdtemp(join(tmpdir(), "hull-update-"));
     t.after(() => rm(root, { recursive: true, force: true }));
-    const { source, next } = await templateRepo(root);
+    const { source, next } = await templateRepo(root, FROM_EXPLORER);
     // The copy hull shipped (git blob ad17ec0f; tests/ai-layer.test.mjs checks the hash).
     const shipped = await readFile(join(HULL, "tests/fixtures/explorer/explorer.md"), "utf8");
     for (const [name, content, kept] of [
@@ -123,7 +129,7 @@ test(
     ]) {
       const app = join(root, name);
       const opts = ["--data", "scope=hullci", "--yes", "--json", "--no-post"];
-      const made = run(root, "new", source, app, "--ref", prev, ...opts);
+      const made = run(root, "new", source, app, "--ref", FROM_EXPLORER, ...opts);
       assert.equal(made.status, 0, made.stdout + made.stderr);
       const explorer = join(app, ".claude/agents/explorer.md");
       await mkdir(join(app, ".claude/agents"), { recursive: true });
