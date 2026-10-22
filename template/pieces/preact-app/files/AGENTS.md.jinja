@@ -10,3 +10,6 @@ Preact client app on Vite+, deployed as Cloudflare static assets (`wrangler.json
 - `pnpm dev` serves on port 5173; `pnpm build` writes `dist/`.
 {% if "ui-storybook" in pieces %}- Shared components: import from `@{{ scope }}/ui` (`workspace:*`, built by `vp pack`; turbo builds it first).
 {% endif %}- Preview deploy: `pnpm deploy:preview` with `PR_NUMBER` set.
+- PR previews need the Worker to exist: deploy it once with
+  `pnpm turbo run deploy --filter=@{{ scope }}/{{ name }}` (`wrangler login` first); until then
+  `preview.yml` skips it with a notice.

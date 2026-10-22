@@ -215,7 +215,7 @@ Root files (class in brackets):
   `!.env.example`, `.dev.vars`, `.docspack`);
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
-- `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] (§8.2),
+- `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] with `.github/scripts/preview.mjs` [owned] (§8.2),
   `desktop.yml.jinja` [owned] (§8.3), `release.yml` [owned] with
   `.github/scripts/release-plan.mjs` [owned] (§8.7; plain files, rendered in every repo, idle
   without a rust-cli or ts-lib package). A `.jinja` workflow can emit GitHub's `${{ … }}` only with
@@ -649,11 +649,22 @@ A plain owned file rendered by `base` for every repo (user decision 2026-10-14: 
 cannot emit `${{` from a `.jinja` file, §4.3 item 8). A first step checks for `apps/*/wrangler.jsonc`
 and every later step is skipped when there is none, so base-only repos pay a ~5 s no-op. `on: pull_request`;
 same checkout/install; step skipped when `secrets.CLOUDFLARE_API_TOKEN` is empty (forks); runs
-`pnpm turbo run deploy:preview --affected` with `PR_NUMBER`, `CLOUDFLARE_API_TOKEN`,
+`node .github/scripts/preview.mjs` [owned], which runs `pnpm turbo run deploy:preview --affected
+--continue --log-prefix=task` with `PR_NUMBER`, `CLOUDFLARE_API_TOKEN`,
 `CLOUDFLARE_ACCOUNT_ID` (declared as `passThroughEnv` of `deploy:preview`/`deploy` in `turbo.json`,
-because turbo 2's strict env mode filters undeclared variables) under `shell: bash` (pipefail);
-writes the `*.workers.dev` preview URLs from wrangler's output to the job summary.
-`permissions: contents: read` only.
+because turbo 2's strict env mode filters undeclared variables) and writes the `*.workers.dev`
+preview URLs from wrangler's output to the job summary. `permissions: contents: read` only.
+
+A Worker that was never deployed cannot take a preview: `wrangler versions upload` (4.151.0) exits 1
+with "You cannot upload a new version of a Worker that does not yet exist". `preview.mjs` reads the
+`<pkg>:deploy:preview:` prefixed lines and the `Failed:` line of turbo's output; when every failed
+task is the `deploy:preview` of such a package, the step passes, the summary lists each skipped
+app with its one-time `pnpm turbo run deploy --filter=<pkg>`, and a `::notice` names it. Any other
+failure (build, auth, a mix) fails the job. Decision 2026-10-22 (found in a fresh Cloudflare
+account): a PR never creates or deploys a production Worker. Rejected: a deploy-on-`main` workflow
+(the template ships none; production deploys stay a repo choice) and `wrangler preview` (creates the
+parent Worker, but it is open beta in 4.151.0 and a different preview model with its own config).
+The deployable pieces' `AGENTS.md` names the one-time deploy.
 Caveats in the README: preview URLs are public unless Cloudflare Access protects them, and do not
 work for Workers with Durable Objects.
 
