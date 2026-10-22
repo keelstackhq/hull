@@ -3,6 +3,21 @@
 hull is a template: a version is a git tag `v<semver>` on this repo, and `splice update` moves a
 generated repo between versions (`docs/template-format.md` §7).
 
+## v0.2.1 — 2026-10-22
+
+Fixes found adopting v0.2.0 in a repo first rendered before v0.1.0.
+
+- `splice update` deletes a leftover `.claude/agents/explorer.md` (base shipped it before v0.1.0,
+  then renamed it `explore.md`). No splice lock tracks it, so `migrations/0.2.1.toml` uses a step,
+  not a `[[remove]]`: it deletes the file when it is the copy hull shipped and reports an edited
+  copy, which it keeps.
+- The generated `CLAUDE.md` no longer says to run `splice update` (it is owned, so whoever reads it
+  has already updated). It names `splice channel add gh:keelstackhq/hull//rigging --piece claude`
+  only for a repo whose `.claude/agents/` lacks the subagents. The upgrade order stays under
+  "Upgrading to 0.2.0" in the README.
+- `base` is implicit: the README and hull's notes no longer show `--piece base`, and the dev
+  renderer CLI refuses it (exit 2) with splice 0.2.0's messages.
+
 ## v0.2.0 — 2026-10-22
 
 **Breaking for repos generated from v0.1.0:** the four subagents left `base`.

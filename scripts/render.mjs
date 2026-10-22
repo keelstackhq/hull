@@ -51,14 +51,18 @@ function nameClashes(instances) {
 }
 
 /**
- * @param {{ template: string, out: string, pieces: string[], vars: Record<string,string>, templateVersion?: string }} opts
+ * @param {{ template: string, out: string, pieces: string[], vars: Record<string,string>, templateVersion?: string, implicitBase?: boolean }} opts (implicitBase: the CLI refuses a listed base, like splice)
  * @returns {Promise<Result>}
  */
 export async function renderNew(opts) {
   const out = resolve(opts.out);
   await assertEmptyOut(out);
   const t = await loadTemplate(resolve(opts.template));
-  const instances = resolveRequest(t, { pieces: opts.pieces, vars: opts.vars ?? {} });
+  const instances = resolveRequest(
+    t,
+    { pieces: opts.pieces, vars: opts.vars ?? {} },
+    { implicitBase: opts.implicitBase },
+  );
   await checkMinSplice(t);
   const plan = await buildPlan(t, instances, {
     templateVersion: opts.templateVersion ?? "0.0.0-dev",
@@ -157,7 +161,7 @@ export async function main(argv) {
     json = values.json === true;
     if (positionals[0] !== "new" || positionals.length !== 1) {
       throw new UsageError(
-        "usage: render.mjs new --template <dir> --out <dir> [--piece id[:name]]...",
+        "usage: render.mjs new --template <dir> --out <dir> [--piece id[:name]]... (base is always rendered; do not list it)",
       );
     }
     if (!values.template || !values.out) throw new UsageError("--template and --out are required");
@@ -167,6 +171,7 @@ export async function main(argv) {
       pieces: values.piece ?? [],
       vars: parseData(values.data ?? []),
       templateVersion: values["template-version"],
+      implicitBase: true,
     });
     if (json) process.stdout.write(`${JSON.stringify(result)}\n`);
     else for (const c of result.changes) process.stdout.write(`${c.action} ${c.path}\n`);

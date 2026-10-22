@@ -1,0 +1,8 @@
+# 0.2.1: `.claude/agents/explorer.md` shipped before v0.1.0 (renamed to explore.md on 2026-10-17).
+# No splice lock tracks it, so a [[remove]] would only report it ("not tracked in the lock;
+# kept"). This step deletes it when it is the copy hull shipped (git blob ad17ec0f, the only
+# version) and reports an edited copy, which it keeps.
+
+[[step]]
+description = "Delete the pre-0.1.0 .claude/agents/explorer.md if unedited"
+run = 'f=.claude/agents/explorer.md; if [ ! -f "$f" ]; then :; elif [ "$(git hash-object "$f")" = ad17ec0f7072cdef5051c8f5ccafc875cec54f51 ]; then rm "$f"; else echo "kept edited $f (renamed explore.md, now in the rigging channel): delete or merge it" >&2; fi'

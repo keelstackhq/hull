@@ -406,8 +406,9 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   §4.3.3) with a seed `<target>/CLAUDE.md` of `@AGENTS.md`.
 - `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`). Since 0.2.0 they
   are not in `base`: rigging's `claude` piece ships them (§14); `migrations/0.2.0.toml` removes
-  base's copies and the generated `CLAUDE.md` says to run `splice update`, then
-  `splice channel add gh:keelstackhq/hull//rigging --piece claude`:
+  base's copies (0.2.1 also the pre-0.1.0 `explorer.md`), and the generated `CLAUDE.md` says to
+  run `splice channel add gh:keelstackhq/hull//rigging --piece claude` if `.claude/agents/` lacks
+  them:
 
 | Agent | Model | Tools | Use |
 |---|---|---|---|
@@ -752,7 +753,8 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
 - Implements contract §1–§4 and §8 (JSON shape, exit codes), and writes files for `new` only:
   every planned file is created (`action: "create"`, its `class`). No lock file (only splice
   writes it), no `[[post]]`, no `update`/`check`/`add`, no merges, no migrations.
-- `base` is always applied first and exactly once; `--piece base` is accepted and ignored.
+- `base` is always applied first and exactly once. The CLI refuses `--piece base` (exit 2, splice
+  0.2.0's messages); `renderNew` (dogfood, tests) accepts it in a piece list and ignores it.
 - `--out` must not exist or be empty (exit 2).
 - Exit 2: unknown piece, missing `requires`, a non-multiple piece twice, duplicate instance name,
   a var failing its `pattern`, unknown var. Exit 3: invalid `splice.toml`/`piece.toml`, unknown
@@ -955,5 +957,11 @@ this, a hull repo that added `--piece claude` got a claim conflict on them), and
 generated `CLAUDE.md` say: run `splice update`, then
 `splice channel add gh:keelstackhq/hull//rigging --piece claude`. Not a post or step: those run
 before the main lock is written. Class changes made before v0.1.0 (`<target>/CLAUDE.md` owned →
-seed, `explorer.md` removed) need no migration: splice 0.2.0 applies the class-change rules
-(splice spec §10 item 12).
+seed) need no migration: splice 0.2.0 applies the class-change rules (splice spec §10 item 12).
+
+**hull 0.2.1 (2026-10-22).** `explorer.md` (base, 2026-10-14 to 10-17, renamed `explore.md`)
+survives in repos rendered before v0.1.0 and adopted with `splice new --force`: no lock tracks it,
+so a `[[remove]]` only reports it. `migrations/0.2.1.toml` has a `[[step]]` that deletes it when
+its git blob is the one hull shipped (`ad17ec0f`) and reports an edited copy. The generated
+`CLAUDE.md` names the rigging command only "if `.claude/agents/` lacks them": it is owned, so its
+reader already ran `splice update`, and the subset cannot test whether a channel was added.

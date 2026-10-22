@@ -188,6 +188,27 @@ test("usage error with --json → exit 2 and ok:false", async () => {
   assert.ok(o.messages.length > 0);
 });
 
+// splice 0.2.0 `new` renders base implicitly and refuses it as a --piece (exit 2, same messages).
+for (const [piece, message] of [
+  ["base", "piece `base` is not `multiple` and is listed twice"],
+  ["base:x", "piece `base` is not `multiple`; it cannot be named (`--piece base:x`)"],
+]) {
+  test(`CLI: --piece ${piece} → exit 2 like splice, nothing written`, async () => {
+    const out = await outDir();
+    const argv = ["new", "--template", FIXTURE, "--out", out, "--piece", piece, "--json"];
+    const { code, stdout } = await runCli([...argv, "--piece", "app"]);
+    assert.equal(code, 2);
+    assert.deepEqual(JSON.parse(stdout).messages, [message]);
+    assert.equal(await exists(out, "."), false);
+  });
+}
+
+test("CLI usage says base is implicit", async () => {
+  const { code, stdout } = await runCli(["oops", "--json"]);
+  assert.equal(code, 2);
+  assert.match(JSON.parse(stdout).messages[0], /base is always rendered; do not list it/);
+});
+
 test("for-loop and in-pieces render identically to the contract examples", async () => {
   const golden = await readFile(join(FIXTURE, "..", "golden", "pieces.txt"), "utf8");
   const t = await variant({

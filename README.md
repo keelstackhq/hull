@@ -14,10 +14,11 @@ stack, tool versions and config, and keeps them current. Your app code stays you
 
 ```bash
 node scripts/render.mjs new --template template --out ../my-repo \
-  --piece base --piece preact-app:web --piece hono-worker:api --data scope=acme
+  --piece preact-app:web --piece hono-worker:api --data scope=acme
 cd ../my-repo && git init && pnpm install && node scripts/agents-index.mjs && pnpm run ci
 ```
 
+`base` is always rendered; like splice, the dev renderer refuses `--piece base` (exit 2).
 The dev renderer runs no `[[post]]` hooks, so run `node scripts/agents-index.mjs` yourself after
 rendering to create the docs index (splice will run it).
 
