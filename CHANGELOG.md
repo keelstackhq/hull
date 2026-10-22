@@ -13,18 +13,21 @@ generated repo between versions (`docs/template-format.md` §7).
   `splice update`, then `splice channel add gh:keelstackhq/hull//rigging --piece claude`.
 - Generated CI uses [hoard](https://github.com/keelstackhq/hoard) (`keelstackhq/hoard@v0`) as the
   Turborepo remote cache instead of `actions/cache` on `.turbo/cache`.
-- splice 0.2.0 can render the template again: v0.1.0 shipped `template/migrations/.gitkeep`, which
-  splice refuses ("migration files must be named <semver>.toml"). The dev renderer applies the
-  same check now.
 - Hull's own CI renders its combos with splice 0.2.0 and tests the dev renderer against it
   (identical trees for every combo) and `splice update` from the previous tag. A weekly splice
   update bot (`.github/workflows/splice.yml`) keeps the org-decisions channel current once
   splice's Action tag `v1` carries its channel-only fix.
 
+## v0.1.1 — 2026-10-22
+
+- splice 0.2.0 can render the template again: dropped `template/migrations/.gitkeep`, which
+  splice refuses ("migration files must be named <semver>.toml"). The dev renderer applies the
+  same check now. Otherwise identical to v0.1.0.
+
 ## v0.1.0 — 2026-10-22
 
-First tag. Render it with `scripts/render.mjs` (the dev renderer); splice 0.2.0 refuses this tag
-(see v0.2.0).
+First tag. splice 0.2.0 refuses this tag (`template/migrations/.gitkeep`); use v0.1.1, or render
+it with `scripts/render.mjs` (the dev renderer).
 
 **Pieces** (`base` is always included; the others are opt-in, some `multiple`):
 
