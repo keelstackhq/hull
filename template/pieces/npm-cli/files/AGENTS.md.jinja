@@ -11,8 +11,8 @@ needs a rust-cli instance named `{{ crate }}` in `crates/{{ crate }}`.
 - `scripts/stage.mjs` turns release artifacts into `dist-npm/`; the platform list is `TARGETS`.
 - `version` here and in `crates/{{ crate }}/Cargo.toml` must match; bump both together.
   `test/version-sync.test.js` checks it.
-- `typecheck` is `node --check` (no `@types/node` in the catalog for `tsc`); `test` and `typecheck`
-  do not build the crate.
+- `typecheck` is `tsc --noEmit` (`checkJs`, `@types/node`); `test` and `typecheck` do not build
+  the crate.
 - A human pushes the tag `{{ crate }}-v<version>`; `release.yml` publishes the platform packages,
   then the launcher. Human steps first: first publish of each new npm name by hand; a trusted
   publisher (this repo, `release.yml`, environment `release`) on the launcher and all five

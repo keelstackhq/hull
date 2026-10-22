@@ -19,7 +19,11 @@ test("piece manifest", async () => {
   assert.equal(p.vars.crate.default, "cli");
   assert.equal(p.vars.name.pattern, "^[a-z][a-z0-9-]*$");
   assert.equal(p.vars.crate.pattern, "^[a-z][a-z0-9-]*$");
-  assert.deepEqual(p.requires, ["base"]);
+  assert.deepEqual(p.requires, ["base", "rust-cli"]);
+});
+
+test("npm-cli without a rust-cli instance is refused", async () => {
+  await assert.rejects(renderCombo(["base", "npm-cli:cli"]), /requires "rust-cli"/);
 });
 
 test("classes", async () => {
@@ -64,10 +68,9 @@ test("package.json: no publish-time metadata, four scripts, bin and crate wiring
   assert.equal(pkg.scripts.preinstall, undefined);
   assert.deepEqual(Object.keys(pkg.scripts), ["lint", "format:check", "typecheck", "test"]);
   assert.equal(pkg.scripts.test, "vp test run");
-  assert.match(
-    pkg.scripts.typecheck,
-    /^node --check bin\/launcher\.js && node --check scripts\/stage\.mjs/,
-  );
+  assert.equal(pkg.scripts.typecheck, "tsc --noEmit");
+  assert.equal(pkg.devDependencies.typescript, "catalog:");
+  assert.equal(pkg.devDependencies["@types/node"], "catalog:");
   for (const [k, v] of Object.entries(pkg.scripts)) assert.ok(!/vp run/.test(v), k);
 });
 
@@ -79,12 +82,13 @@ test("turbo.json: test and typecheck do not build the crate", async () => {
   assert.deepEqual(turbo.tasks.typecheck.dependsOn, []);
 });
 
-test("tsconfig checks the JavaScript sources (editors; typecheck is node --check)", async () => {
+test("tsconfig checks the JavaScript sources with Node types (typecheck is tsc)", async () => {
   const { dir } = await renderCombo(PIECES);
   const ts = JSON.parse(await read(dir, "packages/cli/tsconfig.json"));
   assert.equal(ts.extends, "../../tsconfig.base.json");
   assert.equal(ts.compilerOptions.allowJs, true);
   assert.equal(ts.compilerOptions.checkJs, true);
+  assert.deepEqual(ts.compilerOptions.types, ["node"]);
   assert.deepEqual(ts.include, ["bin", "scripts", "test"]);
 });
 
