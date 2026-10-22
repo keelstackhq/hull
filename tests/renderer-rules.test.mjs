@@ -284,3 +284,25 @@ test("min_splice 0.3.0-rc.1 is above 0.2.0", async () => {
   const t = await withMinSplice("0.3.0-rc.1", { "r.txt.jinja": "{% raw %}x{% endraw %}\n" });
   await render(t);
 });
+
+// --- migrations/ holds only <semver>.toml files (splice 0.2.0 rejects anything else)
+const migrationCase = (name, content, ok) =>
+  test(`migrations/${name} → ${ok ? "loads" : "TemplateError"}`, async () => {
+    const t = await copy();
+    await writeFile(join(t, "migrations", name), content);
+    if (ok) await loadTemplate(t);
+    else await rejects(TemplateError, /migration/, loadTemplate(t));
+  });
+migrationCase(".gitkeep", "", false);
+migrationCase("v1.2.0.toml", "", false);
+migrationCase("1.2.toml", "", false);
+migrationCase("01.2.0.toml", "", false);
+migrationCase("1.2.0.yaml", "", false);
+migrationCase("1.2.0.toml", "[[remove]\n", false);
+migrationCase("1.2.0.toml", '[[remove]]\npath = "old.txt"\n', true);
+migrationCase("1.2.0-rc.1.toml", "", true);
+test("a directory inside migrations/ → TemplateError", async () => {
+  const t = await copy();
+  await mkdir(join(t, "migrations", "1.2.0.toml"));
+  await rejects(TemplateError, /migration/, loadTemplate(t));
+});
