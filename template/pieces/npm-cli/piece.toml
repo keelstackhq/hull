@@ -1,7 +1,7 @@
 id = "npm-cli"
 description = "npm launcher and per-platform packages that ship a rust-cli binary, staged at release time"
 multiple = true
-requires = ["base"]
+requires = ["base", "rust-cli"]
 target = "packages/{{ name }}"
 
 [vars]

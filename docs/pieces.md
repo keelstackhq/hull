@@ -155,7 +155,7 @@ npm launcher and per-platform packages that ship a rust-cli binary, staged at re
 
 - Multiple instances: yes
 - Target: `packages/{{ name }}`
-- Requires: `base`
+- Requires: `base`, `rust-cli`
 
 Variables:
 

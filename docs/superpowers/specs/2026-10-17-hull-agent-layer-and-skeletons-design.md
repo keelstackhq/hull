@@ -200,7 +200,7 @@ are unchanged. A failure fails `ci` with the fix command.
 
 ## 4. (B) Skeleton pieces
 
-Common to all three: `multiple = true`, `requires = ["base"]`, piece var `name`
+Common to all three: `multiple = true`, `requires = ["base"]` (npm-cli: `["base", "rust-cli"]`, owner decision 2026-10-22), piece var `name`
 (`^[a-z][a-z0-9-]*$`), per-instance `AGENTS.md` [owned] + `CLAUDE.md` [seed] (D3), and a
 `"hull": { "release": "<piece-id>" }` field in the instance `package.json` that `release-plan.mjs`
 reads (§4.4). Every task the CI runs exists as a package script, except npm-cli `build` (nothing to
@@ -245,7 +245,7 @@ missing.
 
 | Path (under target) | Class | Content |
 |---|---|---|
-| `package.json.jinja` | shared json | name `@{{ scope }}/{{ name }}`, version `0.0.0`, `type: module`, `bin: { "{{ crate }}": "bin/launcher.js" }`, `files: ["bin"]`, `publishConfig: { access: "public", provenance: true }`, `hull.release = "npm-cli"`; no `optionalDependencies` (D13); devDependency `"@{{ scope }}/{{ crate }}-crate": "workspace:*"` so turbo `--affected` runs this package's tests when the crate changes; scripts `lint`, `format:check`, `typecheck` (`node --check` on the five JS files, see below), `test` (`vp test run`) |
+| `package.json.jinja` | shared json | name `@{{ scope }}/{{ name }}`, version `0.0.0`, `type: module`, `bin: { "{{ crate }}": "bin/launcher.js" }`, `files: ["bin"]`, `publishConfig: { access: "public", provenance: true }`, `hull.release = "npm-cli"`; no `optionalDependencies` (D13); devDependency `"@{{ scope }}/{{ crate }}-crate": "workspace:*"` so turbo `--affected` runs this package's tests when the crate changes; scripts `lint`, `format:check`, `typecheck` (`tsc --noEmit`, see below); devDependencies `typescript` and `@types/node` (catalog), `test` (`vp test run`) |
 | `turbo.json` | owned | extends `//`; `test.dependsOn: []` and `typecheck.dependsOn: []` (no build of the crate for a unit test or a typecheck, so a launcher-only PR never runs cargo) |
 | `tsconfig.json` | owned | extends base, `allowJs`, `checkJs`, includes `bin`, `scripts`, `test` |
 | `vite.config.ts` | owned | test options only |
@@ -257,10 +257,9 @@ missing.
 | `README.md` | seed | install/usage stub (npm page) |
 | `AGENTS.md` / `CLAUDE.md` | owned / seed | how the launcher resolves binaries; "never add postinstall"; bump both versions together |
 
-`typecheck`: `tsc --noEmit` with `checkJs` passes under TypeScript 7 (verified 2026-10-17, §9 item 8), but
-only with `@types/node`, which the catalog does not pin and the plan did not list; the script is therefore
-`node --check` on `bin/launcher.js`, `scripts/stage.mjs` and the three tests until that dependency is
-approved. The `tsconfig.json` stays, but editors show `node:*` errors until `@types/node` is installed.
+`typecheck`: `tsc --noEmit` with `allowJs`, `checkJs` and `types: ["node"]` (verified under TypeScript 7,
+§9 item 8). Until the owner decision of 2026-10-22 added `@types/node` 24.19.2 to the catalog, the script
+was `node --check` on the five JavaScript files.
 
 Platforms (as splice §12): `linux-x64`/`linux-arm64` (static musl, so no `libc` field),
 `darwin-x64`, `darwin-arm64`, `win32-x64` (`x86_64-pc-windows-msvc`).
@@ -441,5 +440,5 @@ lines" becomes "Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines", and its layou
   until `hoist release` ships. No changesets.
 - **D14 naming: `@<scope>/<name>-crate`** for the private Rust workspace package (the
   recommended default, as implemented).
-- Open and recorded in `docs/PROGRESS.md` (Status, Blocked): add `@types/node` to the catalog so
-  npm-cli `typecheck` is back to `tsc`; npm-cli `requires` = `["base", "rust-cli"]`.
+- Settled 2026-10-22 (owner): `@types/node` 24.19.2 in the catalog, npm-cli `typecheck` is `tsc
+  --noEmit`; npm-cli `requires = ["base", "rust-cli"]`.
