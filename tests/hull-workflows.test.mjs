@@ -52,3 +52,16 @@ test("hull ci.yml installs splice SPLICE_VERSION before Test and sets SPLICE_BIN
   );
   assert.match(steps[i].run, /SPLICE_BIN=.*>> "\$GITHUB_ENV"/);
 });
+
+test("hull splice.yml runs the splice update bot on all sources", async () => {
+  const wf = YAML.parse(await readFile(DIR + "splice.yml", "utf8"));
+  assert.ok(wf.on.schedule?.length, "scheduled");
+  assert.ok("workflow_dispatch" in wf.on);
+  assert.deepEqual(wf.permissions, { contents: "write", "pull-requests": "write" });
+  const [checkout, bot] = wf.jobs.update.steps;
+  assert.match(checkout.uses, /^actions\/checkout@/);
+  assert.equal(checkout.with["persist-credentials"], false);
+  assert.equal(bot.uses, "keelstackhq/splice/action@v1");
+  assert.equal(bot.with.scope, "all");
+  assert.equal(bot.with.token, "${{ secrets.SPLICE_BOT_TOKEN || github.token }}");
+});
