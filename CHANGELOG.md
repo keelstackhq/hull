@@ -1,0 +1,67 @@
+# Changelog
+
+hull is a template: a version is a git tag `v<semver>` on this repo, and `splice update` moves a
+generated repo between versions (`docs/template-format.md` §7).
+
+## v0.2.0 — 2026-10-22
+
+**Breaking for repos generated from v0.1.0:** the four subagents left `base`.
+
+- `base` no longer ships `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`. They are in
+  hull's `rigging` channel (piece `claude`). `migrations/0.2.0.toml` removes base's unedited
+  copies; edited ones are kept and reported. To upgrade, in this order:
+  `splice update`, then `splice channel add gh:keelstackhq/hull//rigging --piece claude`.
+- Generated CI uses [hoard](https://github.com/keelstackhq/hoard) (`keelstackhq/hoard@v0`) as the
+  Turborepo remote cache instead of `actions/cache` on `.turbo/cache`.
+- Hull's own CI renders its combos with splice 0.2.0 and tests the dev renderer against it
+  (identical trees for every combo) and `splice update` from the previous tag. A weekly splice
+  update bot (`.github/workflows/splice.yml`) keeps the org-decisions channel current once
+  splice's Action tag `v1` carries its channel-only fix.
+
+## v0.1.1 — 2026-10-22
+
+- splice 0.2.0 can render the template again: dropped `template/migrations/.gitkeep`, which
+  splice refuses ("migration files must be named <semver>.toml"). The dev renderer applies the
+  same check now. Otherwise identical to v0.1.0.
+
+## v0.1.0 — 2026-10-22
+
+First tag. splice 0.2.0 refuses this tag (`template/migrations/.gitkeep`); use v0.1.1, or render
+it with `scripts/render.mjs` (the dev renderer).
+
+**Pieces** (`base` is always included; the others are opt-in, some `multiple`):
+
+| Piece | What it adds |
+|---|---|
+| `base` | pnpm 12 workspace with an exact catalog, Turborepo, TypeScript 7, Vite+ (one Vite per repo), one-job CI with an affected early exit, Renovate preset, release workflow, AI layer |
+| `preact-app` | Preact app on Vite+ with cascivo components, deployed to Cloudflare static assets |
+| `ui-storybook` | Preact UI package on cascivo with Storybook 10.6 |
+| `astro-site` | Astro 7 static site with Preact islands on the shared Vite+ core |
+| `hono-worker` | Hono on Cloudflare Workers: JSON request logs without query strings, headers or bodies; optional scrubbed Sentry |
+| `rust-tool` | Rust crate in a root Cargo workspace, run by Turborepo (clippy, rustfmt, nextest) |
+| `rust-cli` | Production Rust CLI: one JSON object per run, fixed exit codes, pinned toolchain, cargo-deny |
+| `npm-cli` | npm launcher and per-platform packages that ship a `rust-cli` binary (requires `rust-cli`) |
+| `ts-lib` | Publishable ESM TypeScript library with publint and attw |
+| `tauri-app` | Tauri v2 desktop shell around a `preact-app`; Rust builds only in the scheduled `desktop.yml` |
+| `docs` | docspack: local, version-locked docs for agents, with a packs manifest |
+
+**AI layer.** A canonical `AGENTS.md` (≤ 60 lines) with a thin `CLAUDE.md` (≤ 20), the subagents
+`Explore` (haiku), `implementer`, `reviewer`, `ci-fixer`, the skills `verify` and `add-piece`, a
+PreToolUse guard hook (denies publish, force and tag pushes and secret reads; asks before editing
+template-owned files), a generated docs index with a CI check, and per-instance `AGENTS.md`.
+
+**CI budget.** A generated repo's CI is one job plus `ci-ok`, on `pull_request` and `merge_group`,
+running only affected tasks. Budget: ≤ 45 s for a typical PR, ≤ 15 s docs-only. Measured on
+`keelstackhq/cli-canary` (2026-10-21, warm): npm-cli-only PR 26 s, docs-only 9 s, crate worst case
+42 s (n = 3, p50 26 s). Tauri, Storybook builds and Playwright stay off the PR path.
+
+**Known limits.**
+
+- The Tauri `.deb` build (`desktop.yml`) and the Cloudflare preview deploy (`preview.yml`) have
+  not run against a real account or runner yet.
+- Whether an empty `vars.SENTRY_DSN` in `wrangler.jsonc` overrides a `wrangler secret put`
+  value is unverified.
+- The `@docspack-community/*` packs are not published, so `pnpm docs:packs --online` lists them
+  as missing.
+- The first real npm release of a generated tool (provenance, trusted publishing, the
+  cross-built macOS x86_64 binary) has not been run.
