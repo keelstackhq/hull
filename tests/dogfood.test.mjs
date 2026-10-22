@@ -108,3 +108,21 @@ test("splice renderer: a failing splice new fails the combo", async (t) => {
 test("unknown renderer is rejected", async () => {
   await assert.rejects(dogfood({ combos: ["base"], renderer: "nope" }), /renderer/);
 });
+
+test("with TURBO_API set (hoard) and no --cache-dir, turbo runs without --cache-dir", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(" "));
+    return 0;
+  };
+  const before = process.env.TURBO_API;
+  process.env.TURBO_API = "http://127.0.0.1:1";
+  t.after(() =>
+    before === undefined ? delete process.env.TURBO_API : (process.env.TURBO_API = before),
+  );
+  await dogfood({ combos: ["base"], root, run, splice: ["splice"] });
+  assert.ok(calls.includes(`pnpm turbo run ${CI_TASKS.join(" ")}`), calls.join("\n"));
+  assert.ok(!calls.some((c) => c.includes("--cache-dir")));
+});

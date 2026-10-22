@@ -178,7 +178,7 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 
 ---
 
-### Task 6: Remote cache with hoard — BLOCKED until `keelstackhq/hoard@v1` is released
+### Task 6: Remote cache with hoard — done 2026-10-22 with hoard 0.1.0 (`keelstackhq/hoard@v0`)
 
 **Files:**
 - Modify: `template/pieces/base/files/.github/workflows/ci.yml` (plain), `.github/workflows/ci.yml`
@@ -187,11 +187,11 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 **Interfaces:**
 - Consumes: `keelstackhq/hoard@v1` (no inputs needed for the GitHub cache backend; it sets `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` for later steps — confirm from hoard's README at release).
 
-- [ ] **Step 1: Write failing tests:** the generated workflow has a step `uses: keelstackhq/hoard@v1` before `turbo run`, no `actions/cache` step on `.turbo`, and the hoard step is guarded by `skip` like the rest.
-- [ ] **Step 2: Run `pnpm test` — expect FAIL.**
-- [ ] **Step 3: Replace** the `actions/cache` turbo step in both workflows; hull's dogfood passes `--cache-dir` only when hoard is absent.
+- [x] **Step 1: Write failing tests:** the generated workflow has a step `uses: keelstackhq/hoard@v1` before `turbo run`, no `actions/cache` step on `.turbo`, and the hoard step is guarded by `skip` like the rest.
+- [x] **Step 2: Run `pnpm test` — expect FAIL.**
+- [x] **Step 3: Replace** the `actions/cache` turbo step in both workflows; hull's dogfood passes `--cache-dir` only when hoard is absent.
 - [ ] **Step 4: Run `pnpm test` — expect PASS;** after merge, compare `ci-timing` p50 before/after and record both in PROGRESS.
-- [ ] **Step 5: Commit** — `ci: use hoard as the Turborepo remote cache`
+- [x] **Step 5: Commit** — `ci: use hoard as the Turborepo remote cache`
 
 ---
 

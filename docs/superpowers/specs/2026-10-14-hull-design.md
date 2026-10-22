@@ -625,8 +625,9 @@ upstream.
   4. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
   5. `pnpm install --frozen-lockfile --prefer-offline`.
-  6. Turbo cache: `actions/cache` on `.turbo/cache`, key `turbo-${{ runner.os }}-${{ github.sha }}`,
-     restore-keys `turbo-${{ runner.os }}-`. Replaced by `keelstackhq/hoard@v1` once released.
+  6. Turbo cache: `uses: keelstackhq/hoard@v0` (since 2026-10-22, hoard 0.1.0): a Turborepo
+     remote cache in the GitHub Actions cache; it exports `TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`
+     for the `turbo run` step. No `actions/cache` step.
   6. Rust (present in the plain `ci.yml`, guarded at runtime by
      `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
@@ -807,7 +808,8 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    before Test. Rust toolchain set up only when a
    selected combo contains rust-tool or rust-cli; that step also adds `Swatinem/rust-cache@v2` (workspace `combos/cli -> target`)
    and installs `cargo-nextest@0.9.148` and `cargo-deny@0.20.2`, which the cli combo's generated `ci` task list uses.
-4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
+4. The turbo cache is `keelstackhq/hoard@v0` (remote cache, before dogfood); dogfood passes
+   `--cache-dir` only when `TURBO_API` is unset (local runs). The pnpm store cache is keyed
    on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
    download time, never correctness.
 
@@ -829,7 +831,7 @@ Budget for hull's own PR CI: ≤ 120 s warm when one piece changes, ≤ 20 s doc
 A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci` script and
 `dogfood.mjs` all use exactly this list.
 
-## 11. Switching to splice and hoard (blocked)
+## 11. Switching to splice and hoard (done 2026-10-22)
 
 - **splice 0.2.0** (done 2026-10-22): hull CI renders with splice (§8.1 step 3); the dev renderer
   stays as an oracle: `tests/splice-parity.test.mjs` renders every combo with both (splice with
@@ -840,8 +842,9 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
   owned file, `splice update` to the working tree's template refused without `--force`: seed
   unchanged, the user's dependency kept, the owned file replaced, `splice check` exit 0 at the end.
   Both skip with a message when `SPLICE_BIN` is unset.
-- **hoard v1** (blocked until released): the `actions/cache` turbo step becomes
-  `uses: keelstackhq/hoard@v1` in the generated `ci.yml` and in hull's CI.
+- **hoard 0.1.0** (done 2026-10-22; the Action's moving tag is `v0`, not `v1`): the
+  `actions/cache` turbo step became `uses: keelstackhq/hoard@v0` in the generated `ci.yml` and in
+  hull's CI.
 
 ## 12. Testing
 

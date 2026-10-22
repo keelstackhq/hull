@@ -65,3 +65,14 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   assert.equal(bot.with.scope, "all");
   assert.equal(bot.with.token, "${{ secrets.SPLICE_BOT_TOKEN || github.token }}");
 });
+
+test("hull ci.yml uses hoard@v0 for the turbo cache before dogfood, without --cache-dir", async () => {
+  const steps = await hullCi();
+  const i = steps.findIndex((s) => s.uses === "keelstackhq/hoard@v0");
+  assert.ok(i >= 0, "uses keelstackhq/hoard@v0");
+  assert.equal(steps[i].if, "steps.combos.outputs.args != ''");
+  const df = steps.findIndex((s) => s.name === "Dogfood combos");
+  assert.ok(i < df, "before dogfood");
+  assert.doesNotMatch(steps[df].run, /--cache-dir/);
+  assert.ok(!steps.some((s) => s.uses?.startsWith("actions/cache")), "no actions/cache step");
+});

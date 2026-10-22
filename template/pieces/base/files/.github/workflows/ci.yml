@@ -56,13 +56,9 @@ jobs:
       - name: Install
         if: steps.affected.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile --prefer-offline
-      - uses: actions/cache@v4
+      # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM
+      - uses: keelstackhq/hoard@v0
         if: steps.affected.outputs.skip != 'true'
-        with:
-          path: .turbo/cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ runner.os }}-
       - name: Rust affected?
         id: rust
         if: steps.affected.outputs.skip != 'true' && hashFiles('.github/scripts/rust-affected.mjs') != ''
