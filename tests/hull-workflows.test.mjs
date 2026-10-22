@@ -40,6 +40,19 @@ test("hull ci.yml installs nextest@0.9.148 and cargo-deny@0.20.2, with rust-cach
   assert.equal(cache.with.workspaces, "${{ runner.temp }}/combos/cli -> target");
 });
 
+test("hull ci.yml installs splice SPLICE_VERSION before Test and sets SPLICE_BIN", async () => {
+  const { SPLICE_VERSION } = await import("../scripts/lib/splice.mjs");
+  const steps = await hullCi();
+  const i = steps.findIndex((s) => s.name === "Install splice");
+  assert.ok(i >= 0, "Install splice step");
+  assert.ok(i < steps.findIndex((s) => s.name === "Test"), "before Test");
+  assert.match(
+    steps[i].run,
+    new RegExp(`@keelstackhq/splice@${SPLICE_VERSION.replaceAll(".", "\\.")}\\b`),
+  );
+  assert.match(steps[i].run, /SPLICE_BIN=.*>> "\$GITHUB_ENV"/);
+});
+
 test("hull splice.yml runs the splice update bot on all sources", async () => {
   const wf = YAML.parse(await readFile(DIR + "splice.yml", "utf8"));
   assert.ok(wf.on.schedule?.length, "scheduled");

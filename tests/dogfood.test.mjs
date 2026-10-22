@@ -69,7 +69,7 @@ test("base combo runs git init, install, index write, turbo, index check in orde
     calls.push([cmd, ...args].join(" "));
     return 0;
   };
-  await dogfood({ combos: ["base"], root, cacheDir: "/c", run });
+  await dogfood({ combos: ["base"], root, cacheDir: "/c", run, renderer: "dev" });
   assert.deepEqual(calls, [
     "git init -q",
     "pnpm install --no-frozen-lockfile --prefer-offline",
@@ -77,4 +77,34 @@ test("base combo runs git init, install, index write, turbo, index check in orde
     `pnpm turbo run ${CI_TASKS.join(" ")} --cache-dir=/c`,
     "node scripts/agents-index.mjs --check",
   ]);
+});
+
+test("splice renderer (default): splice new (git init + post hooks), then turbo, index check", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(" "));
+    return 0;
+  };
+  await dogfood({ combos: ["site"], root, cacheDir: "/c", run, splice: ["splice"] });
+  const src = `${join(root, "template-src")}//template`;
+  assert.deepEqual(calls, [
+    `splice new ${src} ${join(root, "site")} --ref HEAD --piece astro-site:site --piece rust-tool:tool --data scope=hullci --yes --json`,
+    `pnpm turbo run ${CI_TASKS.join(" ")} --cache-dir=/c`,
+    "node scripts/agents-index.mjs --check",
+    `node ${fileURLToPath(new URL("../scripts/check-single-vite.mjs", import.meta.url))} ${join(root, "site")}`,
+  ]);
+});
+
+test("splice renderer: a failing splice new fails the combo", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const run = async (cmd) => (cmd === "splice" ? 3 : 0);
+  const r = await dogfood({ combos: ["base"], root, run, splice: ["splice"] });
+  assert.equal(r[0].ok, false);
+});
+
+test("unknown renderer is rejected", async () => {
+  await assert.rejects(dogfood({ combos: ["base"], renderer: "nope" }), /renderer/);
 });

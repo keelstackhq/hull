@@ -125,9 +125,11 @@ The items below are the gaps as hull first found them.
    errors, exit 3). hull's templates never rely on undefined-is-empty.
 6. **File modes.** The contract does not carry the executable bit. Hook scripts are invoked as
    `bash <path>`, so they never need it.
-7. **Non-interactive `new`.** The contract has no CLI. hull assumes
-   `splice new <source> <dest> --piece <id>[:<name>]... --data <key>=<value>... --yes --json`
-   and adapts in plan 03 when splice publishes its CLI.
+7. **Non-interactive `new`.** Contract §9.14:
+   `splice new <source> <dest> --piece <id>[:<name>]... --data <key>=<value>... --yes --json`,
+   confirmed against splice 0.2.0 (2026-10-22). `base` is implicit (listing it is exit 2), a local
+   source must be a git repo (`<repo>//template`, `--ref` picks the commit), and `new` runs
+   `git init` in `<dest>` and the `[[post]]` hooks unless `--no-post`.
 8. **Literal `{{` in `.jinja` output.** GitHub Actions expressions (`${{ … }}`) collide with the
    subset, which has no string-literal output. The contract now has `{% raw %}…{% endraw %}` (§4,
    §9.23), so a piece-dependent workflow can be a `.jinja` file with `${% raw %}{{ … }}{% endraw %}`.
@@ -328,8 +330,8 @@ cargo for this crate only: `build` `cargo build --release -p {{ name }}`, `lint`
 `$TURBO_ROOT$/target/release/{{ name }}`, inputs `src/**`, `Cargo.toml`, `$TURBO_ROOT$/Cargo.lock`
 (`$TURBO_ROOT$` verified with turbo 2.11.8 on 2026-10-15: a cached build restores the binary). `[[post]]`
 `cargo generate-lockfile` on `new` and `cargo update --workspace` on `add` (adds the new member
-without bumping locked crates); dogfood runs the same command, because the dev renderer
-does not run `[[post]]`.
+without bumping locked crates); splice runs them in dogfood; with `--renderer dev` dogfood runs
+`cargo generate-lockfile` itself, because the dev renderer does not run `[[post]]`.
 `AGENTS.md` [owned] (≤ 20 lines; points a distributed CLI to `rust-cli`, §6.10) and `CLAUDE.md` [seed] (`@AGENTS.md`).
 
 ### 6.7 `tauri-app`
@@ -792,13 +794,15 @@ One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
    `scripts/render.mjs`, `scripts/lib/**`, `scripts/dogfood.mjs`, `scripts/combos.json`, root
    `package.json`/lockfile, the workflow and any other path under `template/` select all; docs and
    tests select none. An unknown or missing base (first push, force-push) selects all.
-3. `node scripts/dogfood.mjs --combo <each>`: render into `$RUNNER_TEMP/combos/<name>`, then in
-   sequence per combo `pnpm install --no-frozen-lockfile --prefer-offline` (shared pnpm store),
-   `node scripts/agents-index.mjs` (the dev renderer does not run `[[post]]`),
-   `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
-   `node scripts/agents-index.mjs --check`, and `check-single-vite` for combos with Vite pieces. Rust toolchain set up only when a
-   selected combo contains rust-tool or rust-cli (`cargo generate-lockfile` runs for both, standing in
-   for the `[[post]]` hook); that step also adds `Swatinem/rust-cache@v2` (workspace `combos/cli -> target`)
+3. `node scripts/dogfood.mjs --combo <each>`: commit a snapshot of `template/` (working tree) to a
+   scratch git repo, `splice new <snapshot>//template $RUNNER_TEMP/combos/<name> --ref HEAD ...`
+   (runs `git init` and the `[[post]]` hooks: `pnpm install`, `cargo generate-lockfile`, the agents
+   index), then `pnpm turbo run lint format:check typecheck test build --cache-dir=$RUNNER_TEMP/turbo-cache`,
+   `node scripts/agents-index.mjs --check`, and `check-single-vite` for combos with Vite pieces.
+   `--renderer dev` uses the dev renderer and runs the hooks' commands itself. CI installs
+   `@keelstackhq/splice@0.2.0` (`SPLICE_VERSION` in `scripts/lib/splice.mjs`) and sets `SPLICE_BIN`
+   before Test. Rust toolchain set up only when a
+   selected combo contains rust-tool or rust-cli; that step also adds `Swatinem/rust-cache@v2` (workspace `combos/cli -> target`)
    and installs `cargo-nextest@0.9.148` and `cargo-deny@0.20.2`, which the cli combo's generated `ci` task list uses.
 4. The turbo cache dir is cached with `actions/cache` (later hoard). The pnpm store cache is keyed
    on hull's lockfile while combos install with `--no-frozen-lockfile`, so a stale store only costs
@@ -824,13 +828,15 @@ A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci
 
 ## 11. Switching to splice and hoard (blocked)
 
-- **splice v0.1** (blocked until released): hull CI renders with
-  `pnpm dlx @keelstackhq/splice@0.1 new ./template <dir> ... --yes --json`; the dev renderer stays as
-  an oracle: a test renders every combo with both and diffs the trees (excluding `.splice/`).
-  Update test: render the `web` combo from the previous hull tag, commit, apply scripted user edits
-  (edit a seed file, add a dependency to `apps/web/package.json`, edit an owned file), run
-  `splice update` to the working tree's template: seed unchanged, the user's dependency kept, the
-  owned edit reported by `check` and replaced only with `--force`, `splice check` exit 0 at the end.
+- **splice 0.2.0** (done 2026-10-22): hull CI renders with splice (§8.1 step 3); the dev renderer
+  stays as an oracle: `tests/splice-parity.test.mjs` renders every combo with both (splice with
+  `--no-post`, the dev renderer with splice's `template.version`) and diffs the trees (excluding
+  `.splice/` and `.git/`), and checks the §8 JSON shape. `tests/splice-update.test.mjs`: render the
+  `web` combo from the previous hull tag, commit, apply scripted user edits (edit a seed file, add
+  a dependency to `apps/web/package.json`, edit an owned file), `splice check` exit 1 naming the
+  owned file, `splice update` to the working tree's template refused without `--force`: seed
+  unchanged, the user's dependency kept, the owned file replaced, `splice check` exit 0 at the end.
+  Both skip with a message when `SPLICE_BIN` is unset.
 - **hoard v1** (blocked until released): the `actions/cache` turbo step becomes
   `uses: keelstackhq/hoard@v1` in the generated `ci.yml` and in hull's CI.
 

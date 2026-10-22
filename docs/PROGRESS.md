@@ -49,6 +49,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-22 · owner decisions (npm-cli) · `feat(npm-cli): tsc typecheck with @types/node, require rust-cli` · catalog pins `@types/node` 24.19.2 (published 2026-10-09, `npm view` 2026-10-22); npm-cli `typecheck` is `tsc --noEmit` (`checkJs`, `types: ["node"]`, devDeps `typescript` + `@types/node`); `requires = ["base", "rust-cli"]` (npm-cli alone is refused); 667/667 tests (RED first: 5 failing), lint+fmt clean; dogfood base, web, site, docs, cli, lib ok (Node 24.22.1, cargo-nextest 0.9.148, cargo-deny 0.20.2); spec §6, §6.11, §7, §13 and agent-layer spec §4, §10 amended; docs/pieces.md regenerated.
 - 2026-10-22 · splice update bot · `ci: add the splice update bot` · `.github/workflows/splice.yml` (weekly + workflow_dispatch, `keelstackhq/splice/action@v1` scope all, token `SPLICE_BOT_TOKEN || github.token`, checkout without persisted credentials); workflow test RED first (ENOENT); 668/668 tests, lint+fmt clean; no combo affected
 - 2026-10-22 · migrations names · `fix: migrations/ holds only <semver>.toml files` · splice 0.2.0 refused hull's template (also tag v0.1.0) with `template/migrations/.gitkeep: migration files must be named <semver>.toml`; dropped the `.gitkeep`s (fixture keeps `migrations/1.0.0.toml`), dev renderer now rejects non-`<semver>.toml` entries, invalid TOML and `[[step]]`/`[[remove]]` without `run`/`path` like splice; 9 tests RED first; 676/676, lint+fmt clean; `splice new /home/user/hull//template --ref HEAD` ok; dogfood base, web, docs, lib, site, cli ok
+- 2026-10-22 · 03/7 · `ci: render combos with splice and test template updates` · dogfood `--renderer splice|dev` (default splice: commits a snapshot of `template/` to a scratch repo, `splice new <snap>//template --ref HEAD`, splice runs the `[[post]]` hooks; dev path unchanged), `scripts/lib/splice.mjs` (`SPLICE_VERSION` 0.2.0, `SPLICE_BIN` else `pnpm dlx`), hull CI installs splice before Test; `tests/splice-parity.test.mjs` (every combo identical to the dev renderer, excluding `.splice/` and `.git/`; §8 JSON shape) and `tests/splice-update.test.mjs` (web combo from v0.1.0 → working tree: check exit 1 on the owned edit, update refused without `--force`, seed kept, `left-pad` kept, owned replaced, check exit 0). RED first: dogfood renderer tests (3) and CI step test; parity first failed on `.git/` (splice `new` runs `git init`). Splice flags: `base` is implicit (listing it is exit 2), local sources must be git repos. Reviewer (sonnet): approve with minor changes, all applied (no redundant `git init`, splice output labelled by combo, update test fails instead of skipping on CI without a tag). Cost here: the two splice test files 2.6 s, `npm i -g @keelstackhq/splice@0.2.0` 1.4 s; dogfood base/web/site/docs/cli/lib with splice ok. Not done: `add rust-tool:b` keeps locked crates (needs cargo in the test).
 
 ## Measurements
 
@@ -79,8 +80,6 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
 
 - Plan 03 Task 6 (hoard remote cache): `keelstackhq/hoard@v1` is not released (repo not publicly reachable on 2026-10-15). Action (keelstackhq/hoard owners): publish `v1` with a README documenting the GitHub-cache backend and the env it sets (`TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`); then rerun plan 03 Task 6.
-
-- Plan 03 Task 7 (render with splice + update test): `@keelstackhq/splice` is not on npm (E404 on 2026-10-15 and again on 2026-10-21; 0.2.0 needed). Action (keelstackhq/splice owners): publish 0.2.0 with `splice new|add|update|check --json` per contract §9.14; then rerun plan 03 Task 7 with `SPLICE_BIN` set.
 
 - Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
@@ -143,7 +142,7 @@ All timings are from this cloud container, not GitHub runners; they are not evid
 2. Cloudflare account: preview smoke test (secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) and the `vars.SENTRY_DSN` vs `wrangler secret put` check.
 3. ~~Contract: agree a `{% raw %}` addition with keelstackhq/splice~~ done 2026-10-21 (contract §4, §9.23; dev renderer implements it).
 4. npm scope `@docspack-community` + owner to publish the community doc packs.
-5. keelstackhq/hoard v1 release (plan 03 Task 6) and @keelstackhq/splice 0.2.0 release (plan 03 Task 7).
+5. keelstackhq/hoard release (plan 03 Task 6); splice 0.2.0 is out and Task 7 is done (2026-10-22).
 6. Release v0.1.0 (plan 03 Task 8): merge to `main`, changelog, `git tag v0.1.0 && git push origin v0.1.0`.
 
 Environment note: this container shipped Node 22 / pnpm 10; the build used Node 24.21 (nvm) and pnpm 12.11.2.
