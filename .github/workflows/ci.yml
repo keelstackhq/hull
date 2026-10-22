@@ -37,6 +37,11 @@ jobs:
         run: pnpm lint
       - name: Format
         run: pnpm format:check
+      - name: Install splice
+        # same version as SPLICE_VERSION in scripts/lib/splice.mjs (tests/hull-workflows.test.mjs)
+        run: |
+          npm install -g --no-fund --no-audit @keelstackhq/splice@0.2.0
+          echo "SPLICE_BIN=$(command -v splice)" >> "$GITHUB_ENV"
       - name: Test
         run: pnpm test
       - name: Affected combos

@@ -29,10 +29,11 @@ node scripts/dogfood.mjs --combo base
 node scripts/dogfood.mjs --combo web --combo site
 ```
 
-When splice 0.1 is out, the equivalent is
-`pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template my-repo --piece ...` (flags unconfirmed),
-later `splice add`, `splice update` (owned files replaced, shared files merged, your source never
-touched) and `splice check` in CI.
+With splice (0.2.0 or later) the equivalent is
+`pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template my-repo --piece preact-app:web ...`
+(`base` is always included), later `splice add`, `splice update` (owned files replaced, shared
+files merged, your source never touched) and `splice check` in CI. hull's own CI renders its
+combos with splice; `node scripts/dogfood.mjs --renderer dev` uses the dev renderer instead.
 
 ## Pieces
 

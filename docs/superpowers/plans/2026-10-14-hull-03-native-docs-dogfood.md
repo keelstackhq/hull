@@ -18,7 +18,7 @@
 - Tauri builds run only in `desktop.yml` (scheduled + manual), never on the PR path.
 - docspack commands: `docspack sync`, `docspack index --repo`, `docspack ask "<q>" --json`. Never auto-edit `package.json` from scripts.
 - Budgets: generated repo job `ci` p50 ≤ 45 s (typical PR), ≤ 15 s docs-only; hull job `ci` ≤ 120 s warm, ≤ 20 s docs-only.
-- splice invocation (contract §9.14): `pnpm dlx @keelstackhq/splice@0.1 new <source> <dest> --piece <id>[:<name>]... --data <k>=<v>... --yes --json`.
+- splice invocation (contract §9.14; confirmed with 0.2.0 on 2026-10-22, `base` implicit): `splice new <repo>//template <dest> --ref HEAD --piece <id>[:<name>]... --data <k>=<v>... --yes --json` (`SPLICE_BIN`, else `pnpm dlx @keelstackhq/splice@0.2.0`).
 
 ## Review Focus
 
@@ -42,7 +42,7 @@ community-packs/{README.md,vite-plus/}
 .github/workflows/desktop.yml                         # hull: scheduled tauri combo build
 scripts/ci-timing.mjs  scripts/pieces-doc.mjs  docs/pieces.md
 tests/rust-tool.test.mjs tauri-app.test.mjs docs-piece.test.mjs ci-timing.test.mjs pieces-doc.test.mjs
-tests/splice-parity.test.mjs  tests/splice-update.test.mjs   # Task 7 (blocked)
+tests/splice-parity.test.mjs  tests/splice-update.test.mjs   # Task 7
 ```
 
 ---
@@ -195,10 +195,10 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 
 ---
 
-### Task 7: Render with splice and test updates — BLOCKED until `@keelstackhq/splice` 0.1 is released
+### Task 7: Render with splice and test updates — done 2026-10-22 with splice 0.2.0
 
 **Files:**
-- Modify: `scripts/dogfood.mjs` (`--renderer splice|dev`, default `splice`), `.github/workflows/ci.yml`, `template/pieces/base/files/.claude/skills/add-piece/SKILL.md` (real flags), spec §4.3.8 and §11
+- Modify: `scripts/dogfood.mjs` (`--renderer splice|dev`, default `splice`), `.github/workflows/ci.yml`, `template/pieces/base/files/.claude/skills/add-piece/SKILL.md` (real flags; checked against `splice add --help` 0.2.0, already right), spec §4.3.8 and §11
 - Create: `tests/splice-parity.test.mjs`, `tests/splice-update.test.mjs`
 - Test: both new files (skipped with a clear message when `SPLICE_BIN` is unset; CI sets it)
 
@@ -206,8 +206,8 @@ test("CLI exits 1 over budget", ...);   // inject a fake gh via opts.gh
 - Consumes: splice CLI and `--json` output (contract §8); `renderNew` as the oracle.
 
 - Notes from the Milestone 3 review (2026-10-15): splice runs `[[post]]` hooks (`pnpm install`, `cargo generate-lockfile`/`cargo update --workspace`), so the parity test must compare trees before hooks or ignore lockfiles, `node_modules` and `target/`; dogfood must then drop its own `cargo generate-lockfile` step. The update test should also check that `add rust-tool:b` does not bump locked crates. Hull PRs touching only `template/pieces/tauri-app/**` select no combo; consider a non-scheduled desktop combo without `build:desktop`.
-- [ ] **Step 1: Align flags.** Read splice's README/`splice new --help`; update the assumed invocation everywhere (spec §4.3.8, this plan's Global Constraints, add-piece skill). Report any contract mismatch to the splice repo.
-- [ ] **Step 2: Write failing tests:**
+- [x] **Step 1: Align flags.** Read splice's README/`splice new --help`; update the assumed invocation everywhere (spec §4.3.8, this plan's Global Constraints, add-piece skill). Report any contract mismatch to the splice repo.
+- [x] **Step 2: Write failing tests:**
 
 ```js
 test("splice and the dev renderer produce identical trees for every combo", ...); // ignore .splice/
@@ -224,10 +224,10 @@ test("update keeps seed, merges shared, guards owned", async () => {
 });
 ```
 
-- [ ] **Step 3: Run with `SPLICE_BIN` set — expect FAIL** (dogfood still on the dev renderer).
-- [ ] **Step 4: Switch** dogfood and hull CI to `pnpm dlx @keelstackhq/splice@0.1 new …`; keep the dev renderer for the parity test.
-- [ ] **Step 5: Run `pnpm test` with `SPLICE_BIN` and `node scripts/dogfood.mjs --combo base --combo web --combo site --combo docs` — expect PASS.**
-- [ ] **Step 6: Commit** — `ci: render combos with splice and test template updates`
+- [x] **Step 3: Run with `SPLICE_BIN` set — expect FAIL** (dogfood still on the dev renderer).
+- [x] **Step 4: Switch** dogfood and hull CI to splice 0.2.0 (`SPLICE_BIN`, else `pnpm dlx @keelstackhq/splice@0.2.0`; done 2026-10-22); keep the dev renderer for the parity test.
+- [x] **Step 5: Run `pnpm test` with `SPLICE_BIN` and `node scripts/dogfood.mjs --combo base --combo web --combo site --combo docs` — expect PASS.**
+- [x] **Step 6: Commit** — `ci: render combos with splice and test template updates`
 
 ---
 
