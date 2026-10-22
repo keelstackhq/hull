@@ -3,7 +3,7 @@
 hull is a template: a version is a git tag `v<semver>` on this repo, and `splice update` moves a
 generated repo between versions (`docs/template-format.md` §7).
 
-## v0.2.0 — unreleased (tag after this file is on `main`)
+## v0.2.0 — 2026-10-22
 
 **Breaking for repos generated from v0.1.0:** the four subagents left `base`.
 
