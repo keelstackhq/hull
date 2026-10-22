@@ -115,7 +115,7 @@ Milestones 1, 2 and 3 are reviewed (lines above). Updated 2026-10-17 after the m
 export PATH=/path/to/node24/bin:$PATH          # Node 24, pnpm 12.11.2
 pnpm install
 pnpm test && pnpm lint && pnpm format:check
-node scripts/render.mjs new --template template --out /tmp/x --piece base --piece preact-app:web --data scope=acme --json
+node scripts/render.mjs new --template template --out /tmp/x --piece preact-app:web --data scope=acme --json
 cd /tmp/x && git init -q && pnpm install --no-frozen-lockfile && pnpm run ci
 node scripts/dogfood.mjs --combo base --combo web --combo site --combo docs   # needs Rust + cargo-nextest for site
 node scripts/affected-combos.mjs --base HEAD~1

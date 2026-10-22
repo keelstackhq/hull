@@ -26,11 +26,20 @@ function checkPattern(spec, name, value) {
   }
 }
 
-export function resolveRequest(t, req) {
+/** `implicitBase`: listing the base piece is a usage error, as in splice 0.2.0 `new`. */
+export function resolveRequest(t, req, { implicitBase = false } = {}) {
   const parsed = req.pieces.map((item) => {
     const i = item.indexOf(":");
     return i === -1 ? { id: item } : { id: item.slice(0, i), explicit: item.slice(i + 1) };
   });
+  const listedBase = implicitBase && parsed.find((p) => p.id === t.base);
+  if (listedBase) {
+    throw new UsageError(
+      listedBase.explicit === undefined
+        ? `piece \`${t.base}\` is not \`multiple\` and is listed twice`
+        : `piece \`${t.base}\` is not \`multiple\`; it cannot be named (\`--piece ${t.base}:${listedBase.explicit}\`)`,
+    );
+  }
   const requested = [
     {
       id: t.base,

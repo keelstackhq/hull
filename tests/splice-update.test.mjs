@@ -105,3 +105,34 @@ test("update keeps seed, merges shared, guards owned", { skip }, async (t) => {
   const final = run(app, "check", "--json", "--offline");
   assert.equal(final.status, 0, final.stdout + final.stderr);
 });
+
+// Repos first rendered before v0.1.0 (dev renderer) and later adopted with `splice new --force`
+// still carry `.claude/agents/explorer.md`, which no lock tracks (migrations/0.2.1.toml).
+test(
+  "update deletes an unedited pre-0.1.0 explorer.md, keeps an edited one",
+  { skip },
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), "hull-update-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const { source, next } = await templateRepo(root);
+    // The copy hull shipped (git blob ad17ec0f; tests/ai-layer.test.mjs checks the hash).
+    const shipped = await readFile(join(HULL, "tests/fixtures/explorer/explorer.md"), "utf8");
+    for (const [name, content, kept] of [
+      ["unedited", shipped, false],
+      ["edited", `${shipped}my note\n`, true],
+    ]) {
+      const app = join(root, name);
+      const opts = ["--data", "scope=hullci", "--yes", "--json", "--no-post"];
+      const made = run(root, "new", source, app, "--ref", prev, ...opts);
+      assert.equal(made.status, 0, made.stdout + made.stderr);
+      const explorer = join(app, ".claude/agents/explorer.md");
+      await mkdir(join(app, ".claude/agents"), { recursive: true });
+      await writeFile(explorer, content);
+      git(app, "add", "-A");
+      git(app, "commit", "-q", "-m", "old render");
+      const up = run(app, "update", "--to", next, "--yes", "--json", "--no-post");
+      assert.equal(up.status, 0, up.stdout + up.stderr);
+      assert.equal(existsSync(explorer), kept, `${name}: ${up.stdout}`);
+    }
+  },
+);

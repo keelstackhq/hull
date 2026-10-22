@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/p
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -136,11 +137,47 @@ test("migration 0.2.0 removes base's four agent files", async () => {
   assert.equal(m.step, undefined, "not a step: steps run before the main lock is written");
 });
 
-test("CLAUDE.md: run splice update, then add the rigging channel with --piece claude", async () => {
+// `explorer.md` shipped from 2026-10-14 to 10-17 (88a9409 → renamed in 5ba172a), before any tag,
+// so no splice lock tracks it and a [[remove]] keeps it ("not tracked in the lock"): a step.
+const EXPLORER_BLOB = "ad17ec0f7072cdef5051c8f5ccafc875cec54f51"; // the only version hull shipped
+
+test("migration 0.2.1 removes the pre-0.1.0 explorer.md, unedited copies only", async () => {
+  const { parse } = await import("smol-toml");
+  const m = parse(readFileSync(join(REAL_TEMPLATE, "migrations/0.2.1.toml"), "utf8"));
+  assert.equal(m.remove, undefined, "a [[remove]] of an untracked file only reports it");
+  assert.equal(m.step.length, 1);
+  const fixture = fileURLToPath(new URL("./fixtures/explorer/explorer.md", import.meta.url));
+  const hash = spawnSync("git", ["hash-object", fixture], { encoding: "utf8" });
+  assert.equal(hash.stdout.trim(), EXPLORER_BLOB, "the fixture is the copy hull shipped");
+  const shipped = readFileSync(fixture, "utf8");
+  const runIn = async (content, env = process.env) => {
+    const dir = await mkdtemp(join(tmpdir(), "hull-mig-"));
+    await mkdir(join(dir, ".claude/agents"), { recursive: true });
+    if (content !== undefined) await writeFile(join(dir, ".claude/agents/explorer.md"), content);
+    const r = spawnSync("/bin/sh", ["-c", m.step[0].run], { cwd: dir, encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    return { kept: existsSync(join(dir, ".claude/agents/explorer.md")), stderr: r.stderr };
+  };
+  assert.deepEqual(await runIn(shipped), { kept: false, stderr: "" }, "unedited copy is deleted");
+  const edited = await runIn(`${shipped}\nmy note\n`);
+  assert.ok(edited.kept && /kept edited/.test(edited.stderr), "edited copy is kept and reported");
+  assert.deepEqual(await runIn(undefined), { kept: false, stderr: "" }, "no copy: still succeeds");
+  const noGit = await runIn(shipped, {
+    ...process.env,
+    PATH: await mkdtemp(join(tmpdir(), "nogit-")),
+  });
+  assert.ok(noGit.kept && /cannot check/.test(noGit.stderr), "without git: kept, says why");
+});
+
+// CLAUDE.md is owned: whoever reads its current text already ran `splice update`, and the template
+// cannot see whether a channel was added, so the hint is conditional in prose and never stale.
+test("CLAUDE.md: add the rigging channel if .claude/agents lacks the subagents", async () => {
   const text = await read((await renderCombo(["base"])).dir, "CLAUDE.md");
-  const update = text.indexOf("`splice update`");
-  const add = text.indexOf("`splice channel add gh:keelstackhq/hull//rigging --piece claude`");
-  assert.ok(update > 0 && add > update, text);
+  assert.doesNotMatch(text, /splice update/, "upgrade order lives in hull's README/CHANGELOG");
+  assert.match(
+    text,
+    /if `\.claude\/agents\/`\s+lacks them: `splice channel add gh:keelstackhq\/hull\/\/rigging --piece claude`/,
+  );
   for (const [name] of AGENTS_LIST) assert.match(text, new RegExp(`\`${name}\``));
 });
 
