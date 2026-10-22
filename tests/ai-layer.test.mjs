@@ -116,18 +116,36 @@ test("AGENTS.md sends local notes to project.md or a package AGENTS.md, not CLAU
   assert.ok(!/below the import/.test(text));
 });
 
-test("agent files: frontmatter name matches case-sensitively", async () => {
-  const { dir } = await renderCombo(["base"]);
+const RIGGING_AGENTS = join(REAL_TEMPLATE, "../rigging/pieces/claude/files/.claude/agents");
+
+test("base ships no .claude/agents: subagents come from rigging's claude piece", async () => {
+  const { dir } = await renderCombo(["base", "docs"]);
+  assert.ok(!existsSync(join(dir, ".claude/agents")));
   for (const [name, file] of AGENTS_LIST) {
-    assert.equal(frontmatter(await read(dir, `.claude/agents/${file}`)).name, name, file);
+    assert.equal(frontmatter(readFileSync(join(RIGGING_AGENTS, file), "utf8")).name, name, file);
   }
-  assert.ok(!existsSync(join(dir, ".claude/agents/explorer.md")));
 });
 
-test("Explore: haiku, read-only tools, use proactively", async () => {
-  const fm = frontmatter(
-    await read((await renderCombo(["base"])).dir, ".claude/agents/explore.md"),
+test("migration 0.2.0 removes base's four agent files", async () => {
+  const { parse } = await import("smol-toml");
+  const m = parse(readFileSync(join(REAL_TEMPLATE, "migrations/0.2.0.toml"), "utf8"));
+  assert.deepEqual(
+    m.remove.map((r) => [r.path, r.piece]),
+    AGENTS_LIST.map(([, file]) => [`.claude/agents/${file}`, "base"]),
   );
+  assert.equal(m.step, undefined, "not a step: steps run before the main lock is written");
+});
+
+test("CLAUDE.md: run splice update, then add the rigging channel with --piece claude", async () => {
+  const text = await read((await renderCombo(["base"])).dir, "CLAUDE.md");
+  const update = text.indexOf("`splice update`");
+  const add = text.indexOf("`splice channel add gh:keelstackhq/hull//rigging --piece claude`");
+  assert.ok(update > 0 && add > update, text);
+  for (const [name] of AGENTS_LIST) assert.match(text, new RegExp(`\`${name}\``));
+});
+
+test("Explore (rigging): haiku, read-only tools, use proactively", async () => {
+  const fm = frontmatter(readFileSync(join(RIGGING_AGENTS, "explore.md"), "utf8"));
   assert.equal(fm.name, "Explore");
   assert.equal(fm.model, "haiku");
   assert.equal(fm.tools, "Read, Grep, Glob");

@@ -64,10 +64,24 @@ yet, so no CI p50 has been measured. Heavy work (Tauri, Storybook build) stays o
 Not a template option. To use Blacksmith, Namespace or Depot, change `runs-on` in
 `.github/workflows/ci.yml`; their sticky disks replace the pnpm store cache step.
 
+## Upgrading to 0.2.0
+
+hull 0.2.0 moves the four subagents (`.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`)
+out of `base` into the `rigging` channel. In that order:
+
+```bash
+pnpm dlx @keelstackhq/splice update      # removes base's unedited agent files (edited ones are kept and reported)
+pnpm dlx @keelstackhq/splice channel add gh:keelstackhq/hull//rigging --piece claude
+```
+
+`channel add` refuses while base's copies are still there, so run `update` first. Delete or move
+any edited copy it reports before the `channel add`.
+
 ## Built for Claude Code
 
-A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, a project `Explore`
-subagent on haiku plus `implementer` sonnet, `reviewer` opus and `ci-fixer` sonnet, skills
+A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, subagents from the
+`rigging` channel (`splice channel add gh:keelstackhq/hull//rigging --piece claude`: a project
+`Explore` on haiku plus `implementer` sonnet, `reviewer` opus and `ci-fixer` sonnet), skills
 (`verify`, `add-piece`, `docs-lookup`), a `/loop` default that iterates until checks pass, a
 PreToolUse guard hook (denies publish, force or tag pushes and secret reads; asks before editing
 template-owned files), a generated docs index (`docs/agents/index.md`), an opt-in Stop hook, and

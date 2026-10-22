@@ -1,0 +1,19 @@
+# 0.2.0: base's subagents moved to hull's rigging channel (piece `claude`).
+# Unedited copies are deleted; edited ones are kept and reported. Then run
+# `splice channel add gh:keelstackhq/hull//rigging --piece claude` (README, CLAUDE.md).
+
+[[remove]]
+path = ".claude/agents/explore.md"
+piece = "base"
+
+[[remove]]
+path = ".claude/agents/implementer.md"
+piece = "base"
+
+[[remove]]
+path = ".claude/agents/reviewer.md"
+piece = "base"
+
+[[remove]]
+path = ".claude/agents/ci-fixer.md"
+piece = "base"
