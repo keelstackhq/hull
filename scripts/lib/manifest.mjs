@@ -22,6 +22,36 @@ const VAR_KEYS = ["prompt", "default", "pattern"];
 const FILES_KEYS = ["owned", "shared", "seed"];
 const POST_KEYS = ["run", "when"];
 
+// semver 2.0: no leading zeros, optional pre-release and build metadata
+const NUM = "(?:0|[1-9]\\d*)";
+const PRE = `(?:${NUM}|\\d*[a-zA-Z-][0-9a-zA-Z-]*)`;
+const SEMVER_TOML = new RegExp(
+  `^${NUM}\\.${NUM}\\.${NUM}(?:-${PRE}(?:\\.${PRE})*)?(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)?\\.toml$`,
+);
+
+/** Contract §7: `migrations/` holds only `<semver>.toml` files with `[[step]].run` / `[[remove]].path`. */
+async function checkMigration(path, entry) {
+  const bad = (why) => new TemplateError(`${path}: ${why}`);
+  if (!entry.isFile() || !SEMVER_TOML.test(entry.name)) {
+    throw bad("migration files must be named <semver>.toml, for example 1.2.0.toml");
+  }
+  let doc;
+  try {
+    doc = parse(await readFile(path, "utf8"));
+  } catch (e) {
+    throw bad(`invalid migration TOML: ${e.message.split("\n")[0]}`);
+  }
+  for (const [key, field] of [
+    ["step", "run"],
+    ["remove", "path"],
+  ]) {
+    if (doc[key] === undefined) continue;
+    if (!Array.isArray(doc[key]) || !doc[key].every((s) => typeof s?.[field] === "string")) {
+      throw bad(`migration [[${key}]] entries need a string \`${field}\``);
+    }
+  }
+}
+
 function isObject(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -201,6 +231,9 @@ export async function loadTemplate(dir) {
   try {
     for (const f of await readdir(join(dir, "migrations"), { recursive: true })) {
       await assertNotSymlink(join(dir, "migrations", f), `migration ${f}`);
+    }
+    for (const e of await readdir(join(dir, "migrations"), { withFileTypes: true })) {
+      await checkMigration(join(dir, "migrations", e.name), e);
     }
   } catch (e) {
     if (e instanceof TemplateError) throw e;
