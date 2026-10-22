@@ -76,16 +76,12 @@ jobs:
         if: steps.rust.outputs.needed == 'true'
         with:
           tool: cargo-nextest@0.9.148,cargo-deny@0.20.2
-      - uses: actions/cache@v4
+      # Turborepo remote cache for the combos; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM
+      - uses: keelstackhq/hoard@v0
         if: steps.combos.outputs.args != ''
-        with:
-          path: ${{ runner.temp }}/turbo-cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ runner.os }}-
       - name: Dogfood combos
         if: steps.combos.outputs.args != ''
-        run: node scripts/dogfood.mjs ${{ steps.combos.outputs.args }} --root "$RUNNER_TEMP/combos" --cache-dir "$RUNNER_TEMP/turbo-cache"
+        run: node scripts/dogfood.mjs ${{ steps.combos.outputs.args }} --root "$RUNNER_TEMP/combos"
       - name: Job duration
         if: always()
         continue-on-error: true

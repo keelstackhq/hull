@@ -57,7 +57,8 @@ One job plus a `ci-ok` check, on `pull_request` and `merge_group`. Turbo runs on
 and exits early when nothing relevant changed. Target: 45 s or less for a typical PR, 15 s or less
 for docs-only, on GitHub's own runners. These are targets: the reference canary repo is not set up
 yet, so no CI p50 has been measured. Heavy work (Tauri, Storybook build) stays off the PR path.
-`keelstackhq/hoard@v1` as a shared remote cache is planned, not yet released.
+The Turborepo cache is [hoard](https://github.com/keelstackhq/hoard) (`keelstackhq/hoard@v0`), a
+remote cache stored in the GitHub Actions cache: no account, no token.
 
 ### Custom runners
 

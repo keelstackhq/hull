@@ -36,7 +36,7 @@ export function comboSteps(cacheDir, pieces = [], dir = ".", renderer = "dev") {
             : []),
           // the base [[post]] hook, which the dev renderer does not run
           ["node", ["scripts/agents-index.mjs"]],
-          [cmd, [...args, `--cache-dir=${cacheDir}`]],
+          turbo(cmd, args, cacheDir),
           ["node", ["scripts/agents-index.mjs", "--check"]],
         ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
@@ -46,11 +46,14 @@ export function comboSteps(cacheDir, pieces = [], dir = ".", renderer = "dev") {
 }
 
 // splice `new` already ran `git init` and the [[post]] hooks
+// no cache dir with a remote cache (hoard sets TURBO_API)
+const turbo = (cmd, args, cacheDir) => [
+  cmd,
+  cacheDir ? [...args, `--cache-dir=${cacheDir}`] : args,
+];
+
 function spliceSteps(cmd, args, cacheDir) {
-  return [
-    [cmd, [...args, `--cache-dir=${cacheDir}`]],
-    ["node", ["scripts/agents-index.mjs", "--check"]],
-  ];
+  return [turbo(cmd, args, cacheDir), ["node", ["scripts/agents-index.mjs", "--check"]]];
 }
 
 const RENDERERS = new Set(["splice", "dev"]);
@@ -91,7 +94,11 @@ export async function dogfood(opts) {
   const root = resolve(opts.root ?? join(tmpdir(), "hull-dogfood"));
   const [spliceBin, ...spliceArgs] = opts.splice ?? spliceCommand();
   let source;
-  const cacheDir = resolve(opts.cacheDir ?? join(root, ".turbo-cache"));
+  const cacheDir = opts.cacheDir
+    ? resolve(opts.cacheDir)
+    : process.env.TURBO_API
+      ? undefined
+      : join(root, ".turbo-cache");
   const results = [];
   const exec = opts.run ?? run;
   for (const name of opts.combos) {

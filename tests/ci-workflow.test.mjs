@@ -94,11 +94,14 @@ test("install is frozen and prefer-offline; setup-node caches pnpm", () => {
   assert.ok(step("pnpm/action-setup"));
 });
 
-test("turbo cache restores by prefix", () => {
-  const c = step("actions/cache");
-  assert.equal(c.with.path, ".turbo/cache");
-  assert.match(c.with.key, /^turbo-\$\{\{ runner\.os \}\}-\$\{\{ github\.sha \}\}$/);
-  assert.match(c.with["restore-keys"], /turbo-\$\{\{ runner\.os \}\}-/);
+test("hoard is the turbo remote cache: after install, before turbo run, no actions/cache", () => {
+  const i = steps.findIndex((s) => s.uses === "keelstackhq/hoard@v0");
+  assert.ok(i >= 0, "uses keelstackhq/hoard@v0");
+  assert.match(steps[i].if, /steps\.affected\.outputs\.skip != 'true'/);
+  const install = steps.findIndex((s) => s.run?.startsWith("pnpm install"));
+  const turbo = steps.findIndex((s) => s.run?.startsWith("pnpm turbo run"));
+  assert.ok(install < i && i < turbo, `install ${install} < hoard ${i} < turbo ${turbo}`);
+  assert.ok(!steps.some((s) => s.uses?.startsWith("actions/cache")), "no actions/cache step");
 });
 
 test("turbo run uses CI_TASKS and --affected", () => {
