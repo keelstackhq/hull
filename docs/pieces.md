@@ -55,6 +55,7 @@ Files (owned):
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/preview.yml`
+- `.github/scripts/preview.mjs`
 - `.github/workflows/desktop.yml`
 - `.github/scripts/affected.mjs`
 - `.github/scripts/rust-affected.mjs`

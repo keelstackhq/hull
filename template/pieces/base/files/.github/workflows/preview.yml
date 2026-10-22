@@ -46,9 +46,5 @@ jobs:
       - name: Deploy previews
         if: steps.detect.outputs.deploy == 'true' && env.CLOUDFLARE_API_TOKEN != ''
         shell: bash
-        run: |
-          pnpm turbo run deploy:preview --affected 2>&1 | tee "$RUNNER_TEMP/preview.log"
-          {
-            echo "## Preview deployments"
-            sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/preview.log" | grep -Eo 'https://[^ )]*\.workers\.dev[^ )]*' | sort -u || true
-          } >> "$GITHUB_STEP_SUMMARY"
+        # Skips (with a notice) an app whose Worker was never deployed; see preview.mjs.
+        run: node .github/scripts/preview.mjs

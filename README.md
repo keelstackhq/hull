@@ -102,6 +102,8 @@ example Axiom) is configured in the Cloudflare dashboard; the syntax is unverifi
   `astro check` does not support TypeScript 7, so astro-site typechecks with `tsc --noEmit`.
 - Storybook 10.6 lists Vite+ 0.x as its peer; hull accepts 1.x (`peerDependencyRules`), not tested upstream.
 - Cloudflare preview URLs are public unless Access protects them, and do not work with Durable Objects.
+- A PR preview needs its Worker to exist. On a fresh Cloudflare account, deploy each app once
+  (`pnpm turbo run deploy --filter=@scope/<app>`); until then `preview.yml` skips it with a notice.
 - Workers Logs free tier drops to 0.5 GB/day from 2026-12-01; lower `observability.head_sampling_rate`
   in `wrangler.jsonc` to stay under it.
 - The template contract cannot emit GitHub's `${{ }}` from a `.jinja` file, so `ci.yml` and

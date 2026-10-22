@@ -3,6 +3,15 @@
 hull is a template: a version is a git tag `v<semver>` on this repo, and `splice update` moves a
 generated repo between versions (`docs/template-format.md` §7).
 
+## v0.2.2 — 2026-10-22
+
+- PR previews no longer go red on a fresh Cloudflare account. `wrangler versions upload` refuses a
+  Worker that was never deployed, so `preview.yml` now runs `.github/scripts/preview.mjs` (new,
+  owned): it skips such an app, writes the one-time `pnpm turbo run deploy --filter=<pkg>` to the job
+  summary and a notice, and still fails on any other error. A PR never deploys production.
+- The `AGENTS.md` of preact-app, astro-site and hono-worker names that one-time deploy
+  (astro-site and hono-worker now render it from `AGENTS.md.jinja`, same path and class).
+
 ## v0.2.1 — 2026-10-22
 
 Fixes found adopting v0.2.0 in a repo first rendered before v0.1.0.

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import YAML from "yaml";
 import { renderCombo } from "./helpers.mjs";
+import { TURBO_ARGS, report } from "../template/pieces/base/files/.github/scripts/preview.mjs";
 
 const PATH = ".github/workflows/preview.yml";
 
@@ -55,16 +56,89 @@ test("job env carries Cloudflare secrets, PR number and turbo scm range", () => 
   assert.match(job.env.TURBO_SCM_HEAD, /github\.sha/);
 });
 
-test("deploy step runs deploy:preview --affected, skipped without the token", () => {
-  const d = steps.find((s) => /deploy:preview/.test(s.run ?? ""));
-  assert.match(d.run, /turbo run deploy:preview --affected/);
+test("deploy step runs preview.mjs, skipped without the token", () => {
+  const d = steps.find((s) => /preview\.mjs/.test(s.run ?? ""));
+  assert.equal(d.run.trim(), "node .github/scripts/preview.mjs");
   assert.equal(d.shell, "bash");
-  assert.match(d.run, /tee /);
-  assert.match(d.run, /workers\\\.dev/);
-  assert.match(d.run, /x1b/);
-  assert.match(d.run, /GITHUB_STEP_SUMMARY/);
   assert.match(d.if, /env\.CLOUDFLARE_API_TOKEN != ''/);
   assert.match(d.if, /outputs\.deploy == 'true'/);
+});
+
+test("preview.mjs is owned by base and runs only deploy:preview (never production deploy)", () => {
+  const c = base.result.changes.find((x) => x.path === ".github/scripts/preview.mjs");
+  assert.equal(c.class, "owned");
+  assert.deepEqual(TURBO_ARGS, [
+    "turbo",
+    "run",
+    "deploy:preview",
+    "--affected",
+    "--continue",
+    "--log-prefix=task",
+  ]);
+});
+
+// Shapes of real turbo 2.11 output with --log-prefix=task in GitHub Actions (checked 2026-10-22).
+const WEB_OK = [
+  "::group::@acme/web:deploy:preview",
+  "@acme/web:deploy:preview: Version Preview Alias URL: \x1b[36mhttps://pr-3-web.acme.workers.dev\x1b[0m",
+  "::endgroup::",
+].join("\n");
+const API_MISSING = [
+  "\x1b[;31m@acme/api:deploy:preview\x1b[;0m",
+  "@acme/api:deploy:preview: \x1b[31m✘ [ERROR]\x1b[0m You cannot upload a new version of a Worker that does not yet exist. Please run the `deploy` command first.",
+  "@acme/api:deploy:preview: [ELIFECYCLE] Command failed with exit code 1.",
+].join("\n");
+const tail = (failed) =>
+  ` Tasks:    1 successful, 2 total\nFailed:    ${failed}\n ERROR  run failed: command  exited (1)\n`;
+
+test("report: success lists the preview URLs without ANSI codes", () => {
+  const r = report(`${WEB_OK}\n Tasks:    1 successful, 1 total\n`, 0);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.urls, ["https://pr-3-web.acme.workers.dev"]);
+  assert.deepEqual(r.notCreated, []);
+  assert.match(r.summary, /^## Preview deployments\n/);
+  assert.match(r.summary, /https:\/\/pr-3-web\.acme\.workers\.dev/);
+});
+
+test("report: a Worker that was never deployed is skipped with a notice, not a failure", () => {
+  const r = report(`${WEB_OK}\n${API_MISSING}\n${tail("@acme/api#deploy:preview")}`, 1);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.notCreated, ["@acme/api"]);
+  assert.deepEqual(r.urls, ["https://pr-3-web.acme.workers.dev"]);
+  assert.match(r.summary, /does not exist yet/);
+  assert.match(r.summary, /pnpm turbo run deploy --filter=@acme\/api/);
+  assert.equal(r.notices.length, 1);
+  assert.match(r.notices[0], /^::notice title=Preview skipped::@acme\/api/);
+});
+
+test("report: any other failure still fails the job", () => {
+  const build = report(`${API_MISSING}\n${tail("@acme/web#build, @acme/api#deploy:preview")}`, 1);
+  assert.equal(build.ok, false);
+  const auth = report(
+    `@acme/web:deploy:preview: ✘ [ERROR] Authentication error [code: 10000]\n${tail("@acme/web#deploy:preview")}`,
+    1,
+  );
+  assert.equal(auth.ok, false);
+  assert.deepEqual(auth.notCreated, []);
+  const both = report(
+    `${API_MISSING}\n@acme/web:deploy:preview: ✘ [ERROR] boom\n${tail("@acme/api#deploy:preview, @acme/web#deploy:preview")}`,
+    1,
+  );
+  assert.equal(both.ok, false);
+});
+
+test("report: a non-zero exit without a Failed line fails", () => {
+  assert.equal(report(" ERROR  run failed: no lockfile\n", 1).ok, false);
+  assert.equal(report(API_MISSING, 1).ok, false);
+});
+
+test("deployable pieces document the one-time first deploy", async () => {
+  for (const piece of ["preact-app:web", "astro-site:site", "hono-worker:api"]) {
+    const name = piece.split(":")[1];
+    const { dir } = await renderCombo(["base", piece]);
+    const doc = await readFile(join(dir, `apps/${name}/AGENTS.md`), "utf8");
+    assert.match(doc, /pnpm turbo run deploy --filter=@\w+\/\w+/, piece);
+  }
 });
 
 test("install matches ci.yml rules", () => {
