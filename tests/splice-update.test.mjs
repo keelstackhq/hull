@@ -115,18 +115,11 @@ test(
     const root = await mkdtemp(join(tmpdir(), "hull-update-"));
     t.after(() => rm(root, { recursive: true, force: true }));
     const { source, next } = await templateRepo(root);
-    const shipped = spawnSync(
-      "git",
-      ["cat-file", "blob", "ad17ec0f7072cdef5051c8f5ccafc875cec54f51"],
-      {
-        cwd: HULL,
-        encoding: "utf8",
-      },
-    );
-    assert.equal(shipped.status, 0, String(shipped.stderr));
+    // The copy hull shipped (git blob ad17ec0f; tests/ai-layer.test.mjs checks the hash).
+    const shipped = await readFile(join(HULL, "tests/fixtures/explorer/explorer.md"), "utf8");
     for (const [name, content, kept] of [
-      ["unedited", shipped.stdout, false],
-      ["edited", `${shipped.stdout}my note\n`, true],
+      ["unedited", shipped, false],
+      ["edited", `${shipped}my note\n`, true],
     ]) {
       const app = join(root, name);
       const opts = ["--data", "scope=hullci", "--yes", "--json", "--no-post"];

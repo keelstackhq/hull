@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/p
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -145,21 +146,27 @@ test("migration 0.2.1 removes the pre-0.1.0 explorer.md, unedited copies only", 
   const m = parse(readFileSync(join(REAL_TEMPLATE, "migrations/0.2.1.toml"), "utf8"));
   assert.equal(m.remove, undefined, "a [[remove]] of an untracked file only reports it");
   assert.equal(m.step.length, 1);
-  const shipped = spawnSync("git", ["cat-file", "blob", EXPLORER_BLOB], { encoding: "utf8" });
-  assert.equal(shipped.status, 0, "explorer.md blob missing: fetch hull's full history");
-  const runIn = async (content) => {
+  const fixture = fileURLToPath(new URL("./fixtures/explorer/explorer.md", import.meta.url));
+  const hash = spawnSync("git", ["hash-object", fixture], { encoding: "utf8" });
+  assert.equal(hash.stdout.trim(), EXPLORER_BLOB, "the fixture is the copy hull shipped");
+  const shipped = readFileSync(fixture, "utf8");
+  const runIn = async (content, env = process.env) => {
     const dir = await mkdtemp(join(tmpdir(), "hull-mig-"));
     await mkdir(join(dir, ".claude/agents"), { recursive: true });
     if (content !== undefined) await writeFile(join(dir, ".claude/agents/explorer.md"), content);
-    const r = spawnSync("sh", ["-c", m.step[0].run], { cwd: dir, encoding: "utf8" });
+    const r = spawnSync("/bin/sh", ["-c", m.step[0].run], { cwd: dir, encoding: "utf8", env });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    const kept = existsSync(join(dir, ".claude/agents/explorer.md"));
-    assert.equal(/kept edited/.test(r.stderr), kept, "an edited copy is reported");
-    return kept;
+    return { kept: existsSync(join(dir, ".claude/agents/explorer.md")), stderr: r.stderr };
   };
-  assert.equal(await runIn(shipped.stdout), false, "unedited copy is deleted");
-  assert.equal(await runIn(`${shipped.stdout}\nmy note\n`), true, "edited copy is kept");
-  assert.equal(await runIn(undefined), false, "no copy: the step still succeeds");
+  assert.deepEqual(await runIn(shipped), { kept: false, stderr: "" }, "unedited copy is deleted");
+  const edited = await runIn(`${shipped}\nmy note\n`);
+  assert.ok(edited.kept && /kept edited/.test(edited.stderr), "edited copy is kept and reported");
+  assert.deepEqual(await runIn(undefined), { kept: false, stderr: "" }, "no copy: still succeeds");
+  const noGit = await runIn(shipped, {
+    ...process.env,
+    PATH: await mkdtemp(join(tmpdir(), "nogit-")),
+  });
+  assert.ok(noGit.kept && /cannot check/.test(noGit.stderr), "without git: kept, says why");
 });
 
 // CLAUDE.md is owned: whoever reads its current text already ran `splice update`, and the template
