@@ -37,6 +37,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f \"${CLAUDE_PROJECT_DIR:-.}/.bosun/bosun.toml\" ] && command -v bosun >/dev/null 2>&1; then exec bosun hook pre-tool-use; fi",
+            "timeout": 120
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -46,6 +56,15 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f \"${CLAUDE_PROJECT_DIR:-.}/.bosun/bosun.toml\" ] && command -v bosun >/dev/null 2>&1; then exec bosun hook session-start; fi",
             "timeout": 120
           }
         ]
