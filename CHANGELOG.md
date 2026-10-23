@@ -3,6 +3,24 @@
 hull is a template: a version is a git tag `v<semver>` on this repo, and `splice update` moves a
 generated repo between versions (`docs/template-format.md` §7).
 
+## v0.3.0 — unreleased
+
+**New: pure Rust repos.** A third template, `gh:keelstackhq/hull//template-rust` (spec §15). It
+has no Node, pnpm or Turborepo: measured, a Turborepo cache hit saved about 1 s over a warm cargo
+no-op, while Node setup cost about 10 s per PR.
+
+- `splice new gh:keelstackhq/hull//template-rust <dir> --piece rust-cli:cli`: a cargo virtual
+  workspace (`crates/*`, seed crate `crates/common`), Rust 1.99.1 in `rust-toolchain.toml`,
+  `rustfmt.toml`, a root `deny.toml`, a nextest `ci` profile.
+- One CI job + `ci-ok`: docs-only early exit, rust-cache, then fmt, clippy, cargo-deny, nextest and
+  doc tests. Measured on `keelstackhq/rust-canary`: docs-only PR 7 s, crate PR 34 s warm
+  (budgets 15 s and 45 s).
+- `release.yml` releases through hoist (as berth and bosun do); nothing releases until the
+  repository variable `HOIST_RELEASE` is `enabled`. `splice.yml` is the update bot.
+- The same AI layer as `template/`, with cargo commands; the generated README names the rigging
+  and decisions channel adds.
+- `template/` is unchanged. hull's tooling renders combos from either template (combo `rust`).
+
 ## v0.2.2 — 2026-10-22
 
 - PR previews no longer go red on a fresh Cloudflare account. `wrangler versions upload` refuses a
