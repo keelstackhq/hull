@@ -686,7 +686,8 @@ Measure with `scripts/ci-timing.mjs` (hull) or by hand:
 `completedAt − startedAt` of job `ci`. The script reports p50/p90 and exits 1 when p50 exceeds
 the budget. Canary repos rendered from hull are the reference: `keelstackhq/example-app` (`web` combo; p50 29 s,
 p90 51 s, docs-only 7 s) and `keelstackhq/cli-canary` (`cli` combo, 2026-10-21: npm-cli-only PR 26 s,
-docs-only 9 s, crate PR 42 s warm; cold `main` 98 s).
+docs-only 9 s, crate PR 42 s warm; cold `main` 98 s) and `keelstackhq/rust-canary` (`rust` combo of
+`template-rust`, 2026-10-23: docs-only 7 s, crate PR 34 s warm, cold PR 65 s).
 
 ### 8.5 Custom runners
 

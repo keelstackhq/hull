@@ -13,7 +13,8 @@ no-op, while Node setup cost about 10 s per PR.
   workspace (`crates/*`, seed crate `crates/common`), Rust 1.99.1 in `rust-toolchain.toml`,
   `rustfmt.toml`, a root `deny.toml`, a nextest `ci` profile.
 - One CI job + `ci-ok`: docs-only early exit, rust-cache, then fmt, clippy, cargo-deny, nextest and
-  doc tests. Measured on `keelstackhq/rust-canary`: see the numbers below.
+  doc tests. Measured on `keelstackhq/rust-canary`: docs-only PR 7 s, crate PR 34 s warm
+  (budgets 15 s and 45 s).
 - `release.yml` releases through hoist (as berth and bosun do); nothing releases until the
   repository variable `HOIST_RELEASE` is `enabled`. `splice.yml` is the update bot.
 - The same AI layer as `template/`, with cargo commands; the generated README names the rigging
