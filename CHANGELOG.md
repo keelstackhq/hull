@@ -19,7 +19,10 @@ no-op, while Node setup cost about 10 s per PR.
   repository variable `HOIST_RELEASE` is `enabled`. `splice.yml` is the update bot.
 - The same AI layer as `template/`, with cargo commands; the generated README names the rigging
   and decisions channel adds.
-- `template/` is unchanged. hull's tooling renders combos from either template (combo `rust`).
+- hull's tooling renders combos from either template (combo `rust`).
+- Both templates' `.claude/settings.json` run bosun's hooks (`bosun hook pre-tool-use`,
+  `bosun hook session-start`) when the repo uses bosun: each is a no-op unless `bosun` is on
+  `PATH` and `.bosun/bosun.toml` exists. bosun's channel cannot own that file in a hull repo.
 
 ## v0.2.2 — 2026-10-22
 

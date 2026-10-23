@@ -459,7 +459,14 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `hooks.PreToolUse` matcher `Bash|Read|Grep|Glob|Edit|Write|MultiEdit|NotebookEdit` →
   `node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs"`;
   `hooks.SessionStart` matcher `startup|resume` → `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"`;
-  `hooks.Stop` → stop-checks; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
+  `hooks.Stop` → stop-checks; bosun's two hooks (decision 2026-10-23, option b: bosun's channel
+  cannot share this owned file, splice allows one owner per path): a second `PreToolUse` entry
+  (bosun's matcher `Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__github__.*`) and a second
+  `SessionStart` entry (no matcher, like bosun's) run `bosun hook pre-tool-use` /
+  `bosun hook session-start` through `if [ -f "${CLAUDE_PROJECT_DIR:-.}/.bosun/bosun.toml" ] &&
+  command -v bosun >/dev/null 2>&1; then exec bosun hook …; fi`: exit 0 and silent unless the repo
+  uses bosun, and `exec` passes bosun's stdin and exit code (a block) through; timeout 120;
+  `tests/bosun-hooks.test.mjs` runs the guard with and without bosun; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
   (`superpowers@superpowers-marketplace`, repo `obra/superpowers-marketplace`) and caveman
   (`caveman@akramsystems-plugins`, repo `akramsystems/caveman`). Shape checked against
   code.claude.com/docs (settings, hooks, statusline) on 2026-10-14: `enabledPlugins` keys are
@@ -1082,7 +1089,7 @@ the build matrix.
 **AI layer.** Same rules and budgets as §6.9 (`AGENTS.md` ≤ 60 lines, `CLAUDE.md` ≤ 20), with
 cargo commands in place of pnpm. `.claude/hooks/guard.mjs` and `.claude/statusline.sh` are
 byte-identical to `template/`'s copies (a test enforces this). `settings.json` allows cargo and
-denies `cargo publish`. `session-start.sh` runs `rustup show` and `cargo fetch --locked`,
+denies `cargo publish`, and carries the same guarded bosun hooks as §6.9. `session-start.sh` runs `rustup show` and `cargo fetch --locked`,
 quietly. `stop-checks.sh` and the `verify` skill run the Rust CI steps. `scripts/agents-index.mjs`
 lists the workspace crates from each `crates/*/Cargo.toml`.
 
