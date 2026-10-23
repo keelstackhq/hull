@@ -5,11 +5,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { CI_TASKS } from "./lib/ci-tasks.mjs";
+import { CI_TASKS, RUST_CI_STEPS } from "./lib/ci-tasks.mjs";
+import { comboTemplate, comboVars, isRustTemplate } from "./lib/combos.mjs";
 import { snapshotTemplate, spliceCommand, spliceNewArgs } from "./lib/splice.mjs";
 import { renderNew } from "./render.mjs";
 
-const TEMPLATE = fileURLToPath(new URL("../template", import.meta.url));
+const HULL = fileURLToPath(new URL("..", import.meta.url));
 const COMBOS = new URL("./combos.json", import.meta.url);
 
 /** The CI command every rendered combo runs (parity with generated CI). */
@@ -18,6 +19,24 @@ export const ciCommand = () => ["pnpm", "turbo", "run", ...CI_TASKS];
 const CHECK_SINGLE_VITE = fileURLToPath(new URL("./check-single-vite.mjs", import.meta.url));
 const RUST_PIECES = new Set(["rust-tool", "rust-cli"]);
 const VITE_PIECES = new Set(["preact-app", "ui-storybook", "astro-site"]);
+
+/** Steps run in a rendered template-rust combo (spec §15): no pnpm, no turbo. */
+export function rustComboSteps(renderer = "dev") {
+  const ci = RUST_CI_STEPS.map((s) => {
+    const [cmd, ...args] = s.split(" ");
+    return [cmd, args];
+  });
+  // splice already ran `git init` and the [[post]] hooks (cargo generate-lockfile, agents index)
+  const setup =
+    renderer === "splice"
+      ? []
+      : [
+          ["git", ["init", "-q"]],
+          ["cargo", ["generate-lockfile"]],
+          ["node", ["scripts/agents-index.mjs"]],
+        ];
+  return [...setup, ...ci, ["node", ["scripts/agents-index.mjs", "--check"]]];
+}
 
 /** Steps run in each rendered combo; `check-single-vite` for combos with Vite pieces. */
 export function comboSteps(cacheDir, pieces = [], dir = ".", renderer = "dev") {
@@ -93,7 +112,8 @@ export async function dogfood(opts) {
   const { vars, combos } = JSON.parse(await readFile(COMBOS, "utf8"));
   const root = resolve(opts.root ?? join(tmpdir(), "hull-dogfood"));
   const [spliceBin, ...spliceArgs] = opts.splice ?? spliceCommand();
-  let source;
+  /** @type {Map<string, string>} template dir → splice source */
+  const sources = new Map();
   const cacheDir = opts.cacheDir
     ? resolve(opts.cacheDir)
     : process.env.TURBO_API
@@ -112,24 +132,25 @@ export async function dogfood(opts) {
       try {
         await rm(dir, { recursive: true, force: true });
         await mkdir(root, { recursive: true });
+        const template = opts.template ?? join(HULL, comboTemplate(combo));
+        const cvars = comboVars(combo, vars);
         if (renderer === "dev") {
-          await renderNew({
-            template: opts.template ?? TEMPLATE,
-            out: dir,
-            pieces: combo.pieces,
-            vars,
-          });
+          await renderNew({ template, out: dir, pieces: combo.pieces, vars: cvars });
           ok = true;
         } else {
-          source ??= await snapshotTemplate(opts.template ?? TEMPLATE, root);
-          const args = [...spliceArgs, ...spliceNewArgs(source, dir, combo.pieces, vars)];
+          if (!sources.has(template)) sources.set(template, await snapshotTemplate(template, root));
+          const source = sources.get(template);
+          const args = [...spliceArgs, ...spliceNewArgs(source, dir, combo.pieces, cvars)];
           ok = (await exec(spliceBin, args, root, name)) === 0;
         }
       } catch (e) {
         process.stderr.write(`[${name}] ${e.message ?? String(e)}\n`);
       }
       if (ok) {
-        for (const [cmd, args] of comboSteps(cacheDir, combo.pieces, dir, renderer)) {
+        const steps = isRustTemplate(combo)
+          ? rustComboSteps(renderer)
+          : comboSteps(cacheDir, combo.pieces, dir, renderer);
+        for (const [cmd, args] of steps) {
           if ((await exec(cmd, args, dir)) !== 0) {
             ok = false;
             break;

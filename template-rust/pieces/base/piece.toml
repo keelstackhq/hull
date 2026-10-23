@@ -1,0 +1,19 @@
+id = "base"
+description = "Pure Rust workspace root: cargo, rustup pin, cargo-deny, nextest, CI, hoist release and AI layer (no Node)"
+
+[files]
+shared = ["Cargo.toml", "crates/common/Cargo.toml"]
+owned = [".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/docs-only.mjs", ".github/scripts/release-pending.mjs", "scripts/agents-index.mjs", "rust-toolchain.toml", "rustfmt.toml", "deny.toml", ".config/nextest.toml", "renovate.json"]
+seed = ["AGENTS.md", "README.md", "docs/agents/project.md", "hoist.toml", "crates/common/src/**"]
+
+[merge]
+"Cargo.toml" = "toml"
+"crates/common/Cargo.toml" = "toml"
+
+[[post]]
+run = "cargo generate-lockfile"
+when = ["new"]
+
+[[post]]
+run = "node scripts/agents-index.mjs"
+when = ["new", "add", "update"]

@@ -31,6 +31,12 @@
     {
       "name": "lib",
       "pieces": ["base", "ts-lib:lib"]
+    },
+    {
+      "name": "rust",
+      "template": "template-rust",
+      "pieces": ["base", "rust-cli:cli"],
+      "vars": {}
     }
   ]
 }

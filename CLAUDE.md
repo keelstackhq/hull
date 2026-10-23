@@ -19,6 +19,7 @@ template/splice.toml            template manifest (format 1)
 template/pieces/<id>/           piece.toml + files/ (base, preact-app, ui-storybook, astro-site,
                                 hono-worker, rust-tool, rust-cli, npm-cli, ts-lib, tauri-app, docs)
 rigging/                        splice channel template (empty base meta; core, claude, skills; §14)
+template-rust/                  pure Rust template (base, rust-cli; no Node/Turborepo; §15)
 scripts/render.mjs, lib/        dev renderer (contract §1-§4, §8, §9; `new` only)
 scripts/combos.json             piece combinations hull CI renders
 scripts/dogfood.mjs             render combos, run their CI command
@@ -63,7 +64,7 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
   Budget ≤ 45 s typical PR, ≤ 15 s docs-only. Heavy work (Tauri, Storybook build, Playwright)
   never on the PR path.
 - **CI task list** is `CI_TASKS` in `scripts/lib/ci-tasks.mjs`; the parity test keeps the generated
-  workflow, the base `ci` script and dogfood in sync.
+  workflow, the base `ci` script and dogfood in sync. `template-rust` uses `RUST_CI_STEPS` likewise.
 - **Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines** (`AGENTS.md` ≤ 60, `CLAUDE.md` ≤ 20). Per-instance notes:
   `<target>/AGENTS.md` owned, `<target>/CLAUDE.md` seed.
 - **No secrets in logs** (hono-worker logs never include query strings, headers or bodies).

@@ -1,0 +1,47 @@
+# Rust workspace
+
+Generated from {{ template.name }} {{ template.version }}: a Cargo workspace, no Node toolchain.
+Crates live in `crates/*`; versions, lints and profiles are set in the root `Cargo.toml`.
+
+## Commands
+
+The CI steps, in order (run them all before saying a change is done):
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo deny --locked check bans licenses sources
+cargo nextest run --workspace --locked --profile ci
+cargo test --workspace --doc --locked
+```
+
+Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
+`node scripts/agents-index.mjs` (regenerate `docs/agents/index.md`; CI checks it).
+
+## Rules
+
+- Test first: write the failing test, watch it fail, implement, watch it pass.
+- Verify with real output before saying a task is done or fixed.
+- Keep files small and focused; one task per change; no drive-by refactors.
+- Dependencies are exact pins (`=x.y.z`); `--locked` everywhere; no `unsafe` (workspace lint).
+- Files owned by the template (configs, workflows, `.claude/`) are updated by `splice update`;
+  put local changes in seed files, `docs/agents/project.md` or a crate's `AGENTS.md`.
+- Never print or commit secrets; never read `.env*`.
+- Releases are made by the release workflow (hoist) after a human merges the release PR; never
+  publish, tag or push tags yourself.
+- At most 2-3 parallel agents, on files that barely overlap.
+- Before a long task write the next steps to `docs/agents/project.md`; start fresh rather than
+  compacting.
+- A hook `ask` becomes a denial in `-p`/unattended runs: do the change by hand or run interactively.
+
+## Crates
+
+- `crates/common`: shared library code (seed, unpublished).{% if "rust-cli" in pieces %}
+- `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit
+  codes and cargo-deny; see `crates/<name>/AGENTS.md`.{% endif %}
+
+## Where to look
+
+- `docs/agents/project.md`: repo-specific notes; read first.
+- `docs/agents/index.md`: generated map of commands, crates and docs.
+- `<dir>/AGENTS.md`: notes for one crate.

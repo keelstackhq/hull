@@ -1,0 +1,6 @@
+# hoist settings for this crate (keelstackhq/hoist). Uncomment once the crate is released:
+# remove `publish = false` from Cargo.toml first. `bin` is the binary name (the crate directory).
+#
+# [publish]
+# crates = {}
+# github_release = { targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"] }

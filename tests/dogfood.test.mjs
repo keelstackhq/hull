@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dogfood } from "../scripts/dogfood.mjs";
-import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
+import { CI_TASKS, RUST_CI_STEPS } from "../scripts/lib/ci-tasks.mjs";
+import { comboTemplate, comboVars } from "../scripts/lib/combos.mjs";
 
 test("a render failure fails that combo without throwing", async () => {
   const root = await mkdtemp(join(tmpdir(), "hull-df-"));
@@ -28,12 +29,14 @@ test("every combo in combos.json renders", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const c of combos) {
     await renderNew({
-      template: fileURLToPath(new URL("../template", import.meta.url)),
+      template: fileURLToPath(new URL(`../${comboTemplate(c)}`, import.meta.url)),
       out: join(root, c.name),
       pieces: c.pieces,
-      vars,
+      vars: comboVars(c, vars),
     });
-    await access(join(root, c.name, "package.json"));
+    await access(
+      join(root, c.name, comboTemplate(c) === "template" ? "package.json" : "Cargo.toml"),
+    );
   }
 });
 
@@ -125,4 +128,40 @@ test("with TURBO_API set (hoard) and no --cache-dir, turbo runs without --cache-
   await dogfood({ combos: ["base"], root, run, splice: ["splice"] });
   assert.ok(calls.includes(`pnpm turbo run ${CI_TASKS.join(" ")}`), calls.join("\n"));
   assert.ok(!calls.some((c) => c.includes("--cache-dir")));
+});
+
+test("rust combo (template-rust): no pnpm or turbo; cargo steps, index write and check", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(" "));
+    return 0;
+  };
+  const r = await dogfood({ combos: ["rust"], root, cacheDir: "/c", run, renderer: "dev" });
+  assert.ok(r[0].ok);
+  assert.deepEqual(calls, [
+    "git init -q",
+    "cargo generate-lockfile",
+    "node scripts/agents-index.mjs",
+    ...RUST_CI_STEPS,
+    "node scripts/agents-index.mjs --check",
+  ]);
+});
+
+test("rust combo with splice: renders template-rust without vars, then the cargo steps", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "hull-df-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const run = async (cmd, args) => {
+    calls.push([cmd, ...args].join(" "));
+    return 0;
+  };
+  await dogfood({ combos: ["rust"], root, run, splice: ["splice"] });
+  const src = `${join(root, "template-rust-src")}//template-rust`;
+  assert.deepEqual(calls, [
+    `splice new ${src} ${join(root, "rust")} --ref HEAD --piece rust-cli:cli --yes --json`,
+    ...RUST_CI_STEPS,
+    "node scripts/agents-index.mjs --check",
+  ]);
 });

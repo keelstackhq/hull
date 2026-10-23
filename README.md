@@ -36,6 +36,17 @@ With splice (0.2.0 or later) the equivalent is
 files merged, your source never touched) and `splice check` in CI. hull's own CI renders its
 combos with splice; `node scripts/dogfood.mjs --renderer dev` uses the dev renderer instead.
 
+## Pure Rust repos
+
+For a Rust-only project use the second template, `template-rust` (spec §15): a Cargo workspace
+(`crates/*`), pinned toolchain, cargo-deny, cargo-nextest, one CI job with a docs-only exit,
+releases through hoist, and the same AI layer. It has no Node, pnpm or Turborepo.
+
+```bash
+pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template-rust my-repo --piece rust-cli:cli
+node scripts/dogfood.mjs --combo rust   # hull: render it and run its cargo CI steps
+```
+
 ## Pieces
 
 | Piece | What you get |

@@ -29,15 +29,19 @@ test("hull ci.yml Rust condition matches rust-tool and rust-cli combos only", as
   assert.equal(await exit(["site"]), 0);
   assert.equal(await exit(["web"]), 1);
   assert.equal(await exit(["lib"]), 1);
+  assert.equal(await exit(["rust"]), 0);
 });
 
-test("hull ci.yml installs nextest@0.9.148 and cargo-deny@0.20.2, with rust-cache for the cli combo", async () => {
+test("hull ci.yml installs nextest@0.9.148 and cargo-deny@0.20.2, with rust-cache for the cli and rust combos", async () => {
   const steps = await hullCi();
   const install = steps.find((s) => s.uses?.startsWith("taiki-e/install-action"));
   assert.equal(install.with.tool, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
   const cache = steps.find((s) => s.uses === "Swatinem/rust-cache@v2");
   assert.equal(cache.if, "steps.rust.outputs.needed == 'true'");
-  assert.equal(cache.with.workspaces, "${{ runner.temp }}/combos/cli -> target");
+  assert.equal(
+    cache.with.workspaces,
+    "${{ runner.temp }}/combos/cli -> target\n${{ runner.temp }}/combos/rust -> target\n",
+  );
 });
 
 test("hull ci.yml installs splice SPLICE_VERSION before Test and sets SPLICE_BIN", async () => {

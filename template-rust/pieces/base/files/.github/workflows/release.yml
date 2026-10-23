@@ -1,0 +1,171 @@
+name: release
+
+# Releases through hoist (keelstackhq/hoist), the way berth and bosun do it:
+# - detect: which workspace crates have a version without a tag (or a tag on HEAD)? Is releasing
+#   switched on (repository variable HOIST_RELEASE = enabled)?
+# - advisories: `cargo deny check advisories` (only here, never on pull requests).
+# - build: release binaries for 5 targets as dist/<bin>-<target>. Runs when a release is pending
+#   and enabled, or on a manual run (workflow_dispatch = dry run: builds; publish and prepare run
+#   only on a push to main).
+# - publish: tags, GitHub Releases and crates.io through trusted publishing, in environment
+#   `release`. prepare: opens, updates or closes the release PR (branch hoist/release).
+# With HOIST_RELEASE unset, a push to main runs `detect` only: nothing is tagged or published.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  HOIST_VERSION: 0.2.0
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      pending: ${{ steps.detect.outputs.pending }}
+      enabled: ${{ steps.gate.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: detect
+        shell: bash
+        run: |
+          set -o pipefail
+          node .github/scripts/release-pending.mjs detect | tee -a "$GITHUB_OUTPUT"
+      - id: gate
+        env:
+          HOIST_RELEASE: ${{ vars.HOIST_RELEASE }}
+        run: |
+          if [ "$HOIST_RELEASE" = "enabled" ]; then enabled=true; else enabled=false; fi
+          echo "release gate (vars.HOIST_RELEASE): $enabled"
+          echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
+
+  advisories:
+    needs: detect
+    if: github.event_name == 'workflow_dispatch' || (needs.detect.outputs.pending == 'true' && needs.detect.outputs.enabled == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.20.2
+      - run: cargo deny --locked check advisories
+
+  build:
+    needs: detect
+    if: github.event_name == 'workflow_dispatch' || (needs.detect.outputs.pending == 'true' && needs.detect.outputs.enabled == 'true')
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            musl: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            musl: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Rust toolchain (from rust-toolchain.toml) and target
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup target add "${{ matrix.target }}"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}
+      - run: cargo build --release --locked --workspace --bins --target ${{ matrix.target }}
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          CC_aarch64_unknown_linux_musl: musl-gcc
+      - name: Stage dist/<bin>-<target>
+        run: node .github/scripts/release-pending.mjs stage ${{ matrix.target }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          # a workspace without binaries (only libraries) stages nothing
+          if-no-files-found: warn
+          retention-days: 7
+
+  publish:
+    needs: [detect, advisories, build]
+    # Only a push to main publishes: a manual run is always a dry run.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect.outputs.pending == 'true' && needs.detect.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # `cargo publish` (run by hoist) builds each crate.
+      - name: Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      # npm >= 11.5.1 and Node >= 22.14.0 for trusted publishing; hoist itself comes from npm.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - run: npm install -g "@keelstackhq/hoist@$HOIST_VERSION"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - run: hoist release publish --assets dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  prepare:
+    needs: [detect, publish]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect.outputs.enabled == 'true' && (needs.detect.outputs.pending == 'false' || needs.publish.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # A PR pushed with the default GITHUB_TOKEN runs no checks; the optional secret
+      # HOIST_RELEASE_TOKEN (Contents and Pull requests: write) makes the release PR run CI.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.HOIST_RELEASE_TOKEN || github.token }}
+      - name: Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - run: npm install -g "@keelstackhq/hoist@$HOIST_VERSION"
+      - run: hoist release prepare
+        env:
+          GH_TOKEN: ${{ secrets.HOIST_RELEASE_TOKEN || github.token }}
