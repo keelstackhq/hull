@@ -1,6 +1,6 @@
 # hull — design
 
-Date: 2026-10-14 · Status: approved for build · amended by `2026-10-17-hull-agent-layer-and-skeletons-design.md` (agent layer v2, skeleton pieces) and §14 (2026-10-18: `rigging/` channel, root `AGENTS.md` seed) · Org `keelstackhq`, repo `keelstackhq/hull`
+Date: 2026-10-14 · Status: approved for build · amended by `2026-10-17-hull-agent-layer-and-skeletons-design.md` (agent layer v2, skeleton pieces) §14 (2026-10-18: `rigging/` channel, root `AGENTS.md` seed) and §15 (2026-10-23: `template-rust/`, pure Rust repos) · Org `keelstackhq`, repo `keelstackhq/hull`
 
 hull is an opinionated, AI-native monorepo template. It owns structure, stack, tool versions and
 config, never app logic. Consumers render it with `splice` (`keelstackhq/splice`, Rust) from
@@ -39,6 +39,8 @@ template/
   migrations/                  # empty in v0.1 (.gitkeep)
 rigging/                       # second template: the splice channel `rigging` (§14)
   splice.toml  pieces/{core,claude,skills}/
+template-rust/                 # third template: pure Rust repos, no Node/pnpm/Turborepo (§15)
+  splice.toml  pieces/{base,rust-cli}/
 scripts/
   render.mjs                   # dev renderer CLI (§9)
   lib/errors.mjs manifest.mjs subset.mjs ownership.mjs plan.mjs render-file.mjs ci-tasks.mjs
@@ -976,3 +978,108 @@ so a `[[remove]]` only reports it. `migrations/0.2.1.toml` has a `[[step]]` that
 its git blob is the one hull shipped (`ad17ec0f`) and reports an edited copy. The generated
 `CLAUDE.md` names the rigging command only "if `.claude/agents/` lacks them": it is owned, so its
 reader already ran `splice update`, and the subset cannot test whether a channel was added.
+
+## 15. Pure Rust repos: `template-rust/` (2026-10-23)
+
+The owner wants to start a pure Rust project from hull. `template/` is always a pnpm + Turborepo
+monorepo; its `rust-cli`/`rust-tool` crates live in `crates/*` inside it. Decision: a third
+template in this repo, `template-rust/`, rendered with
+`splice new gh:keelstackhq/hull//template-rust`. No Turborepo, no Node or pnpm in the repo.
+Contract format 1 stays as it is (D-003, D-005).
+
+**Turborepo: no.** Evidence from 2026-10-23:
+
+| Measurement | Turborepo (`cli` combo: base + rust-cli) | Plain cargo, same crate |
+|---|---|---|
+| Cold, no `target/`, all CI tasks (local) | 25.8 s | 26.0 s |
+| Crate source changed, warm `target/` (local) | 1.35 s (cache miss) | 2.2 s |
+| Nothing changed (local) | 0.24 s (full hit) | 1.35 s (cargo no-op) |
+| Node setup on a GitHub runner (hull run 39808906539) | pnpm/action-setup 5 s + setup-node 4 s + install 1 s | 0 s |
+
+- A turbo hit saves about 1 s over a warm cargo no-op. A PR that changes a crate changes that
+  crate's inputs, so it always misses the cache. Hits help only re-runs of the same tree
+  (merge_group, then the push to `main`).
+- Turbo caches task outputs, never `target/`. So the restore of `target/` (rust-cache; 621 MB
+  locally for the `cli` crate) is needed either way. The cache work for Rust belongs to rust-cache
+  or sccache (hoard's Rust research), not to a Turborepo remote cache.
+- Node costs about 10 s on every non-docs PR, about 22 % of the 45 s budget. The `cli-canary`
+  crate PR already takes 42 s warm (§8.4).
+- The agent layer needs no Node toolchain. It needs only files (`AGENTS.md`, `CLAUDE.md`,
+  `.claude/`), the rigging and decisions channels (splice), and two small Node scripts
+  (`agents-index.mjs`, `docs-only.mjs`) that use the runner's preinstalled `node` and Node
+  built-ins only, like the index check in §8.1.
+- Lost: the `--affected` task graph and the hoard Turborepo cache. A docs-only exit and cargo's
+  own fingerprints take their place. Per-crate selection (`-p` from `cargo metadata` and the diff)
+  stays an option if a large workspace needs it.
+
+**Contract fit.** Contract §2 applies the template's `base` to every `splice new`, exactly once.
+So a `rust-base` piece in `template/` cannot remove `package.json`, `pnpm-workspace.yaml` or
+`turbo.json`. Contract §1 already lets a template live in a subdirectory, and `rigging/` (§14) is
+precedent for a second template in this repo. `template-rust/splice.toml`: `format = 1`,
+`name = "hull-rust"`, `base = "base"`, `min_splice = "0.2.0"` (the update bot and channels need
+it), no template `[vars]`. hull's `v<semver>` tags version all three templates.
+
+**Shape** (`template-rust/pieces/`):
+
+- `base` (root): `Cargo.toml.jinja` [shared, toml]: a virtual workspace, `resolver = "3"`,
+  `members = ["crates/*"]`, `[workspace.package]` (`edition = "2024"`,
+  `rust-version = "1.99.1"`), `[workspace.lints]` (`unsafe_code = "forbid"`, clippy `all` warn),
+  `[profile.release] lto = "thin"`. Cargo errors on a virtual workspace without members, so `base`
+  ships the seed crate `crates/common` (`publish = false`, a lib with one unit test and one doc
+  test), like `packages/shared` in §6.1. Owned files: `rust-toolchain.toml` (`1.99.1`, `clippy`,
+  `rustfmt`, profile minimal), `rustfmt.toml` (`style_edition = "2024"`), `deny.toml` (the §6.10
+  policy for the whole workspace), `.config/nextest.toml` (profile `ci`: no fail-fast),
+  `.gitignore`, `.gitattributes`, `renovate.json` (the same preset, §8.6), the workflows below,
+  and the AI layer below. Seed files: `README.md`, `AGENTS.md`, `docs/agents/project.md`,
+  `hoist.toml`.
+- `rust-cli` (`crates/{{ name }}`): the §6.10 crate without `package.json` or `turbo.json`.
+  `deny.toml` moves to the root. `src/**` and `tests/**` are byte-identical to `template/`'s
+  rust-cli (a test enforces this). `hoist.toml` [seed] holds the commented
+  `[publish] github_release` for the five §8.7 targets.
+- No `npm-cli` launcher yet (berth and bosun ship one with hoist), and no `rust-lib` piece yet:
+  `common` is the library seed. Both are follow-ups.
+
+**CI of generated repos** (`ci.yml`, owned, plain; §8.1 rules: one job `ci` + `ci-ok`,
+`pull_request` + `merge_group` + push to the default branch, no path filters, `fetch-depth: 0`,
+`filter: blob:none`):
+
+1. `node scripts/agents-index.mjs --check` (runner's node).
+2. Docs-only early exit: `node .github/scripts/docs-only.mjs` sets `skip=true` only when the
+   `BASE...HEAD` diff is not empty and every path is root `*.md`, `docs/**`, `.claude/**` or
+   `LICENSE*`. Files under `crates/` are never docs, because `include_str!`/`#[doc]` can read them.
+   An unknown base or a git error runs everything. All later steps check `skip`.
+3. `rustup toolchain install` (reads `rust-toolchain.toml`), `Swatinem/rust-cache@v2` (key
+   `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action`
+   (`cargo-nextest@0.9.148,cargo-deny@0.20.2`).
+4. The Rust CI steps, in order. `RUST_CI_STEPS` in `scripts/lib/ci-tasks.mjs` keeps the workflow,
+   `AGENTS.md` and dogfood in sync:
+   `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`;
+   `cargo deny --locked check bans licenses sources`;
+   `cargo nextest run --workspace --locked --profile ci`; `cargo test --workspace --doc --locked`
+   (nextest does not run doc tests).
+5. `Job duration` against the budget (45 s typical PR, 15 s docs-only).
+
+**Release** (`release.yml`, owned; the berth/bosun flow through hoist 0.2.0 from npm): on push
+to `main` + `workflow_dispatch`; `detect` runs `.github/scripts/release-pending.mjs` (Node
+built-ins, exported for hull's tests): a crate is a package when it has a `version` and
+`publish` is not `false`. Its tag is `[release] tag_format` from the root `hoist.toml`, or
+`{name}@{version}` in a workspace. It is pending when that tag is missing or on HEAD. The gate is
+`vars.HOIST_RELEASE == 'enabled'`, so nothing releases until a person turns it on. `build` is
+the bosun target matrix (`cargo build --release --locked --target <t>`; each binary is copied to
+`dist/<bin>-<t>`). `publish` (environment `release`, `contents: write`, `id-token: write`) runs
+`hoist release publish --assets dist`. `prepare` runs `hoist release prepare`. Node is set up
+only in the release jobs that run hoist. The update bot `splice.yml` (owned) is the one splice's
+README gives. Unverified until the first real release (PROGRESS Blocked): the workspace tags and
+the build matrix.
+
+**AI layer.** Same rules and budgets as §6.9 (`AGENTS.md` ≤ 60 lines, `CLAUDE.md` ≤ 20), with
+cargo commands in place of pnpm. `.claude/hooks/guard.mjs` and `.claude/statusline.sh` are
+byte-identical to `template/`'s copies (a test enforces this). `settings.json` allows cargo and
+denies `cargo publish`. `session-start.sh` runs `rustup show` and `cargo fetch --locked`,
+quietly. `stop-checks.sh` and the `verify` skill run the Rust CI steps. `scripts/agents-index.mjs`
+lists the workspace crates from each `crates/*/Cargo.toml`.
+
+**hull tooling.** A combo in `scripts/combos.json` may set `"template": "template-rust"` and its
+own `"vars"`. dogfood renders it from that template and runs `RUST_CI_STEPS` in place of turbo.
+`affected-combos` maps `template-rust/**` to its combos. The new combo is `rust`: base +
+`rust-cli:cli`.
