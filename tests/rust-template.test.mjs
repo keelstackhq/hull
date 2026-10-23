@@ -308,3 +308,22 @@ test("shared with template/: guard.mjs, statusline.sh and rust-cli src/tests are
     "deny.toml policy",
   );
 });
+
+test("README names the rigging and decisions channel adds (D-004); no bosun paths are taken", async () => {
+  const readme = await readFile(join(BASE, "README.md"), "utf8");
+  assert.match(readme, /splice channel add gh:keelstackhq\/hull\/\/rigging --piece claude/);
+  assert.match(
+    readme,
+    /splice channel add gh:keelstackhq\/decisions\/\/channel --track main --piece import-project/,
+  );
+  for (const piece of t.pieces.values()) {
+    for (const src of await walk(piece.filesDir)) {
+      const rel = relative(piece.filesDir, src);
+      assert.doesNotMatch(
+        rel,
+        /^(governance|\.bosun)\/|^\.github\/workflows\/(risk|verdict|main-open|main-health)\.yml$/,
+        rel,
+      );
+    }
+  }
+});
