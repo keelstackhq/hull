@@ -17,7 +17,7 @@ const AGENTS_LIST = [
 ];
 const combosJson = JSON.parse(readFileSync(new URL("../scripts/combos.json", import.meta.url)));
 const COMBOS = [
-  ...combosJson.combos.filter((c) => !c.scheduled).map((c) => c.pieces),
+  ...combosJson.combos.filter((c) => !c.scheduled && !c.template).map((c) => c.pieces),
   ["base", "docs"],
 ];
 const comboVars = combosJson.vars ?? {};

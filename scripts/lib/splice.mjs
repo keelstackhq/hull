@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { cp, mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 /** The splice release hull renders with (hull CI installs exactly this version). */
 export const SPLICE_VERSION = "0.2.0";
@@ -32,17 +32,19 @@ export function git(cwd, ...args) {
 
 /**
  * Commit a copy of `template` (the working tree, uncommitted edits included) to a fresh git repo
- * under `root`, since splice reads templates from git. Returns the splice source `<repo>//template`.
+ * under `root`, since splice reads templates from git. Returns the splice source `<repo>//<name>`,
+ * where `<name>` is the template directory's name (`template`, `template-rust`).
  */
 export async function snapshotTemplate(template, root) {
-  const repo = join(root, "template-src");
+  const name = basename(template);
+  const repo = join(root, name === "template" ? "template-src" : `${name}-src`);
   await rm(repo, { recursive: true, force: true });
   await mkdir(repo, { recursive: true });
-  await cp(template, join(repo, "template"), { recursive: true, verbatimSymlinks: true });
+  await cp(template, join(repo, name), { recursive: true, verbatimSymlinks: true });
   git(repo, "init", "-q");
   git(repo, "add", "-A");
   git(repo, "commit", "-q", "-m", "template snapshot");
-  return `${repo}//template`;
+  return `${repo}//${name}`;
 }
 
 /** Arguments for `splice new` of a combo; `base` is implicit in splice. */

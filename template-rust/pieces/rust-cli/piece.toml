@@ -1,0 +1,20 @@
+id = "rust-cli"
+description = "A production Rust CLI crate: one JSON object per run, fixed exit codes, released through hoist"
+multiple = true
+requires = ["base"]
+target = "crates/{{ name }}"
+
+[vars]
+name = { prompt = "crate and binary name", default = "cli", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["AGENTS.md"]
+shared = ["Cargo.toml"]
+seed = ["src/**", "tests/**", "CLAUDE.md", "hoist.toml"]
+
+[merge]
+"Cargo.toml" = "toml"
+
+[[post]]
+run = "cargo update --workspace"
+when = ["add"]

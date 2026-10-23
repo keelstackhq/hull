@@ -71,7 +71,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         if: steps.rust.outputs.needed == 'true'
         with:
-          workspaces: ${{ runner.temp }}/combos/cli -> target
+          workspaces: |
+            ${{ runner.temp }}/combos/cli -> target
+            ${{ runner.temp }}/combos/rust -> target
       - uses: taiki-e/install-action@v2
         if: steps.rust.outputs.needed == 'true'
         with:

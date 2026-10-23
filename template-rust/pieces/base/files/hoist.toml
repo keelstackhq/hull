@@ -1,0 +1,9 @@
+# hoist (keelstackhq/hoist) settings. Inference covers everything not set here; `hoist explain`
+# shows the result. Per-crate `[publish]` lives in crates/<name>/hoist.toml.
+
+[github]
+required_checks = ["ci-ok"]
+
+[release]
+# Defaults: per-package versioning, tags `{name}@{version}`, publishing from the `release`
+# environment (job `publish` in .github/workflows/release.yml).

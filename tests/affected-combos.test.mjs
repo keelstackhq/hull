@@ -93,10 +93,41 @@ test("real combos: hono-worker selects web, astro-site selects site", () => {
   assert.deepEqual(affectedCombos(["template/pieces/ui-storybook/files/x"], real), ["web"]);
   assert.deepEqual(
     affectedCombos(["template/pieces/base/files/x"], real),
-    real.filter((c) => !c.scheduled).map((c) => c.name),
+    real.filter((c) => !c.scheduled && !c.template).map((c) => c.name),
   );
   assert.deepEqual(
     affectedCombos(["scripts/check-single-vite.mjs"], real),
     real.filter((c) => !c.scheduled).map((c) => c.name),
   );
+});
+
+const mixed = [
+  { name: "base", pieces: ["base"] },
+  { name: "cli", pieces: ["base", "rust-cli:cli"] },
+  { name: "rust", template: "template-rust", pieces: ["base", "rust-cli:cli"], vars: {} },
+  { name: "rust-lib", template: "template-rust", pieces: ["base"], vars: {} },
+];
+
+test("template-rust pieces select only template-rust combos with that piece", () => {
+  assert.deepEqual(affectedCombos(["template-rust/pieces/rust-cli/files/src/x.rs"], mixed), [
+    "rust",
+  ]);
+  assert.deepEqual(affectedCombos(["template/pieces/rust-cli/files/src/x.rs"], mixed), ["cli"]);
+});
+
+test("template-rust base, manifest and other files select every template-rust combo only", () => {
+  for (const f of [
+    "template-rust/pieces/base/files/Cargo.toml.jinja",
+    "template-rust/splice.toml",
+    "template-rust/migrations/0.3.0.toml",
+  ]) {
+    assert.deepEqual(affectedCombos([f], mixed), ["rust", "rust-lib"], f);
+  }
+  assert.deepEqual(affectedCombos(["template/splice.toml"], mixed), ["base", "cli"]);
+  assert.deepEqual(affectedCombos(["scripts/lib/ci-tasks.mjs"], mixed), [
+    "base",
+    "cli",
+    "rust",
+    "rust-lib",
+  ]);
 });

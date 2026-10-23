@@ -1069,7 +1069,13 @@ the bosun target matrix (`cargo build --release --locked --target <t>`; each bin
 `dist/<bin>-<t>`). `publish` (environment `release`, `contents: write`, `id-token: write`) runs
 `hoist release publish --assets dist`. `prepare` runs `hoist release prepare`. Node is set up
 only in the release jobs that run hoist. The update bot `splice.yml` (owned) is the one splice's
-README gives. Unverified until the first real release (PROGRESS Blocked): the workspace tags and
+README gives. The generated README names the two channel adds after `splice new`:
+`rigging --piece claude` and `decisions//channel --track main --piece import-project` (D-004;
+its section lands in the seed `docs/agents/project.md`, which `CLAUDE.md` imports). Checked
+with splice 0.2.0 on the rendered `rust` combo on 2026-10-23: both add cleanly, `splice check`
+passes, `agents-index` needs one re-run. The template leaves `governance/`, `.bosun/` and
+bosun's workflow names (`risk.yml`, `verdict.yml`, `main-open.yml`, `main-health.yml`) free for
+a bosun channel. Unverified until the first real release (PROGRESS Blocked): the workspace tags and
 the build matrix.
 
 **AI layer.** Same rules and budgets as §6.9 (`AGENTS.md` ≤ 60 lines, `CLAUDE.md` ≤ 20), with
