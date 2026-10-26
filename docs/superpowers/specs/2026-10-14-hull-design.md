@@ -24,6 +24,7 @@ visual tests on the PR path, React (Preact only), Cloudflare Pages, our own remo
 ## 2. Names, versions, distribution
 
 - Template source: `gh:keelstackhq/hull//template`. A template version is a git tag `v<semver>` on hull.
+  Since v0.3.0 the tag is created by hull's `release.yml` (§10.5), never by hand.
 - `template/splice.toml`: `format = 1`, `name = "hull"`, `min_splice = "0.1.0"`, `base = "base"`.
 - First release `v0.1.0` after milestone 3. Breaking template changes bump the minor until 1.0 and
   ship a migration (`template/migrations/<semver>.toml`) when files move or disappear.
@@ -853,6 +854,26 @@ Budget for hull's own PR CI: ≤ 120 s warm when one piece changes, ≤ 20 s doc
 `scripts/lib/ci-tasks.mjs` exports `CI_TASKS = ["lint", "format:check", "typecheck", "test", "build"]`.
 A test asserts the generated `ci.yml` turbo command, the base `package.json` `ci` script and
 `dogfood.mjs` all use exactly this list.
+
+### 10.5 `release.yml` (hull, 2026-10-26)
+
+Modelled on splice's `release.yml`. Source of truth: the first `## v<X.Y.Z> — <rest>` heading of
+`CHANGELOG.md`; `<rest>` is `YYYY-MM-DD` (release it) or `unreleased` (release nothing); any other
+heading fails the run. `scripts/release-tag.mjs` decides (`changelogRelease`, `releaseTag`,
+`previousTag`; tests in `tests/release-tag.test.mjs`).
+- Triggers `push` to `main` + `workflow_dispatch`; `permissions: {}`; run-level concurrency
+  `release-run-<run_id>`, no cancel, so pushes never cancel each other's runs (the job-level group
+  below still lets GitHub drop an older *pending* release job of the same tag for a newer one).
+- `plan` (`github.repository == 'keelstackhq/hull'` and ref `main`, `contents: read`): `git
+  ls-remote --tags`; releases when `v<version>` is missing, or (a re-run, attempt > 1) already tags
+  this commit. On a first attempt an existing tag (e.g. one pushed by hand) releases nothing.
+- `release` (`environment: release`, `contents: write`, concurrency `release-tag-<tag>` without
+  cancel): creates the annotated tag `v<version>` on `github.sha` with `GITHUB_TOKEN` (which starts
+  no other workflow, so the release happens in the same run; if another push's run tagged another
+  commit first, this run skips publishing), then `gh release create <tag> --verify-tag --notes-file <changelog section>
+  --generate-notes --notes-start-tag <previous v<semver> tag>`; an existing release is left alone
+  (one release per tag). Owner settings: the `release` environment with required reviewers and
+  `main` in its deployment branches.
 
 ## 11. Switching to splice and hoard (done 2026-10-22)
 

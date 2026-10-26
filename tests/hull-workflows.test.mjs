@@ -80,3 +80,41 @@ test("hull ci.yml uses hoard@v0 for the turbo cache before dogfood, without --ca
   assert.doesNotMatch(steps[df].run, /--cache-dir/);
   assert.ok(!steps.some((s) => s.uses?.startsWith("actions/cache")), "no actions/cache step");
 });
+
+test("hull release.yml plans on main pushes and releases behind the release environment", async () => {
+  const wf = YAML.parse(await readFile(DIR + "release.yml", "utf8"));
+  assert.equal(wf.name, "release");
+  assert.deepEqual(wf.on.push.branches, ["main"]);
+  assert.ok("workflow_dispatch" in wf.on);
+  assert.deepEqual(wf.permissions, {});
+  assert.equal(wf.concurrency.group, "release-run-${{ github.run_id }}");
+  assert.equal(wf.concurrency["cancel-in-progress"], false);
+  const { plan, release } = wf.jobs;
+  assert.equal(
+    plan.if,
+    "github.repository == 'keelstackhq/hull' && github.ref == 'refs/heads/main'",
+  );
+  const publish = release.steps.find((s) => s.name === "Publish the GitHub release");
+  assert.equal(publish.if, "steps.tag.outputs.skip != 'true'");
+  assert.deepEqual(plan.permissions, { contents: "read" });
+  assert.equal(release.needs, "plan");
+  assert.equal(release.if, "needs.plan.outputs.release == 'true'");
+  assert.equal(release.environment, "release");
+  assert.deepEqual(release.permissions, { contents: "write" });
+  assert.equal(release.concurrency.group, "release-tag-${{ needs.plan.outputs.tag }}");
+  assert.equal(release.concurrency["cancel-in-progress"], false);
+  const writers = Object.entries(wf.jobs).filter(([, j]) => j.permissions?.contents === "write");
+  assert.deepEqual(
+    writers.map(([k]) => k),
+    ["release"],
+  );
+  const run = release.steps.map((s) => s.run ?? "").join("\n");
+  assert.match(run, /--verify-tag/);
+  assert.match(run, /--notes-start-tag/);
+  assert.match(run, /git push origin "refs\/tags\/\$TAG"/);
+  for (const job of [plan, release]) {
+    // Credentials stay in the checkout: ls-remote and the tag push need them on a private repo.
+    const co = job.steps.find((s) => s.uses?.startsWith("actions/checkout@"));
+    assert.equal(co.with.ref, "${{ github.sha }}");
+  }
+});

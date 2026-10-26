@@ -3,7 +3,11 @@
 hull is a template: a version is a git tag `v<semver>` on this repo, and `splice update` moves a
 generated repo between versions (`docs/template-format.md` §7).
 
-## v0.3.0 — unreleased
+Releases are automatic: merging a change to `main` whose top heading is a new dated version tags
+`v<version>` and publishes the GitHub release after the owner approves the `release` environment.
+Keep `unreleased` while changes accumulate.
+
+## v0.3.0 — 2026-10-26
 
 **New: pure Rust repos.** A third template, `gh:keelstackhq/hull//template-rust` (spec §15). It
 has no Node, pnpm or Turborepo: measured, a Turborepo cache hit saved about 1 s over a warm cargo

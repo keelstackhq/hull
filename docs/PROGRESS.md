@@ -58,6 +58,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-23 · 05/canary · https://github.com/keelstackhq/rust-canary (rendered from hull d25ab5e with `--piece rust-cli:cli`, plus rigging `--piece claude` and decisions `--piece import-project`; PR #1 merged, measurement PRs #2/#3 closed unmerged) · docs-only 7 s (≤ 15), crate PR 34 s warm (≤ 45), cold PR 65 s; within budget, no lever needed. Biggest warm cost: `rustup toolchain install` 11 s
 - 2026-10-23 · bosun hooks (option b) · `feat: guarded bosun hooks in hull's settings.json` · bosun's channel cannot own `.claude/settings.json` in a hull repo (one owner per path), so both templates' settings add bosun's hooks from keelstackhq/bosun#131 `channel/pieces/core` (PreToolUse matcher `Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__github__.*`, SessionStart without matcher), each `if [ -f .bosun/bosun.toml ] && command -v bosun; then exec bosun hook …; fi` (timeout 120). `tests/bosun-hooks.test.mjs` RED first on the entries; it runs the guard in bash: no-op (exit 0, silent, bosun not run) without bosun or without the toml, bosun's args, stdin and exit 2 pass through with both. guard.mjs and the AGENTS/CLAUDE budgets unchanged. 719/719 with SPLICE_BIN, lint+fmt clean; dogfood base, web, site, docs, cli, lib, rust ok
 
+- 2026-10-26 · auto-release · `ci: tag and release hull from CHANGELOG.md on main` · tests/release-tag.test.mjs 12 + release.yml structure test; `node scripts/release-tag.mjs` on a7ebb3f: v0.3.0 already tagged, nothing to release, previous v0.2.2. v0.3.0 was tagged and released by hand on 2026-10-26; CHANGELOG now dates it.
+
 ## Measurements
 
 <!-- Dogfood and CI timings: date, combo(s), cold/warm, seconds, machine or runner. -->
@@ -91,7 +93,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - template-rust release (spec §15), unverified until a repo releases: the hoist `release.yml` (workspace tags `{name}@{version}`, the 5-target build, `release-pending.mjs stage`). Action: in keelstackhq/rust-canary, follow `docs/agents/project.md` Blocked (drop `publish = false`, `[publish]` in `crates/cli/hoist.toml`, `hoist apply --area release`, `HOIST_RELEASE=enabled`), then merge hoist's release PR. The CI budget is measured (Measurements, 2026-10-23).
 
-- Tag hull v0.3.0 (template-rust; CHANGELOG entry ready). Until a tag contains `template-rust`, `splice check` in a template-rust repo offers v0.2.2, which lacks it, so the weekly update bot in rust-canary may open a broken update PR. Action: `git tag v0.3.0 && git push origin v0.3.0` on main (agents are denied `git tag`).
+- hull auto-release (`release.yml`, spec §10.5) needs repo settings. Action: in keelstackhq/hull Settings → Environments, create or edit `release`: required reviewer = owner, and allow `main` in its deployment branches (a tag-only rule blocks the run, as in splice). The first automatic release is the next dated `## v<X.Y.Z>` heading; v0.3.0 was tagged by hand.
 
 - Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
