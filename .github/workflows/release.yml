@@ -1,0 +1,107 @@
+name: release
+# A version is a git tag `v<semver>` (spec §2). A push to main whose CHANGELOG.md top heading is a
+# new dated `## v<X.Y.Z> — YYYY-MM-DD` is tagged and released here, after the `release` environment
+# approves; `— unreleased` releases nothing. workflow_dispatch on main re-plans with the same logic.
+# The tag is pushed with GITHUB_TOKEN, which starts no other workflow, so tag and release share a run.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+concurrency:
+  # Pushes never cancel or replace each other; the release job is serialised per tag instead.
+  group: release-run-${{ github.run_id }}
+  cancel-in-progress: false
+permissions: {}
+jobs:
+  plan:
+    if: github.repository == 'keelstackhq/hull' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.decide.outputs.version }}
+      tag: ${{ steps.decide.outputs.tag }}
+      release: ${{ steps.decide.outputs.release }}
+      previous: ${{ steps.decide.outputs.previous }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: Is this version released yet?
+        id: decide
+        run: node scripts/release-tag.mjs
+
+  release:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    concurrency:
+      group: release-tag-${{ needs.plan.outputs.tag }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: Tag the commit
+        id: tag
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          SHA: ${{ github.sha }}
+        run: |
+          at=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" | awk '{print $1}' | tail -n 1)
+          if [ -n "$at" ]; then
+            if [ "$at" = "$SHA" ]; then
+              echo "$TAG is already tagged on this commit"
+              exit 0
+            fi
+            # Another push planned the same tag and tagged its commit first: that run releases it.
+            echo "$TAG already tags $at, not this commit: nothing to release here"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "hull ${TAG#v}" "$SHA"
+          if git push origin "refs/tags/$TAG"; then
+            echo "pushed $TAG"
+          else
+            at=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" | awk '{print $1}' | tail -n 1)
+            if [ "$at" = "$SHA" ]; then
+              echo "$TAG appeared meanwhile, on this commit"
+            elif [ -n "$at" ]; then
+              echo "$TAG appeared meanwhile on $at: nothing to release here"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::could not push $TAG"
+              exit 1
+            fi
+          fi
+      - name: Publish the GitHub release
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          node scripts/release-tag.mjs --notes > "$RUNNER_TEMP/notes.md"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "release $TAG already exists"
+            exit 0
+          fi
+          start=()
+          if [ -n "$PREVIOUS" ]; then start=(--notes-start-tag "$PREVIOUS"); fi
+          gh release create "$TAG" --verify-tag --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" --generate-notes "${start[@]}"

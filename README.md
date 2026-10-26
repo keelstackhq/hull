@@ -4,7 +4,7 @@ An opinionated, AI-native monorepo template. Pick the pieces you need; hull owns
 stack, tool versions and config, and keeps them current. Your app code stays yours. Part of
 [keelstack](https://github.com/keelstackhq): tools for bootstrapping projects.
 
-> Status: pre-0.1, no release tag yet. Design: `docs/superpowers/specs/2026-10-14-hull-design.md`;
+> Status: released as git tags `v<semver>` (latest in `CHANGELOG.md`). Design: `docs/superpowers/specs/2026-10-14-hull-design.md`;
 > per-piece reference: `docs/pieces.md`.
 
 ## Quick start
@@ -106,6 +106,14 @@ superpowers + caveman enabled for the team.
 `durationMs`); never query strings, headers or bodies. Workers Logs indexes the fields. Sentry is
 off unless `SENTRY_DSN` is set, and scrubs requests before sending. Optional OTel export (for
 example Axiom) is configured in the Cloudflare dashboard; the syntax is unverified.
+
+## Releasing hull
+
+Releases are automatic (`.github/workflows/release.yml`). The version is the top
+`## v<X.Y.Z> — <date>` heading of `CHANGELOG.md`; keep it `— unreleased` while changes accumulate.
+A push to `main` whose top heading is a new dated version waits for approval of the `release`
+environment, then tags that commit `v<X.Y.Z>` (annotated) and publishes a GitHub release: the
+changelog section plus notes generated since the previous `v<semver>` tag. Nobody tags by hand.
 
 ## Known limits
 

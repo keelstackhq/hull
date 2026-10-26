@@ -24,9 +24,10 @@ scripts/render.mjs, lib/        dev renderer (contract §1-§4, §8, §9; `new` 
 scripts/combos.json             piece combinations hull CI renders
 scripts/dogfood.mjs             render combos, run their CI command
 scripts/affected-combos.mjs     which combos a diff touches
+scripts/release-tag.mjs         hull's own release: version = top dated CHANGELOG.md heading (§10.5)
 renovate/default.json           Renovate preset generated repos extend
 tests/                          node:test: renderer units + template invariants + module tests of
-                                guard.mjs, agents-index.mjs, release-plan.mjs
+                                guard.mjs, agents-index.mjs, release-plan.mjs, release-tag.mjs
 ```
 
 ## Commands
