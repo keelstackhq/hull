@@ -23,6 +23,14 @@ test("isMain is true for the entry script, also when it is run through a symlink
   assert.equal(run(join(real, "probe.mjs")).stdout, "main\n");
   assert.equal(run(join(tmp, "link/probe.mjs")).stdout, "main\n");
   assert.equal(run(join(tmp, "link/importer.mjs")).stdout, "imported\n");
+  const keep = spawnSync(
+    process.execPath,
+    ["--preserve-symlinks-main", join(tmp, "link/probe.mjs")],
+    {
+      encoding: "utf8",
+    },
+  );
+  assert.equal(keep.stdout, "main\n");
 });
 
 test("every hull script decides whether it is the entry script with isMain", async () => {
