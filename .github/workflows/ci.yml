@@ -42,6 +42,21 @@ jobs:
         run: |
           npm install -g --no-fund --no-audit @keelstackhq/splice@0.2.0
           echo "SPLICE_BIN=$(command -v splice)" >> "$GITHUB_ENV"
+      - name: Install sops and age-keygen (tests/bootstrap-secrets.test.mjs)
+        # sops: SHA-256 from sops-v3.13.3.checksums.txt; age: SHA-256 of the v1.3.2 release
+        # tarball as downloaded on 2026-10-27 (age publishes no checksums file).
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/secrets-bin"
+          mkdir -p "$d"
+          curl -fsSL -o "$d/sops" https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.amd64
+          echo "e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b  $d/sops" | sha256sum -c -
+          curl -fsSL -o "$RUNNER_TEMP/age.tgz" https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz
+          echo "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10  $RUNNER_TEMP/age.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/age.tgz" -C "$RUNNER_TEMP" age/age-keygen
+          mv "$RUNNER_TEMP/age/age-keygen" "$d/"
+          chmod +x "$d/sops" "$d/age-keygen"
+          echo "$d" >> "$GITHUB_PATH"
       - name: Test
         run: pnpm test
       - name: Affected combos

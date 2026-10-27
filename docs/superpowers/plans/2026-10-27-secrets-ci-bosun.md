@@ -58,7 +58,6 @@ hull copies) and `tests/channel_circleci.rs`.
 Files: `src/cli/init.rs` (read `.splice/lock.toml`; add `circleci`/`circleci-only` channel pieces
 when the main template has them), `src/cli/doctor.rs` (fail when the channel's provider pieces differ
 from the main template's; in circleci-only mode check `.circleci/src/jobs/ci-ok.yml` or
-`bosun-ok.yml` exists and `circleci-status.yml` exists; warn when `vars.CIRCLECI_STATUS_SENDER` is
-unset — read via the API, GET only), `tests/cli_doctor_circleci.rs`, `tests/cli_init_circleci.rs`,
+`bosun-ok.yml` exists and `circleci-status.yml` exists), `tests/cli_doctor_circleci.rs`, `tests/cli_init_circleci.rs`,
 `docs/spec.md` channel section.
 - Commit: `feat: init and doctor follow the main template's CI provider`

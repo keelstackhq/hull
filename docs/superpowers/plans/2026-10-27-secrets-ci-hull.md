@@ -12,7 +12,8 @@ the owner first (CLAUDE.md); default is a vendored JSON schema checked with a sm
 Fast checks before every commit: `pnpm test && pnpm lint && pnpm format:check`; before the push,
 dogfood for the combos `affected-combos` selects. One push per PR.
 
-PR order and dependencies: `2026-10-27-secrets-ci-00-overview.md`. Do not edit `docs/PROGRESS.md`,
+PR order and dependencies: `2026-10-27-secrets-ci-00-overview.md`. The owner bootstrap script
+(`scripts/owner/bootstrap-secrets.sh`, spec §0 C5) and its test landed with the design PR. Do not edit `docs/PROGRESS.md`,
 `CHANGELOG.md`, `CLAUDE.md` or the base spec before HU-9 (parallel PRs); record deviations in the PR
 body so HU-9 can fold them in.
 
@@ -81,7 +82,7 @@ and `…/workflows/desktop.yml.jinja` (weekly schedule; `{% if "circleci-only" i
     `release.yml`, `preview.yml`, `circleci-status.yml`; GitHub-mode renders are byte-identical to
     before (snapshot of the `web` combo);
   - mirror: trigger `status` only; job-level `if:` filters context (`ci-ok`, `bosun-ok`), non-pending
-    state and sender; `permissions` is exactly `statuses: write`; all event values via `env:`;
+    state and sender `circleci-app[bot]` (constant; CAN-1 verifies it); `permissions` is exactly `statuses: write`; all event values via `env:`;
     `timeout-minutes` ≤ 2;
   - no workflow in any rendered combo with `pull_request_target`, `issue_comment` or `status`
     triggers references `environment:` or `SOPS_AGE_KEY` (security test, S§5.1);
