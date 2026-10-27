@@ -21,14 +21,18 @@ jobs:
       TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
       TURBO_SCM_HEAD: ${{ github.sha }}
     steps:
+      # step: timer
       - name: Start timer
         run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
+      # step: checkout
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           filter: blob:none
+      # step: agents-index
       - name: Agents index current?
         run: node scripts/agents-index.mjs --check
+      # step: affected
       - name: Anything affected?
         id: affected
         env:
@@ -46,6 +50,7 @@ jobs:
             echo "::warning::turbo query affected failed (exit $code); running everything"
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+      # step: setup-pnpm-node
       - uses: pnpm/action-setup@v4
         if: steps.affected.outputs.skip != 'true'
       - uses: actions/setup-node@v5
@@ -53,12 +58,15 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      # step: install
       - name: Install
         if: steps.affected.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile --prefer-offline
+      # step: turbo-cache
       # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM
       - uses: keelstackhq/hoard@v0
         if: steps.affected.outputs.skip != 'true'
+      # step: rust-affected
       - name: Rust affected?
         id: rust
         if: steps.affected.outputs.skip != 'true' && hashFiles('.github/scripts/rust-affected.mjs') != ''
@@ -73,21 +81,26 @@ jobs:
             echo "::warning::turbo query affected --packages failed (exit $code); running Rust steps"
             echo "rust=true" >> "$GITHUB_OUTPUT"
           fi
+      # step: rust-toolchain
       - name: Rust toolchain (from rust-toolchain.toml)
         id: toolchain
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         run: rustup toolchain install
+      # step: rust-cache
       - uses: Swatinem/rust-cache@v2
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         with:
           key: ${{ hashFiles('rust-toolchain.toml') }}
+      # step: rust-tools
       - uses: taiki-e/install-action@v2
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         with:
           tool: cargo-nextest@0.9.148,cargo-deny@0.20.2
+      # step: run-affected
       - name: Run affected tasks
         if: steps.affected.outputs.skip != 'true'
         run: pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only
+      # step: duration
       - name: Job duration
         if: always()
         continue-on-error: true
