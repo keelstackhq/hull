@@ -7,6 +7,27 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.3.1 — 2026-10-27
+
+**Security: symlink-safe agent guard. Update with `splice update`.** In a repo opened through a
+symlink (for example `~/code` pointing at another disk), `.claude/hooks/guard.mjs` compared
+`process.argv[1]` with `import.meta.url`. Node resolves symlinks in only one of them, so the check
+failed and the hook exited 0 without checking anything: the agent safety guard denied nothing.
+
+- Both templates' `guard.mjs` now compare real paths and are fail-safe: when the check is unsure
+  (no `argv[1]`, or a path that cannot be resolved) the guard runs. It is skipped only when it is
+  imported by another module. Also covered: `node --preserve-symlinks-main` and `node -e import()`.
+- The other generated scripts with the same check now compare real paths too, so they no longer
+  silently do nothing in a symlinked checkout: `.github/scripts/{affected,preview,release-plan,
+  rust-affected}.mjs`, `scripts/agents-index.mjs`, docs `scripts/docs-packs.mjs`, npm-cli
+  `scripts/stage.mjs`, and template-rust `.github/scripts/{release-pending,docs-only}.mjs` and
+  `scripts/agents-index.mjs`.
+- `template/`'s generated `.github/workflows/ci.yml` gains `# step: <id>` comment lines. hull now
+  generates the file from one step list (`scripts/gen-ci.mjs`); the steps themselves are unchanged.
+- Contract rule 9.27 (empty re-render removes an owned or shared file) is added to
+  `docs/template-format.md`. It takes effect with splice 0.3.0; hull's templates do not rely on it
+  yet.
+
 ## v0.3.0 — 2026-10-26
 
 **New: pure Rust repos.** A third template, `gh:keelstackhq/hull//template-rust` (spec §15). It
