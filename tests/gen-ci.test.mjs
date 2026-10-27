@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { GITHUB_CI_PATH, githubCi } from "../scripts/gen-ci.mjs";
@@ -43,4 +45,22 @@ test("step ids in ci.yml equal CI_PLAN ids in order", async () => {
     "run-affected",
     "duration",
   ]);
+});
+
+test("gen-ci --check run through a symlinked checkout still reports drift", async (t) => {
+  const tmp = await mkdtemp(join(tmpdir(), "hull-gen-ci-"));
+  t.after(() => rm(tmp, { recursive: true, force: true }));
+  const real = join(tmp, "real");
+  await cp(fileURLToPath(new URL("../scripts/", import.meta.url)), join(real, "scripts"), {
+    recursive: true,
+  });
+  const yml = join(real, "template/pieces/base/files/.github/workflows/ci.yml");
+  await mkdir(dirname(yml), { recursive: true });
+  await writeFile(yml, `${githubCi()}# drift\n`);
+  await symlink(real, join(tmp, "link"), "dir");
+  const r = spawnSync(process.execPath, [join(tmp, "link/scripts/gen-ci.mjs"), "--check"], {
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /out of date/);
 });
