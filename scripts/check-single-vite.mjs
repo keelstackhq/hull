@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseAllDocuments } from "yaml";
+import { isMain } from "./lib/is-main.mjs";
 
 const CORE = "@voidzero-dev/vite-plus-core";
 
@@ -47,7 +47,7 @@ export function checkSingleVite(lockText) {
   return { ok: coreVersions.length === 1 && viteEntries.length === 0, coreVersions, viteEntries };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const dir = process.argv[2];
   if (!dir) {
     console.error("usage: check-single-vite.mjs <repoDir>");

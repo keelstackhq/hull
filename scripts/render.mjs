@@ -11,9 +11,9 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { TemplateError, UsageError } from "./lib/errors.mjs";
+import { isMain } from "./lib/is-main.mjs";
 import { loadTemplate } from "./lib/manifest.mjs";
 import { buildPlan, checkMinSplice, resolveRequest } from "./lib/plan.mjs";
 import { renderString } from "./lib/render-file.mjs";
@@ -190,6 +190,6 @@ export async function main(argv) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   process.exitCode = await main(process.argv.slice(2));
 }

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
+import { isMain } from "./lib/is-main.mjs";
 
 const execFileP = promisify(execFile);
 
@@ -118,7 +117,7 @@ export async function run(argv, opts = {}) {
   };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const r = await run(process.argv.slice(2));
   process.stdout.write(r.out);
   process.stderr.write(r.err);

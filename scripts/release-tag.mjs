@@ -2,7 +2,7 @@
 // heading of CHANGELOG.md; `<rest>` is a date (released) or `unreleased` (accumulating).
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { isMain } from "./lib/is-main.mjs";
 
 const HEADING = /^## v(\S+) — (.*)$/;
 const PLAIN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -76,7 +76,7 @@ export function previousTag(version, remoteTags) {
   return best ? `v${best.join(".")}` : "";
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   try {
     const i = process.argv.indexOf("--changelog");
     const path = i > 0 ? process.argv[i + 1] : new URL("../CHANGELOG.md", import.meta.url);
