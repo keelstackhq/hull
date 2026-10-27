@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { changelogRelease, previousTag, releaseTag } from "../scripts/release-tag.mjs";
+import {
+  changelogRelease,
+  pendingReleasePins,
+  previousTag,
+  releaseTag,
+} from "../scripts/release-tag.mjs";
 
 const SHA = "a".repeat(40);
 const OTHER = "b".repeat(40);
@@ -153,4 +158,42 @@ test("CLI: --notes prints the top section and a malformed heading exits 1", () =
   const bad = spawnSync("node", [SCRIPT, "--changelog", changelog], { encoding: "utf8" });
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /^release-tag: /);
+});
+
+function fakeRoot(marked) {
+  const root = mkdtempSync(join(tmpdir(), "release-pins-"));
+  mkdirSync(join(root, "template/pieces/x"), { recursive: true });
+  mkdirSync(join(root, "rigging"));
+  writeFileSync(join(root, "rigging/ok.yml"), "uses: a/b@v1\n");
+  if (marked) writeFileSync(join(root, "template/pieces/x/w.yml"), "# TODO(hoist-release)\n");
+  return root;
+}
+
+test("pendingReleasePins finds the marker and a clean tree has none", () => {
+  assert.deepEqual(pendingReleasePins(fakeRoot(true)), ["template/pieces/x/w.yml"]);
+  assert.deepEqual(pendingReleasePins(fakeRoot(false)), []);
+  const bare = fakeRoot(false);
+  writeFileSync(join(bare, "rigging/z.yml"), `uses: keelstackhq/hoist/secrets@${"0".repeat(40)}\n`);
+  assert.deepEqual(pendingReleasePins(bare), ["rigging/z.yml"]);
+});
+
+test("CLI: a would-release run with a marker exits 1; --notes does not scan", () => {
+  const dir = mkdtempSync(join(tmpdir(), "release-tag-"));
+  const changelog = join(dir, "CHANGELOG.md");
+  writeFileSync(changelog, "# Changelog\n\n## v9.9.9 — 2026-10-26\n\n- x\n");
+  const remote = join(dir, "remote.git");
+  spawnSync("git", ["init", "-q", "--bare", remote]);
+  spawnSync("git", ["init", "-q", dir]);
+  spawnSync("git", ["-C", dir, "remote", "add", "origin", remote]);
+  const run = (root, ...extra) =>
+    spawnSync("node", [SCRIPT, "--changelog", changelog, "--root", root, ...extra], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, GITHUB_OUTPUT: "" }, // never write to a real CI step's outputs
+    });
+  const bad = run(fakeRoot(true));
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /template\/pieces\/x\/w\.yml/);
+  assert.equal(run(fakeRoot(false)).status, 0);
+  assert.equal(run(fakeRoot(true), "--notes").status, 0);
 });

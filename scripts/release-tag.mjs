@@ -1,7 +1,9 @@
 // Release decision for a push to main. The version comes from the first `## v<X.Y.Z> — <rest>`
 // heading of CHANGELOG.md; `<rest>` is a date (released) or `unreleased` (accumulating).
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isMain } from "./lib/is-main.mjs";
 
 const HEADING = /^## v(\S+) — (.*)$/;
@@ -76,6 +78,32 @@ export function previousTag(version, remoteTags) {
   return best ? `v${best.join(".")}` : "";
 }
 
+const PIN_MARKER = "TODO(hoist-release)";
+const ZERO_PIN = /@0{40}\b/; // a placeholder commit SHA, with or without the marker
+
+/** Paths (relative to `root`) under template/, template-rust/ and rigging/ holding a placeholder pin. */
+export function pendingReleasePins(root) {
+  const hits = [];
+  const walk = (rel) => {
+    let entries;
+    try {
+      entries = readdirSync(join(root, rel), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = `${rel}/${e.name}`;
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) {
+        const text = readFileSync(join(root, p), "utf8");
+        if (text.includes(PIN_MARKER) || ZERO_PIN.test(text)) hits.push(p);
+      }
+    }
+  };
+  for (const d of ["template", "template-rust", "rigging"]) walk(d);
+  return hits.sort();
+}
+
 if (isMain(import.meta.url)) {
   try {
     const i = process.argv.indexOf("--changelog");
@@ -98,6 +126,18 @@ if (isMain(import.meta.url)) {
         const attempt = Number(process.env.GITHUB_RUN_ATTEMPT ?? "1");
         ({ tag, create } = releaseTag({ version, remoteTags, sha, attempt }));
         previous = previousTag(version, remoteTags);
+        if (tag !== "") {
+          const ri = process.argv.indexOf("--root");
+          const root =
+            ri > 0 ? process.argv[ri + 1] : fileURLToPath(new URL("..", import.meta.url));
+          const pending = pendingReleasePins(root);
+          if (pending.length) {
+            console.error(
+              `release-tag: ${PIN_MARKER} pins block the release of ${tag}:\n${pending.join("\n")}`,
+            );
+            process.exit(1);
+          }
+        }
         console.log(
           create
             ? `${tag} is not tagged yet: tag and release it`
