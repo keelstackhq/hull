@@ -121,3 +121,28 @@ test("hull release.yml plans on main pushes and releases behind the release envi
     assert.equal(co.with.ref, "${{ github.sha }}");
   }
 });
+
+// setup-node@v5 turns on the package-manager cache by itself when package.json has
+// `packageManager`; without pnpm on PATH it then fails ("Unable to locate executable file: pnpm").
+test("every setup-node step disables the package-manager cache unless pnpm is set up first under the same condition", async () => {
+  const dirs = [
+    DIR,
+    fileURLToPath(new URL("../template/pieces/base/files/.github/workflows/", import.meta.url)),
+  ];
+  const bad = [];
+  for (const dir of dirs)
+    for (const f of (await readdir(dir)).filter((n) => n.endsWith(".yml"))) {
+      const wf = YAML.parse(await readFile(dir + f, "utf8"));
+      for (const [name, job] of Object.entries(wf.jobs ?? {})) {
+        const pnpm = new Set(); // `if` conditions under which pnpm is set up ("" = always)
+        for (const step of job.steps ?? []) {
+          if (String(step.uses).startsWith("pnpm/action-setup")) pnpm.add(step.if ?? "");
+          if (!String(step.uses).startsWith("actions/setup-node")) continue;
+          const covered = pnpm.has("") || pnpm.has(step.if ?? "");
+          if (!covered && step.with?.["package-manager-cache"] !== false)
+            bad.push(`${dir === DIR ? "hull" : "template"}/${f} ${name}`);
+        }
+      }
+    }
+  assert.deepEqual(bad, []);
+});

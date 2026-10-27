@@ -187,6 +187,7 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false # pnpm is set up only for ts-lib
       - uses: actions/download-artifact@v8
         if: env.KIND == 'rust-cli'
         with:
