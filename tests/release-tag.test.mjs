@@ -197,3 +197,52 @@ test("CLI: a would-release run with a marker exits 1; --notes does not scan", ()
   assert.equal(run(fakeRoot(false)).status, 0);
   assert.equal(run(fakeRoot(true), "--notes").status, 0);
 });
+
+test("pendingReleasePins: loose marker spellings and the @<sha> placeholder are caught", () => {
+  for (const text of ["# todo ( hoist-release )", "uses: a/b@0000000 # x", "uses: a/b@<sha>"]) {
+    const root = fakeRoot(false);
+    writeFileSync(join(root, "template/pieces/x/w.yml"), text + "\n");
+    assert.deepEqual(pendingReleasePins(root), ["template/pieces/x/w.yml"], text);
+  }
+  const ok = fakeRoot(false);
+  writeFileSync(join(ok, "template/pieces/x/w.yml"), "uses: a/b@0a1b2c3 # v1\n");
+  assert.deepEqual(pendingReleasePins(ok), []);
+});
+
+test("pendingReleasePins throws when template/ is missing", () => {
+  assert.throws(() => pendingReleasePins(mkdtempSync(join(tmpdir(), "no-template-"))), /template/);
+});
+
+test("CLI: a re-run on the tagged commit with a marker exits 1", () => {
+  const dir = mkdtempSync(join(tmpdir(), "release-tag-"));
+  const changelog = join(dir, "CHANGELOG.md");
+  writeFileSync(changelog, "# Changelog\n\n## v9.9.9 — 2026-10-26\n\n- x\n");
+  const remote = join(dir, "remote.git");
+  const sh = (...a) => spawnSync("git", ["-C", dir, ...a], { encoding: "utf8" });
+  spawnSync("git", ["init", "-q", "--bare", remote]);
+  spawnSync("git", ["init", "-q", dir]);
+  sh("remote", "add", "origin", remote);
+  sh(
+    "-c",
+    "user.name=t",
+    "-c",
+    "user.email=t@t",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "c",
+  );
+  sh("tag", "v9.9.9");
+  sh("push", "-q", "origin", "v9.9.9");
+  const sha = sh("rev-parse", "HEAD").stdout.trim();
+  const r = spawnSync("node", [SCRIPT, "--changelog", changelog, "--root", fakeRoot(true)], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, GITHUB_OUTPUT: "", GITHUB_SHA: sha, GITHUB_RUN_ATTEMPT: "2" },
+  });
+  assert.match(r.stderr, /template\/pieces\/x\/w\.yml/);
+  assert.equal(r.status, 1);
+});
