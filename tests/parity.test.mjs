@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { ciCommand, comboSteps } from "../scripts/dogfood.mjs";
-import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
+import { CI_PLAN, CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 
 const base = fileURLToPath(new URL("../template/pieces/base/files/", import.meta.url));
 const tasks = CI_TASKS.join(" ");
@@ -14,6 +14,9 @@ test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", async 
   assert.equal(turbo?.[1], tasks);
   const query = yml.match(/query affected --tasks ([a-z: ]+?) >/);
   assert.equal(query?.[1], tasks);
+  const plan = CI_PLAN.map((s) => s.github).join("");
+  assert.ok(plan.includes(`pnpm turbo run ${tasks} --affected`));
+  assert.ok(plan.includes(`query affected --tasks ${tasks} >`));
 
   const pkg = await readFile(`${base}package.json.jinja`, "utf8");
   const ci = pkg.match(/"ci": "turbo run ([a-z: ]+?) --affected"/);

@@ -8,6 +8,7 @@
     "lint": "vp lint scripts tests",
     "format:check": "vp fmt --check scripts tests",
     "render": "node scripts/render.mjs",
+    "gen:ci": "node scripts/gen-ci.mjs",
     "docs:pieces": "node scripts/pieces-doc.mjs > docs/pieces.md"
   },
   "dependencies": {
