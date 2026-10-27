@@ -7,6 +7,15 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.4.0 — unreleased
+
+**Upgrade: move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the `preview` environment
+(Deployment branches → `main`), then delete the repository-level `CLOUDFLARE_*` secrets.**
+
+- PR previews run in two phases: `preview.yml` builds with no secrets and uploads `preview-<pr>`;
+  `preview-deploy.yml` (environment `preview`, default-branch code only) deploys `<app>-preview`.
+- `min_splice` rises to 0.2.0 (raw blocks in `preview-deploy.yml.jinja`).
+
 ## v0.3.1 — 2026-10-27
 
 **Security: symlink-safe agent guard. Update with `splice update`.** In a repo opened through a

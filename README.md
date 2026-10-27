@@ -124,6 +124,9 @@ changelog section plus notes generated since the previous `v<semver>` tag. Nobod
 - PR previews are versions of `<app>-preview` (alias `pr-<n>`), built by `preview.yml` (no secrets)
   and deployed by `preview-deploy.yml` (environment `preview`); no manual first deploy. Never
   create `<app>-preview` by hand; its secrets are readable by every PR.
+- Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` only as secrets of the `preview`
+  environment (and of the prod deploy environment, once `deploy.yml` ships), Deployment branches =
+  Selected, `main`; never as repository secrets.
 - Workers Logs free tier drops to 0.5 GB/day from 2026-12-01; lower `observability.head_sampling_rate`
   in `wrangler.jsonc` to stay under it.
 - The template contract cannot emit GitHub's `${{ }}` from a `.jinja` file, so `ci.yml` and

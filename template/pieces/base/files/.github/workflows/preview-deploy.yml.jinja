@@ -8,7 +8,7 @@ on:
     types: [completed]
 
 concurrency:
-  group: preview-deploy-${{ github.event.workflow_run.head_branch }}
+  group: preview-deploy-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 permissions:
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
-          cache: pnpm
+          package-manager-cache: false
       - name: Install
         run: pnpm install --frozen-lockfile --prefer-offline
       # The PR number comes from the event or the API, never from the artifact.

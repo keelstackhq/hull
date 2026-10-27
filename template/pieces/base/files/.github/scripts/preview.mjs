@@ -327,6 +327,13 @@ if (isMain()) {
     const apps = buildArtifact({ root: process.cwd(), out: ".preview", pr });
     console.log(`preview: packed ${apps.length} app(s): ${apps.join(", ")}`);
   } else if (cmd === "deploy") {
+    for (const k of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) {
+      if (process.env[k]) continue;
+      console.error(
+        `preview: ${k} is empty. Store CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID only as secrets of the \`preview\` environment (Deployment branches: Selected, main), never as repository secrets.`,
+      );
+      process.exit(1);
+    }
     const root = process.cwd();
     const r = await deploy({
       artifact,

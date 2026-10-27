@@ -61,7 +61,7 @@ function triggers(wf) {
 /** Every key and string value under `node`, except step and job `name`s. */
 function* strings(node, key = "") {
   if (typeof node === "string") {
-    if (key !== "name") yield node;
+    if (key !== "name" || node.includes("${{")) yield node;
   } else if (Array.isArray(node)) for (const x of node) yield* strings(x, key);
   else if (node && typeof node === "object")
     for (const [k, v] of Object.entries(node)) {
@@ -95,6 +95,7 @@ function untrustedViolations(rel, wf, load = () => undefined, seen = new Set()) 
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
     scan(`job ${id}`, job);
     const m = LOCAL.exec(job.uses ?? "");
+    if (job.uses && !m) bad.push(`${rel} job ${id}: non-local reusable workflow ${job.uses}`);
     if (m && !seen.has(m[1])) {
       seen.add(m[1]);
       const callee = load(m[1]);
@@ -137,6 +138,15 @@ test("the untrusted-trigger check catches each kind of leak", () => {
   const token = { env: { T: "${{ secrets.GITHUB_TOKEN }}" } };
   assert.deepEqual(untrustedViolations("x", wf(token)), []);
   assert.deepEqual(untrustedViolations("x", wf(leaks[4], { workflow_run: null })), []);
+});
+
+test("the untrusted-trigger check reads expressions in names and flags remote reusable workflows", () => {
+  const wf = (job) => ({ on: { pull_request: null }, jobs: { j: job } });
+  const named = wf({ steps: [{ name: "${{ secrets.NPM_TOKEN }}" }] });
+  assert.ok(untrustedViolations("x", named).length > 0);
+  assert.deepEqual(untrustedViolations("x", wf({ steps: [{ name: "no secrets here" }] })), []);
+  const remote = wf({ uses: "acme/ci/.github/workflows/x.yml@main" });
+  assert.match(untrustedViolations("x", remote).join(), /non-local reusable workflow/);
 });
 
 test("the untrusted-trigger check follows local reusable workflows into the callee", () => {

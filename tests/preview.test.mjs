@@ -161,7 +161,10 @@ test("preview-deploy: a gate job without environment or secrets decides whether 
 });
 
 test("preview-deploy: one deploy per head branch, newer cancels older", () => {
-  assert.match(dep.wf.concurrency.group, /workflow_run\.head_branch/);
+  assert.equal(
+    dep.wf.concurrency.group,
+    "preview-deploy-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}",
+  );
   assert.equal(dep.wf.concurrency["cancel-in-progress"], true);
 });
 
@@ -625,6 +628,7 @@ test("deploy: the missing-Worker error must be wrangler's error line, not any ou
   assert.equal(w.calls.length, 1);
 });
 
+const TOKENS = { CLOUDFLARE_API_TOKEN: "t", CLOUDFLARE_ACCOUNT_ID: "a" };
 const withEnv = (pv) => `{ "name": "w", "main": "src/index.ts", "env": { "preview": ${pv} } }`;
 
 test("deploy: env.preview.services that is not an array fails that app with its own error", async () => {
@@ -685,9 +689,40 @@ test("CLI: deploy reads the artifact directory from PREVIEW_ARTIFACT when no arg
   const dir = artifact((d) => writeFileSync(join(d, "apps/api/wrangler.json"), "{}"));
   const r = spawnSync("node", [SCRIPT, "deploy"], {
     cwd: checkout(),
-    env: { ...process.env, PR_NUMBER: "7", PREVIEW_ARTIFACT: dir },
+    env: { ...process.env, PR_NUMBER: "7", PREVIEW_ARTIFACT: dir, ...TOKENS },
     encoding: "utf8",
   });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /apps\/api\/wrangler\.json: forbidden name/);
+});
+
+test("CLI: deploy without Cloudflare credentials fails early, pointing at the preview environment", () => {
+  for (const missing of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) {
+    const r = spawnSync("node", [SCRIPT, "deploy", artifact()], {
+      cwd: checkout(),
+      env: { ...process.env, PR_NUMBER: "7", ...TOKENS, [missing]: "" },
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 1, missing);
+    assert.match(r.stderr, new RegExp(`${missing} is empty`), missing);
+    assert.match(r.stderr, /secrets of the `preview` environment/, missing);
+    assert.match(r.stderr, /Deployment branches/, missing);
+  }
+});
+
+test("the generated README says where the Cloudflare secrets live", async () => {
+  const text = await readFile(join(base.dir, "README.md"), "utf8");
+  assert.match(text, /CLOUDFLARE_API_TOKEN/);
+  assert.match(text, /CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(text, /secrets of the `preview` environment/);
+  assert.match(text, /Deployment branches[^\n]*main/);
+  assert.match(text, /never as repository secrets/i);
+});
+
+test("preview-deploy: setup-node has no pnpm cache and the package-manager cache is off", () => {
+  for (const wf of [dep.wf, withSecrets]) {
+    const node = usesStep(wf, /^actions\/setup-node@/);
+    assert.equal(node.with.cache, undefined);
+    assert.equal(node.with["package-manager-cache"], false);
+  }
 });

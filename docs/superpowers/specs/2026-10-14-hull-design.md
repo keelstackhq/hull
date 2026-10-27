@@ -674,7 +674,9 @@ config with only `env.preview` bindings (service, Durable Object and queue refer
 `-preview`), and runs `wrangler versions upload --no-bundle --preview-alias pr-<n>` on the
 `<name>-preview` Worker. A first preview creates that Worker once from an empty stub; a PR never
 creates or deploys a production Worker. Credentials: `secrets.CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` of environment `preview`, or, with the `secrets` piece, the hoist action
+`CLOUDFLARE_ACCOUNT_ID`, stored only as secrets of environment `preview` (and of the prod deploy
+environment once `deploy.yml` exists) with Deployment branches = Selected, `main`, never as
+repository secrets (`preview.mjs deploy` fails early with this hint when they are empty); or, with the `secrets` piece, the hoist action
 (`env: preview`). The deployable pieces' `AGENTS.md` states the rules (never create `<app>-preview`
 by hand; its secrets are readable by every PR; `env.preview` ids are preview-only resources).
 Rejected: a deploy-on-`main` workflow (production deploys stay a repo choice) and `wrangler
