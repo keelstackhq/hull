@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { comboTemplate } from "./lib/combos.mjs";
+import { comboTemplate, loadCombos } from "./lib/combos.mjs";
 
 /** @typedef {import("./lib/combos.mjs").Combo} Combo */
 
@@ -12,7 +11,6 @@ const ALL_EXACT = new Set([
   "scripts/render.mjs",
   "scripts/dogfood.mjs",
   "scripts/check-single-vite.mjs",
-  "scripts/combos.json",
   "package.json",
   "pnpm-lock.yaml",
   "scripts/affected-combos.mjs",
@@ -32,7 +30,12 @@ export function affectedCombos(changed, combos) {
   const templates = new Set(live.map(comboTemplate));
   const hit = new Set();
   for (const f of changed) {
-    if (ALL_EXACT.has(f) || f.startsWith("scripts/lib/") || f.startsWith(".github/workflows/"))
+    if (
+      ALL_EXACT.has(f) ||
+      f.startsWith("scripts/lib/") ||
+      f.startsWith("scripts/combos/") ||
+      f.startsWith(".github/workflows/")
+    )
       return all;
     const tpl = f.split("/")[0];
     if (!templates.has(tpl)) continue;
@@ -56,7 +59,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.stderr.write("usage: affected-combos.mjs --base <ref> | --all\n");
     process.exit(2);
   }
-  const { combos } = JSON.parse(readFileSync(new URL("./combos.json", import.meta.url), "utf8"));
+  const { combos } = loadCombos();
   const everything = combos.filter((c) => !c.scheduled).map((c) => c.name);
   let list = everything;
   if (!values.all) {

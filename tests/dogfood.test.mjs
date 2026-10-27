@@ -19,12 +19,10 @@ test("a render failure fails that combo without throwing", async () => {
   assert.ok(results.every((r) => r.ok === false));
 });
 
-test("every combo in combos.json renders", async (t) => {
+test("every combo in scripts/combos/ renders", async (t) => {
   const { renderNew } = await import("../scripts/render.mjs");
-  const { readFile } = await import("node:fs/promises");
-  const { vars, combos } = JSON.parse(
-    await readFile(new URL("../scripts/combos.json", import.meta.url), "utf8"),
-  );
+  const { loadCombos } = await import("../scripts/lib/combos.mjs");
+  const { vars, combos } = loadCombos();
   const root = await mkdtemp(join(tmpdir(), "hull-render-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const c of combos) {

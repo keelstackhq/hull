@@ -1,0 +1,1 @@
+{ "name": "cli", "pieces": ["base", "rust-cli:cli", "npm-cli:cli"] }
