@@ -35,10 +35,7 @@ test("package name and CI scripts", async () => {
   for (const task of CI_TASKS) assert.ok(pkg.scripts[task], task);
   for (const [k, v] of Object.entries(pkg.scripts)) assert.ok(!/vp run/.test(v), k);
   assert.equal(pkg.scripts.build, "vp build");
-  assert.equal(
-    pkg.scripts["deploy:preview"],
-    "wrangler versions upload --preview-alias pr-$PR_NUMBER",
-  );
+  assert.equal(pkg.scripts["deploy:preview"], undefined);
   for (const v of Object.values({ ...pkg.dependencies, ...pkg.devDependencies }))
     assert.equal(v, "catalog:");
 });

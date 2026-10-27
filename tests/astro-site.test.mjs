@@ -41,7 +41,7 @@ test("scripts, name and catalog deps", async () => {
   assert.equal(pkg.scripts.build, "astro build");
   assert.equal(pkg.scripts.typecheck, "tsc --noEmit");
   assert.equal(pkg.scripts.dev, "astro dev");
-  assert.ok(pkg.scripts["deploy:preview"]);
+  assert.equal(pkg.scripts["deploy:preview"], undefined);
   assert.match(pkg.scripts["format:check"], /^vp fmt --check/);
   assert.equal(pkg.scripts["format:check"], "vp fmt --check");
   assert.equal(pkg.scripts.test, "vp test run");

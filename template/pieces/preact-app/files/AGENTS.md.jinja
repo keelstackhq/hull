@@ -9,7 +9,6 @@ Preact client app on Vite+, deployed as Cloudflare static assets (`wrangler.json
 - Tests: `vp test run` with `happy-dom`; `vite.config.ts` inlines `@cascivo/*` so the alias applies.
 - `pnpm dev` serves on port 5173; `pnpm build` writes `dist/`.
 {% if "ui-storybook" in pieces %}- Shared components: import from `@{{ scope }}/ui` (`workspace:*`, built by `vp pack`; turbo builds it first).
-{% endif %}- Preview deploy: `pnpm deploy:preview` with `PR_NUMBER` set.
-- PR previews need the Worker to exist: deploy it once with
-  `pnpm turbo run deploy --filter=@{{ scope }}/{{ name }}` (`wrangler login` first); until then
-  `preview.yml` skips it with a notice.
+{% endif %}- Previews deploy to `<app>-preview` as alias `pr-<n>`. Never create `<app>-preview` by hand.
+- Secrets set on the -preview Worker are readable by every PR.
+- `kv`/`d1`/`r2`/`queue`/`service` ids in `env.preview` must be preview-only resources; previews share that data.

@@ -1,5 +1,6 @@
 name: preview
 
+# Build only: no secrets, no environment. preview-deploy.yml deploys the artifact.
 on:
   pull_request:
 
@@ -15,8 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
       TURBO_SCM_HEAD: ${{ github.sha }}
@@ -43,8 +42,16 @@ jobs:
       - name: Install
         if: steps.detect.outputs.deploy == 'true'
         run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Deploy previews
-        if: steps.detect.outputs.deploy == 'true' && env.CLOUDFLARE_API_TOKEN != ''
-        shell: bash
-        # Skips (with a notice) an app whose Worker was never deployed; see preview.mjs.
-        run: node .github/scripts/preview.mjs
+      - name: Build affected apps
+        if: steps.detect.outputs.deploy == 'true'
+        run: pnpm turbo run build --affected
+      - name: Pack preview artifact
+        if: steps.detect.outputs.deploy == 'true'
+        run: node .github/scripts/preview.mjs build
+      - uses: actions/upload-artifact@v5
+        if: steps.detect.outputs.deploy == 'true'
+        with:
+          name: preview-${{ github.event.pull_request.number }}
+          path: .preview
+          retention-days: 3
+          if-no-files-found: error

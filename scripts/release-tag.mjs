@@ -84,7 +84,8 @@ const PLACEHOLDER = /@\s*(?:0{7,}(?![0-9a-f])|<sha>)/i;
 
 /** Paths (relative to `root`) under template/, template-rust/ and rigging/ holding a placeholder pin. */
 export function pendingReleasePins(root) {
-  if (!existsSync(join(root, "template"))) throw new Error(`no template/ under ${root}`);
+  for (const d of ["template", "template-rust", "rigging"])
+    if (!existsSync(join(root, d))) throw new Error(`no ${d}/ under ${root}`);
   const hits = [];
   const walk = (rel) => {
     let entries;

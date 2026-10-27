@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -164,6 +164,7 @@ function fakeRoot(marked) {
   const root = mkdtempSync(join(tmpdir(), "release-pins-"));
   mkdirSync(join(root, "template/pieces/x"), { recursive: true });
   mkdirSync(join(root, "rigging"));
+  mkdirSync(join(root, "template-rust"));
   writeFileSync(join(root, "rigging/ok.yml"), "uses: a/b@v1\n");
   if (marked) writeFileSync(join(root, "template/pieces/x/w.yml"), "# TODO(hoist-release)\n");
   return root;
@@ -209,8 +210,13 @@ test("pendingReleasePins: loose marker spellings and the @<sha> placeholder are 
   assert.deepEqual(pendingReleasePins(ok), []);
 });
 
-test("pendingReleasePins throws when template/ is missing", () => {
+test("pendingReleasePins throws when any of template/, template-rust/, rigging/ is missing", () => {
   assert.throws(() => pendingReleasePins(mkdtempSync(join(tmpdir(), "no-template-"))), /template/);
+  for (const d of ["template", "template-rust", "rigging"]) {
+    const root = fakeRoot(false);
+    rmSync(join(root, d), { recursive: true, force: true });
+    assert.throws(() => pendingReleasePins(root), new RegExp(d), d);
+  }
 });
 
 test("CLI: a re-run on the tagged commit with a marker exits 1", () => {
