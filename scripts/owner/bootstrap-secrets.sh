@@ -15,7 +15,8 @@
 #
 # Usage:
 #   bootstrap-secrets.sh --self-test
-#   bootstrap-secrets.sh --check-rulesets OWNER/REPO...   (read-only; exit 1 if a release-tag ruleset is missing)
+#   bootstrap-secrets.sh --check-rulesets [--allow-app APP-ID]... OWNER/REPO...
+#       read-only; exit 1 unless every repo has the release-tag ruleset (run it as the owner)
 #   bootstrap-secrets.sh --secrets-dir DIR --owner-pub AGE1 [--owner-pub AGE1]...
 #       --consumer OWNER/REPO:ENV:github
 #       --consumer OWNER/REPO:ENV:circleci:CIRCLECI-PROJECT-ID ...
@@ -118,24 +119,46 @@ setup_github() {
   fi
 }
 
-# tag_ruleset REPO: prints ok | missing | unknown. "ok" = an active tag ruleset (the repo's own or
-# an inherited org one) whose include list has refs/tags/*-v* (or ~ALL) and that restricts tag
-# creation, update and deletion, so only its bypass actors (the owner) can create release tags.
+# tag_ruleset REPO: prints ok | missing | unknown (details on stderr). "ok" = an active tag ruleset
+# (the repo's own or an inherited org one) that
+#   - includes refs/tags/*-v* (or ~ALL) and excludes nothing,
+#   - restricts tag creation, update and deletion,
+#   - lets only these bypass: Repository admin (RepositoryRole 5), OrganizationAdmin, and the
+#     GitHub Apps given with --allow-app (e.g. the D-008 release app).
+# bypass_actors is visible only to admins: without it the result is "unknown" (fail closed), so the
+# owner's own run is the binding check. Private repos need GitHub Pro/Team for rulesets.
 tag_ruleset() {
-  local list ids id r
+  local list ids id r unknown=""
   if ! list=$(gh_get "repos/$1/rulesets?includes_parents=true&per_page=100"); then echo unknown; return 0; fi
+  if ! jq -e 'type == "array"' <<<"$list" >/dev/null 2>&1; then
+    echo "bootstrap-secrets: rulesets of $1: unexpected response" >&2
+    echo unknown
+    return 0
+  fi
   ids=$(jq -r '.[] | select(.target == "tag" and .enforcement == "active") | .id' <<<"$list")
   for id in $ids; do
-    r=$(gh_get "repos/$1/rulesets/$id?includes_parents=true") || continue
-    if jq -e '
-      ((.conditions.ref_name.include // []) | any(. == "refs/tags/*-v*" or . == "~ALL"))
+    if ! r=$(gh_get "repos/$1/rulesets/$id?includes_parents=true"); then unknown=1; continue; fi
+    if ! jq -e 'type == "object" and has("bypass_actors")' <<<"$r" >/dev/null 2>&1; then
+      echo "bootstrap-secrets: ruleset $id of $1: bypass list not visible (run as a repo admin)" >&2
+      unknown=1
+      continue
+    fi
+    if jq -e --arg apps "${ALLOW_APPS:-}" '
+      ($apps | split(",") | map(select(. != ""))) as $allowed
+      | ((.conditions.ref_name.include // []) | any(. == "refs/tags/*-v*" or . == "~ALL"))
+      and ((.conditions.ref_name.exclude // []) | length == 0)
       and ([.rules[]?.type] | (index("creation") != null and index("update") != null and index("deletion") != null))
-    ' <<<"$r" >/dev/null; then
+      and (.bypass_actors | all(
+        (.actor_type == "RepositoryRole" and .actor_id == 5)
+        or .actor_type == "OrganizationAdmin"
+        or (.actor_type == "Integration" and ((.actor_id | tostring) as $i | $allowed | index($i) != null))))
+    ' <<<"$r" >/dev/null 2>&1; then
       echo ok
       return 0
     fi
+    echo "bootstrap-secrets: ruleset $id of $1 does not qualify (pattern, excludes, rules or bypass list)" >&2
   done
-  echo missing
+  if [ -n "$unknown" ]; then echo unknown; else echo missing; fi
 }
 
 # --- CircleCI -------------------------------------------------------------------------------
@@ -219,12 +242,18 @@ setup_circleci() {
 main() {
   local dir="" push=0 owners=() consumers=() bundles=()
   ROTATE=0
+  ALLOW_APPS=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --self-test) self_test; return ;;
       --check-rulesets)
         # Read-only: every repo after the flag must have the release-tag ruleset (§0 P2).
         shift
+        while [ "${1:-}" = --allow-app ]; do
+          [[ "${2:-}" =~ ^[0-9]+$ ]] || die "--allow-app needs a numeric GitHub App id"
+          ALLOW_APPS+="${ALLOW_APPS:+,}$2"
+          shift 2
+        done
         [ $# -ge 1 ] || die "--check-rulesets needs OWNER/REPO arguments"
         need gh; need jq
         TMPD=$(mktemp -d); trap 'rm -rf "$TMPD"' EXIT
@@ -241,6 +270,9 @@ main() {
       --consumer) consumers+=("$2"); shift ;;
       --bundle) bundles+=("$2"); shift ;;
       --push) push=1 ;;
+      --allow-app)
+        [[ "${2:-}" =~ ^[0-9]+$ ]] || die "--allow-app needs a numeric GitHub App id"
+        ALLOW_APPS+="${ALLOW_APPS:+,}$2"; shift ;;
       --rotate) ROTATE=1 ;;
       *) die "unknown argument $1" ;;
     esac
@@ -453,7 +485,8 @@ main() {
   for i in "${!c_name[@]}"; do echo "consumer ${c_env[$i]} ${c_name[$i]} ${c_prov[$i]} ${c_pub[$i]}"; done
   # Informational here (P2 may come after C5); --check-rulesets fails when one is missing.
   printf '%s\n' "${c_repo[@]}" | sort -u | while IFS= read -r repo; do
-    echo "tag ruleset $repo: $(tag_ruleset "$repo") (needed before any release; spec §0 P2)"
+    # stderr silenced: a missing ruleset is expected here and must not look like a failed bootstrap.
+    echo "tag ruleset $repo: $(tag_ruleset "$repo" 2>/dev/null) (info only: needed before any release; check with --check-rulesets, spec §0 P2)"
   done
   printf 'file %s\n' access.toml .sops.yaml "${written[@]}"
   echo "no private key in the repo dir: ok"
