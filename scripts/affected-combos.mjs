@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { comboTemplate, loadCombos } from "./lib/combos.mjs";
+import { isMain } from "./lib/is-main.mjs";
 
 /** @typedef {import("./lib/combos.mjs").Combo} Combo */
 
@@ -51,7 +50,7 @@ export function affectedCombos(changed, combos) {
   return all.filter((n) => hit.has(n));
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const { values } = parseArgs({
     options: { base: { type: "string" }, all: { type: "boolean" } },
   });

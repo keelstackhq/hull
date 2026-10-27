@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { CI_TASKS, RUST_CI_STEPS } from "./lib/ci-tasks.mjs";
 import { comboTemplate, comboVars, isRustTemplate, loadCombos } from "./lib/combos.mjs";
+import { isMain } from "./lib/is-main.mjs";
 import { snapshotTemplate, spliceCommand, spliceNewArgs } from "./lib/splice.mjs";
 import { renderNew } from "./render.mjs";
 
@@ -164,7 +165,7 @@ export async function dogfood(opts) {
   return results;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const { values } = parseArgs({
     options: {
       combo: { type: "string", multiple: true },

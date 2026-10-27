@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Writes the GitHub Actions workflow of generated repos from CI_PLAN (secrets-ci design §6.2).
 // `--check` exits 1 when the checked-in file differs from the generated one.
-import { realpathSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { CI_PLAN } from "./lib/ci-tasks.mjs";
+import { isMain } from "./lib/is-main.mjs";
 
 export const GITHUB_CI_PATH = fileURLToPath(
   new URL("../template/pieces/base/files/.github/workflows/ci.yml", import.meta.url),
@@ -68,6 +68,4 @@ async function main() {
   await writeFile(GITHUB_CI_PATH, text);
 }
 
-// Compare real paths: import.meta.url has symlinks resolved, argv[1] does not.
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url))
-  await main();
+if (isMain(import.meta.url)) await main();

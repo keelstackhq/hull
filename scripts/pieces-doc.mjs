@@ -2,6 +2,7 @@
 // Generates docs/pieces.md from the template manifests.
 // Usage: node scripts/pieces-doc.mjs > docs/pieces.md   (or: pnpm docs:pieces)
 import { fileURLToPath } from "node:url";
+import { isMain } from "./lib/is-main.mjs";
 import { loadTemplate } from "./lib/manifest.mjs";
 
 const code = (s) => `\`${s}\``;
@@ -49,7 +50,7 @@ export function piecesDoc(t) {
   return out.join("\n").replace(/\n+$/, "\n");
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const t = await loadTemplate(fileURLToPath(new URL("../template", import.meta.url)));
   process.stdout.write(piecesDoc(t));
 }
