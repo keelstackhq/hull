@@ -13,6 +13,51 @@ Version facts (checked 2026-10-27 with `git ls-remote --tags`): sops `v3.13.3`, 
 Checksums are not in this spec: the task that pins a binary downloads the release's checksum file
 and records the SHA-256 values with the date (CLAUDE.md: never guess).
 
+## 0. Owner checklist — every human step, done once, before implementation
+
+Mobile first: the computer-only steps come first and take one sitting (about 45 min); the rest
+can be done on a phone. After step P4 no human step remains except batched chat approvals (§0.3).
+"Verify" says how the agents confirm each step; the owner never has to report beyond pasting the
+one public verification block from C5.
+
+### 0.1 Needs a computer (in this order)
+
+| # | Step | Where it lives | Agents verify |
+|---|---|---|---|
+| C1 | Install `sops` 3.13.3 (linux amd64 SHA-256 `e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b`; other platforms from `sops-v3.13.3.checksums.txt`), `age` 1.3.x, `jq`, `gh` (logged in as owner). Run `bash scripts/owner/bootstrap-secrets.sh --self-test` from a hull checkout | owner's computer | the C5 paste includes `self-test ok` (C5 runs it again) |
+| C2 | Owner age keys: `age-keygen -o ~/.config/sops/age/keys.txt` (daily key; also save the file in your password manager); `age-keygen` once more and keep that output **offline** (paper or USB in a safe) as the backup key. Note both `age1…` public keys. Never put a private key in a Claude environment, chat or repo | daily key: `~/.config/sops/age/keys.txt` + password manager; backup: offline | both public keys appear as `owner-1`/`owner-2` recipients in every `*.sops.yaml` of the secrets repo (agents read the ciphertext metadata; HU-6's `hoist secrets check` enforces it from then on) |
+| C3 | Repos: `gh repo create keelstackhq/secrets-shared --private --add-readme` and `gh repo create keelstackhq/hull-canary-circleci --private --add-readme`. GitHub App `keelstackhq-secrets-read` (org Settings → Developer settings → GitHub Apps → New: no webhook; Repository permissions Contents: read, Metadata: read; "Only on this account"), install it on `secrets-shared` only, generate a private key (.pem). Then: `gh variable set SECRETS_READ_APP_ID --org keelstackhq --visibility selected --repos keelstack,hull-canary-circleci --body <app id>`; `gh secret set SECRETS_READ_APP_KEY --org keelstackhq --visibility selected --repos keelstack,hull-canary-circleci < key.pem`; delete the .pem afterwards (C4 pastes it into CircleCI first) | App key: org secret + CircleCI context `secrets-read` only | repos: `list_repos`/GitHub API show both private. App + key: the first `hoist secrets check --remote` run in the canary (CAN-1) mints a token and reads `secrets-shared`; a failure there points to C3 |
+| C4 | CircleCI: sign up at app.circleci.com with GitHub, create org `keelstackhq` **via the GitHub App integration** (no security groups exist for GitHub-App orgs; restrictions are per project + expression, step P3), install the CircleCI GitHub App on `hull-canary-circleci` only, create the project for it. Create context `secrets-read` with `SECRETS_READ_APP_ID` and `SECRETS_READ_APP_KEY` (paste the .pem). Create a personal API token (User settings → Personal API tokens) and note the org ID (Organization settings → Overview) for C5 | CircleCI org + context `secrets-read`; the token only in your shell for C5, then revoke it | CAN-1: the canary's first pipeline reports `ci/circleci: ci-ok` on GitHub (agents read the commit statuses) |
+| C5 | Cloudflare: create a preview-only API token (`keelstack-preview`: Workers Scripts Edit + Cloudflare Pages Edit, this account) and have the current prod token and account ID ready. Then run, with `CIRCLECI_TOKEN` and `CIRCLECI_ORG_ID` exported (`read -rs CIRCLECI_TOKEN; export CIRCLECI_TOKEN`): `gh repo clone keelstackhq/secrets-shared ~/src/secrets-shared` and `bash scripts/owner/bootstrap-secrets.sh --secrets-dir ~/src/secrets-shared --owner-pub <daily age1> --owner-pub <backup age1> --consumer keelstackhq/keelstack:preview:github --consumer keelstackhq/keelstack:prod:github --consumer keelstackhq/hull-canary-circleci:prod:circleci --bundle preview/cloudflare=CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID@keelstack-preview --bundle prod/cloudflare=CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID@keelstack-prod --bundle prod/canary=CANARY_SMOKE@hull-canary-circleci-prod --push`. It prompts (hidden) for each value (`CANARY_SMOKE`: any non-secret word), generates the three CI keys and stores each private key straight into the GitHub environment / CircleCI context (never shown), creates `preview`/`prod` environments with a main-only branch rule, writes `access.toml`, `.sops.yaml` and the encrypted bundles, and pushes. Paste the printed "paste into the chat" block (public data only). Revoke the CircleCI token | values: encrypted in `secrets-shared`; CI keys: environment secrets `SOPS_AGE_KEY` (keelstack `preview`, `prod`) and CircleCI context `hull-canary-circleci-prod` | agents compare the pasted public keys with the recipients in `secrets-shared` (`*.sops.yaml` metadata, `access.toml`), check each file is ciphertext, and read the environments' branch policies through the GitHub API; the end-to-end check is HU-4's first `deploy`/`preview-deploy` run and CAN-1's deploy smoke job (`CANARY_SMOKE` non-empty) |
+
+The script is `scripts/owner/bootstrap-secrets.sh` in this PR; its test
+(`tests/bootstrap-secrets.test.mjs`) runs it against a stub `gh` with keys generated at test time and
+proves: keys go only through stdin, nothing secret lands in the repo, each consumer decrypts only its
+bundle. It does the v1 consumers; later consumers use `hoist secrets grant` (HO-3/HO-4), which the
+owner runs only when adding a consumer, which is outside this implementation.
+
+### 0.2 Phone is enough (any order, after C3/C4)
+
+| # | Step | Agents verify |
+|---|---|---|
+| P1 | github.com → Settings → Applications → Claude → Configure: add `secrets-shared` and `hull-canary-circleci` to the Claude GitHub App | `list_repos` lists both; `add_repo` attaches them |
+| P2 | Rulesets (repo → Settings → Rules → New branch ruleset, target default branch): `secrets-shared`: require PR + Code Owners review, block force pushes, required check `ci-ok`; `hull-canary-circleci`: require PR, block force pushes, required check `ci-ok` with source "GitHub Actions" | GitHub API `GET /repos/{r}/rulesets` (read access) shows the rules |
+| P3 | app.circleci.com → project `hull-canary-circleci` → Project settings: Advanced → enable "dynamic config using setup workflows", "Build forked pull requests" on, "Pass secrets to builds from forked pull requests" off, "Prevent unregistered users from triggering builds" off (merge queue, §12 item 9); Triggers: PRs, default-branch pushes, "Pushes to merge queues". Organization settings → Contexts: `hull-canary-circleci-prod` → Project restriction = the canary project, Expression restriction `pipeline.git.branch == "main"`; `secrets-read` → Project restriction = the canary project | CAN-1: setup+`ci-ok` runs on a PR, on `main` and on a merge-queue branch; a deploy job on a non-main branch fails with a context authorization error (the restriction works) |
+| P4 | Repo settings of `hull-canary-circleci` → Merge queue on for `main` (so CAN-1 can test §7.3) | CAN-1 queues a PR and sees `ci-ok` mirrored on the queue SHA |
+
+No first publish is needed: no new npm package, scope or registry account. hoist, hoard and splice
+already have release flows.
+
+### 0.3 What stays, as batched chat approvals only
+
+- Approve owner-approval PRs (overview table); the orchestrator records them with `/bosun approve`.
+- Merge DEC-1 in `keelstackhq/decisions` (owner-merged, D-002), phone.
+- Approve the `release` environment for the hoist and hoard releases (GitHub mobile → Actions → Review
+  deployments), phone.
+- Optional, off the critical path: tag splice `v0.3.0` (github.com → splice → Releases → Draft new
+  release), phone. Only HU-9's `min_splice` bump and switching existing repos to `circleci-only` wait
+  for it; nothing else blocks on it.
+
 ## 1. Goals and non-goals
 
 Goals:
@@ -436,7 +481,7 @@ jobs:
     if: >-
       (github.event.context == 'ci/circleci: ci-ok' || github.event.context == 'ci/circleci: bosun-ok')
       && github.event.state != 'pending'
-      && github.event.sender.login == vars.CIRCLECI_STATUS_SENDER
+      && github.event.sender.login == 'circleci-app[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -510,14 +555,19 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
 ## 12. Unverified (check during the build; the task that depends on it verifies first)
 
 1. The CircleCI GitHub App status context for a job named `ci-ok` is exactly `ci/circleci: ci-ok`,
-   and the sender login of those statuses (sets `vars.CIRCLECI_STATUS_SENDER`). Canary repo.
+   and the sender login of those statuses is `circleci-app[bot]` (a constant in the mirror; CAN-1
+   checks it and, if it differs, an agent PR fixes the constant in hull and bosun — no owner step).
 2. `checkout: method: blobless` exists and works with `git fetch` of the default branch.
 3. `circleci config pack` output + continuation API works without orbs; `circleci config validate`
    runs offline in hull CI (else hull validates against the CircleCI JSON schema from SchemaStore,
    vendored and pinned).
 4. `<< pipeline.git.base_revision >>` on GitHub App pipelines for default-branch pushes.
 5. Context expression restriction syntax `pipeline.git.branch == "main"`.
-6. `sops decrypt --input-type yaml --output-type json /dev/stdin` reads stdin in 3.13.3.
+6. Verified 2026-10-27 (sops 3.13.3, age 1.1.1 and 1.3.x keys): `sops encrypt --filename-override P
+   --input-type json --output-type yaml --age R /dev/stdin` and `sops decrypt --input-type yaml
+   --output-type json /dev/stdin` work when stdin is a pipe or file. They fail with ENXIO when stdin is
+   a socket (Node `child_process` uses sockets), so hoist must spawn sops with a real pipe (Rust
+   `Stdio::piped()` is one) and Node tests pass a file path.
 7. `ring` 0.17.14 is in hoist's `Cargo.lock` (checked 2026-10-27); unverified: that `RsaKeyPair`
    loads GitHub App keys (PKCS#1 PEM → DER) and signs RS256 for the JWT; if not, the plan's Tech Stack
    asks the owner for `jsonwebtoken` or `rsa`.
@@ -536,6 +586,9 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
 
 ## 13. Owner-only steps
 
+All human steps are in §0; this list maps them to the design for reference.
+
+
 1. Merge the decisions PR (D-009, D-010).
 2. Create the GitHub App `keelstackhq-secrets-read` (Repository contents: read, metadata: read),
    install it only on `secrets-*` repos; org variable `SECRETS_READ_APP_ID`, org secret
@@ -545,14 +598,14 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
 4. `hoist secrets repo init keelstackhq/secrets-shared` (and per-project repos); render
    `template-secrets`; fill `access.toml` with the owner public keys; `hoist secrets edit` to add
    values.
-5. Per consumer and environment: `hoist secrets grant <repo> --env <env> [--provider circleci]`;
-   GitHub environments `preview`, `prod`, `release` with protections (§5.2).
+5. Per consumer and environment: v1 consumers by `scripts/owner/bootstrap-secrets.sh` (§0 C5);
+   later ones by `hoist secrets grant <repo> --env <env> [--provider circleci]`; GitHub environments
+   with protections (§5.2).
 6. CircleCI: connect the org through the GitHub App; per project enable dynamic config (setup
    workflows), triggers (PRs, default-branch pushes, merge-queue pushes), forked PRs build without
    secrets; contexts with project and expression restrictions (§5.3); weekly scheduled trigger for
    desktop/nightly; a personal API token for `hoist secrets grant --provider circleci` (local only).
-7. Rulesets: unchanged names. In circleci mode set `ci-ok`'s expected source to GitHub Actions;
-   set repo variable `CIRCLECI_STATUS_SENDER` after the canary shows the login.
+7. Rulesets: unchanged names. In circleci mode set `ci-ok`'s expected source to GitHub Actions.
 8. Create the canary repo `keelstackhq/hull-canary-circleci` (circleci mode) and its CircleCI project.
 9. Tag/release: splice 0.3.0, hoist (secrets), hoard (standalone), hull (owner tags, D-008).
 10. Optional later: CircleCI namespace and orbs (§6.6); KMS recipients (§3.6).

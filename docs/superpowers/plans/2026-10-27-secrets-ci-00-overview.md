@@ -51,6 +51,7 @@ all of the above → HU-9 (hull wrap-up) ∥ KS-1 (docs)
 | HU-7 | hull | `feat(template-rust): circleci pieces` | HU-3 | yes |
 | HU-8 | hull | `docs: contract rule 9.27` | — (same week as SP-1) | yes (contract) |
 | HU-9 | hull | `docs: secrets + CircleCI — spec amendments, CLAUDE.md, progress, changelog` | all hull PRs | no |
+| SEC-1 | secrets-shared | `chore: adopt template-secrets` (render HU-6's template over the bootstrapped repo; `access.toml` merges, `hoist secrets check` green) | HU-6, §0 C5 | yes (Code Owners) |
 | CAN-1 | canary | render `circleci-only` into `keelstackhq/hull-canary-circleci`, verify spec §12 items 1-5, 8, 9 | HU-3, owner setup | owner setup |
 | BO-1 | bosun | `feat(risk): R-secrets covers sops files; .circleci in critical floor; decrypt hook deny` | — | yes (critical) |
 | BO-2 | bosun | `feat(gates): run on CircleCI` | BO-1 (both edit `docs/spec.md`) | yes (bosun src) |
@@ -65,10 +66,14 @@ then {BO-3b, KS-1, HU-9}. (* pins the released hoist; if it is not released yet 
 both touch `template/pieces/base/files/.github/workflows/` but different files (`preview*.yml` vs
 `ci.yml`/`desktop.yml`); HU-5 and HU-7 both touch `scripts/combos/` with different new files.
 
-## Owner-only setup (spec §13)
+## Owner steps
 
-GitHub App `keelstackhq-secrets-read`; owner age keys; secrets repos; `hoist secrets grant` per
-consumer × env; GitHub environments; CircleCI org (GitHub App), projects, dynamic config, triggers incl.
-merge queue, fork settings, contexts with restrictions, weekly schedules, API token; rulesets'
-expected source for `ci-ok` in circleci mode and `vars.CIRCLECI_STATUS_SENDER`; the canary repo;
-releases/tags of splice 0.3.0, hoard, hoist, hull.
+All human steps are front-loaded in spec §0 (computer steps C1-C5 first, then phone steps P1-P4),
+each with how the agents verify it. Dispatch starts when §0 is done; after that only batched chat
+approvals remain (§0.3): owner-approval PRs, merging DEC-1, `release` environment approvals for
+hoist/hoard, and the optional splice `v0.3.0` tag (off the critical path).
+
+CAN-1 is done by an agent session (no owner step): render `circleci-only` + `secrets` into
+`keelstackhq/hull-canary-circleci` by PR, then check spec §12 items 1-5, 8, 9, 11, the context
+restriction (deploy on a branch must fail) and the deploy smoke job (`CANARY_SMOKE`); it fixes the
+mirror's sender constant in hull and bosun by PR if §12 item 1 differs.
