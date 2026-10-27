@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile, readdir, access } from "node:fs/promises";
-import { isAbsolute, join, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { test } from "node:test";
 import YAML from "yaml";
 import { renderCombo } from "./helpers.mjs";
@@ -21,8 +21,10 @@ import {
   buildArtifact,
   checkArtifact,
   deploy,
+  fenced,
   parseJsonc,
   previewConfig,
+  runWrangler,
   report,
 } from "../template/pieces/base/files/.github/scripts/preview.mjs";
 
@@ -220,8 +222,9 @@ for (const piece of ["preact-app:web", "astro-site:site", "hono-worker:api"]) {
 // Fixture artifacts for `preview.mjs deploy`.
 function artifact(extra = () => {}) {
   const dir = mkdtempSync(join(tmpdir(), "preview-art-"));
-  mkdirSync(join(dir, "apps/api"), { recursive: true });
-  writeFileSync(join(dir, "apps/api/index.js"), "export default {}\n");
+  mkdirSync(join(dir, "apps/api/worker"), { recursive: true });
+  mkdirSync(join(dir, "apps/api/assets"));
+  writeFileSync(join(dir, "apps/api/worker/index.js"), "export default {}\n");
   writeFileSync(join(dir, "manifest.json"), JSON.stringify({ pr: 7, apps: ["api"] }));
   extra(dir);
   return dir;
@@ -234,16 +237,21 @@ function checkout(config = '{ "name": "acme-api", "main": "src/index.ts" }\n') {
 }
 
 test("buildArtifact packs built output and a manifest, dropping forbidden files", () => {
-  const root = checkout();
+  const root = checkout(
+    '{ "name": "w", "main": "src/index.ts", "assets": { "directory": "./public" } }',
+  );
   mkdirSync(join(root, "apps/api/dist"));
+  mkdirSync(join(root, "apps/api/public"));
   writeFileSync(join(root, "apps/api/dist/index.js"), "x");
   writeFileSync(join(root, "apps/api/dist/wrangler.json"), "{}");
+  writeFileSync(join(root, "apps/api/public/app.js"), "client");
   const out = join(root, ".preview");
   buildArtifact({ root, out, pr: "7" });
   const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
   assert.deepEqual(manifest, { pr: 7, apps: ["api"] });
   assert.deepEqual(checkArtifact(out), []);
-  assert.equal(readFileSync(join(out, "apps/api/index.js"), "utf8"), "x");
+  assert.equal(readFileSync(join(out, "apps/api/worker/index.js"), "utf8"), "x");
+  assert.equal(readFileSync(join(out, "apps/api/assets/app.js"), "utf8"), "client");
 });
 
 const CONFIG = `{
@@ -276,7 +284,7 @@ test("parseJsonc strips comments and trailing commas outside strings, top-level 
 const OK = { code: 0, out: "https://pr-7.x.workers.dev\n" };
 const MISSING = {
   code: 1,
-  out: "You cannot upload a new version of a Worker that does not yet exist.",
+  out: "\u2718 [ERROR] You cannot upload a new version of a Worker that does not yet exist.",
 };
 function stub(...results) {
   const calls = [];
@@ -302,10 +310,11 @@ test("deploy: versions upload of a minimal config, never production bindings or 
     call.join(" "),
     /^wrangler versions upload --config \S+ --no-bundle --preview-alias pr-7$/,
   );
-  const keys = "compatibility_date,compatibility_flags,kv_namespaces,main,name";
+  const keys =
+    "base_dir,compatibility_date,compatibility_flags,find_additional_modules,kv_namespaces,main,name";
   assert.equal(Object.keys(cfg).sort().join(), keys);
   assert.equal(cfg.name, "acme-api-preview");
-  assert.match(cfg.main, /preview-art-.*apps\/api\/index\.js$/);
+  assert.match(cfg.main, /preview-art-.*apps\/api\/worker\/index\.js$/);
   assert.deepEqual(cfg.kv_namespaces, [{ binding: "KV", id: "preview-kv" }]);
   assert.doesNotMatch(JSON.stringify(cfg), /prod|routes?"|custom_domain|evil/);
 });
@@ -322,10 +331,12 @@ test("previewConfig: assets for assets-only and for main+assets; no binding or r
   const assets = { directory: "./dist", binding: "ASSETS", run_worker_first: true };
   const both = previewConfig(
     { name: "w", main: "src/i.ts", assets: { ...assets, not_found_handling: "404-page" } },
-    { entry: "/a/i.js", assets: "/a" },
+    { entry: "/a/w/i.js", assets: "/a/assets" },
   );
-  assert.deepEqual(both.assets, { directory: "/a", not_found_handling: "404-page" });
-  assert.equal(both.main, "/a/i.js");
+  assert.deepEqual(both.assets, { directory: "/a/assets", not_found_handling: "404-page" });
+  assert.equal(both.main, "/a/w/i.js");
+  assert.equal(both.find_additional_modules, true);
+  assert.equal(both.base_dir, "/a/w");
   const only = previewConfig({ name: "w", assets }, { assets: "/a" });
   assert.deepEqual(only.assets, { directory: "/a" });
   assert.equal(only.main, undefined);
@@ -355,7 +366,7 @@ test("deploy: a missing Worker is created once from a stub entry, then the PR co
   assert.equal(w.cfgs[1].assets, undefined);
   assert.doesNotMatch(w.cfgs[1].main, /preview-art-/);
   assert.match(readFileSync(w.cfgs[1].main, "utf8"), /new Response/);
-  assert.match(w.cfgs[2].assets.directory, /preview-art-.*apps\/api$/);
+  assert.match(w.cfgs[2].assets.directory, /preview-art-.*apps\/api\/assets$/);
   const bad = stub(MISSING, OK, { code: 1, out: "boom" });
   assert.equal((await go(bad)).ok, false);
   assert.equal(bad.calls.length, 3);
@@ -403,4 +414,120 @@ test("CLI: an unknown subcommand exits 2 with a usage line", () => {
   const r = spawnSync("node", [SCRIPT, "bogus"], { encoding: "utf8" });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /usage: preview\.mjs/);
+});
+
+test("deploy: hostile names and manifest values are rejected and never echoed raw", async () => {
+  const w = stub(OK);
+  const dir = artifact((d) => writeFileSync(join(d, "apps/api/a\n::set-output name=x::y"), ""));
+  const r = await go(w, { artifact: dir });
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.every((e) => !e.includes("\n")));
+  const pr = artifact((d) =>
+    writeFileSync(join(d, "manifest.json"), JSON.stringify({ pr: "1\n::warning::x", apps: [] })),
+  );
+  const r2 = await go(w, { artifact: pr });
+  assert.equal(r2.ok, false);
+  assert.ok(!r2.errors.join("").includes("::warning::"));
+  assert.equal(w.calls.length, 0);
+});
+
+test("fenced wraps wrangler output in stop-commands only on GitHub Actions", async () => {
+  const out = [];
+  assert.equal(
+    await fenced(
+      async () => 5,
+      { GITHUB_ACTIONS: "true" },
+      (t) => out.push(t),
+    ),
+    5,
+  );
+  const token = /^::stop-commands::([0-9a-f]{32})\n$/.exec(out[0])?.[1];
+  assert.ok(token);
+  assert.deepEqual(out.slice(1), [`::${token}::\n`]);
+  const none = [];
+  await fenced(
+    async () => 1,
+    {},
+    (t) => none.push(t),
+  );
+  assert.deepEqual(none, []);
+});
+
+test("deploy: Worker names clashing with a <name>-preview Worker are refused", async () => {
+  for (const other of [
+    '{ "name": "acme-api-preview" }',
+    '{ "name": "o", "env": { "x": { "name": "acme-api-preview" } } }',
+  ]) {
+    const root = checkout();
+    mkdirSync(join(root, "apps/other"));
+    writeFileSync(join(root, "apps/other/wrangler.jsonc"), other);
+    const w = stub(OK);
+    const r = await go(w, { root });
+    assert.equal(r.ok, false);
+    assert.match(r.errors[0], /acme-api-preview/);
+    assert.equal(w.calls.length, 0);
+  }
+});
+
+test("deploy: env.preview service and Durable Object references must be -preview Workers", async () => {
+  const cfg = (pv) => `{ "name": "w", "main": "src/index.ts", "env": { "preview": ${pv} } }`;
+  const bad = [
+    '{ "services": [{ "binding": "S", "service": "prod-api" }] }',
+    '{ "durable_objects": { "bindings": [{ "name": "D", "class_name": "C", "script_name": "prod" }] } }',
+  ];
+  for (const pv of bad) {
+    const w = stub(OK);
+    assert.equal((await go(w, { root: checkout(cfg(pv)) })).ok, false);
+    assert.equal(w.calls.length, 0);
+  }
+  const good = '{ "services": [{ "binding": "S", "service": "api-preview" }] }';
+  assert.equal((await go(stub(OK), { root: checkout(cfg(good)) })).ok, true);
+});
+
+test("deploy: server modules live under worker/ (base_dir), client JS stays in assets/", async () => {
+  const dir = artifact((d) => {
+    mkdirSync(join(d, "apps/api/worker/chunks"));
+    writeFileSync(join(d, "apps/api/worker/chunks/a.mjs"), "x");
+    writeFileSync(join(d, "apps/api/assets/app.js"), "client");
+  });
+  const cfg = '{ "name": "w", "main": "src/index.ts", "assets": { "directory": "./public" } }';
+  const w = stub(OK);
+  await go(w, { artifact: dir, root: checkout(cfg) });
+  const { main, base_dir: base, assets } = w.cfgs[0];
+  assert.equal(base, dirname(main));
+  assert.ok(existsSync(join(base, "chunks/a.mjs")));
+  assert.ok(existsSync(join(assets.directory, "app.js")));
+  assert.ok(!existsSync(join(assets.directory, "chunks")));
+});
+
+test("deploy: a main inside assets.directory is refused", async () => {
+  const w = stub(OK);
+  const cfg = '{ "name": "w", "main": "dist/index.ts", "assets": { "directory": "./dist" } }';
+  const r = await go(w, { root: checkout(cfg) });
+  assert.equal(r.ok, false);
+  assert.match(r.errors[0], /inside assets\.directory/);
+  assert.equal(w.calls.length, 0);
+});
+
+test("deploy: a checkout without apps/ has no name clash and nothing to deploy", async () => {
+  const root = mkdtempSync(join(tmpdir(), "preview-root-"));
+  assert.equal((await go(stub(OK), { root })).ok, false);
+});
+
+test("runWrangler writes stdout and stderr to the same sink, in order", async () => {
+  const chunks = [];
+  const bin = ["node", "-e", "console.log('o1'); console.error('e1')", "--"];
+  const r = await runWrangler(["x"], process.cwd(), { bin, write: (t) => chunks.push(t) });
+  assert.equal(r.code, 0);
+  assert.match(chunks.join(""), /o1[\s\S]*e1|e1[\s\S]*o1/);
+  assert.ok(chunks.join("").includes("e1") && r.out.includes("e1"));
+});
+
+test("deploy: the missing-Worker error must be wrangler's error line, not any output", async () => {
+  const w = stub({
+    code: 1,
+    out: "log: You cannot upload a new version of a Worker that does not yet exist",
+  });
+  assert.equal((await go(w)).ok, false);
+  assert.equal(w.calls.length, 1);
 });

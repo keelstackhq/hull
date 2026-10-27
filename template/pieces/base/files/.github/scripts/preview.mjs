@@ -1,15 +1,15 @@
-// PR previews in two phases. `build` (pull_request, no secrets) packs each app's built output
-// (`dist`: a Worker bundle or static dir) into an artifact. `deploy` (workflow_run, default-branch
+// PR previews in two phases. `build` (pull_request, no secrets) packs each app
+// (`worker/` bundle and `assets/`, kept apart) into an artifact. `deploy` (workflow_run, default-branch
 // checkout, environment preview) rejects anything but plain output, then uploads a version of the
 // `<name>-preview` Worker (`wrangler versions upload --no-bundle --preview-alias pr-<n>`) from a
 // minimal generated config: no production bindings, routes or domains, only `env.preview` bindings.
 // No PR code runs and nothing is built. With no subcommand: the legacy single-job turbo path, until
 // preview.yml moves to the two phases. Node built-ins only.
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   appendFileSync,
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -19,7 +19,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const TURBO_ARGS = [
@@ -31,7 +31,8 @@ export const TURBO_ARGS = [
   "--log-prefix=task",
 ];
 
-const NOT_CREATED = /cannot upload a new version of a Worker that does not yet exist/;
+const NOT_CREATED =
+  /\[ERROR\]\s+You cannot upload a new version of a Worker that does not yet exist/;
 const FORBIDDEN =
   /^(wrangler\.json|package\.json$|pnpm-lock\.yaml$|_worker\.js|\.assetsignore$)|\.toml$/i;
 const forbiddenName = (n) => FORBIDDEN.test(n);
@@ -39,12 +40,16 @@ const DIR = /^[a-z0-9][a-z0-9_-]*$/i;
 const NAME = /^[a-z0-9][a-z0-9-]*$/i;
 
 /** Violations in an artifact tree: forbidden names, symlinks and anything but files and dirs. */
+const SAFE = /^[A-Za-z0-9._@+~-][A-Za-z0-9._@+~ -]*$/;
+const noAnsi = (t) => t.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+
 export function checkArtifact(root) {
   const bad = [];
   const walk = (rel) => {
     for (const e of readdirSync(join(root, rel), { withFileTypes: true })) {
       const p = rel ? `${rel}/${e.name}` : e.name;
-      if (forbiddenName(e.name)) bad.push(`${p}: forbidden name`);
+      if (!SAFE.test(e.name)) bad.push(`${JSON.stringify(p)}: unsafe name`);
+      else if (forbiddenName(e.name)) bad.push(`${p}: forbidden name`);
       else if (e.isDirectory()) walk(p);
       else if (!e.isFile()) bad.push(`${p}: ${e.isSymbolicLink() ? "symlink" : "special file"}`);
     }
@@ -90,7 +95,8 @@ const BINDINGS = "vars kv_namespaces d1_databases r2_buckets services queues dur
  */
 export function previewConfig(cfg, { entry, assets }) {
   const out = { name: `${cfg.name}-preview` };
-  if (entry) out.main = entry;
+  if (entry)
+    Object.assign(out, { main: entry, find_additional_modules: true, base_dir: dirname(entry) });
   if (!entry || cfg.assets) {
     // Only the directory and not_found_handling: never `binding` or `run_worker_first`.
     out.assets = { directory: assets };
@@ -112,19 +118,46 @@ function copyPlain(from, to) {
   }
 }
 
-/** Packs `apps/<dir>/dist` of every app with a wrangler.jsonc into `out`, plus manifest.json. */
+/**
+ * Packs each app with a wrangler.jsonc into `out`: the Worker bundle (`dist`, the
+ * `wrangler deploy --dry-run --outdir` output) under `apps/<dir>/worker/` and the static assets
+ * (`assets.directory`) under `apps/<dir>/assets/`, plus manifest.json.
+ */
 export function buildArtifact({ root, out, pr }) {
   const apps = [];
   for (const e of readdirSync(join(root, "apps"), { withFileTypes: true })) {
     const app = join(root, "apps", e.name);
     if (!e.isDirectory() || !existsSync(join(app, "wrangler.jsonc"))) continue;
-    if (!existsSync(join(app, "dist"))) continue;
-    copyPlain(join(app, "dist"), join(out, "apps", e.name));
-    apps.push(e.name);
+    const cfg = parseJsonc(readFileSync(join(app, "wrangler.jsonc"), "utf8"));
+    const worker = cfg.main ? join(app, "dist") : null;
+    const assets = cfg.assets?.directory ? resolve(app, cfg.assets.directory) : null;
+    if (worker && worker === assets) throw new Error(`${e.name}: main and assets share ${worker}`);
+    for (const [from, to] of [
+      [worker, "worker"],
+      [assets, "assets"],
+    ]) {
+      if (from && existsSync(from)) copyPlain(from, join(out, "apps", e.name, to));
+    }
+    if (existsSync(join(out, "apps", e.name))) apps.push(e.name);
   }
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "manifest.json"), JSON.stringify({ pr: Number(pr), apps }));
   return apps;
+}
+
+/** A default-branch Worker name (top level or any env) equal to some app's `<name>-preview`. */
+function previewNameClash(root) {
+  if (!existsSync(join(root, "apps"))) return undefined;
+  const cfgs = readdirSync(join(root, "apps")).flatMap((d) => {
+    try {
+      return [parseJsonc(readFileSync(join(root, "apps", d, "wrangler.jsonc"), "utf8"))];
+    } catch {
+      return [];
+    }
+  });
+  const previews = new Set(cfgs.map((c) => `${c.name}-preview`));
+  const names = cfgs.flatMap((c) => [c.name, ...Object.values(c.env ?? {}).map((e) => e?.name)]);
+  return names.find((n) => previews.has(n));
 }
 
 /**
@@ -144,10 +177,12 @@ export async function deploy({ artifact: given, root, pr, run }) {
     return fail("manifest.json is missing or not JSON");
   }
   if (String(manifest.pr) !== String(pr)) {
-    return fail(`artifact is for PR ${manifest.pr}, not ${pr}`);
+    return fail("artifact is for another PR");
   }
   const apps = Array.isArray(manifest.apps) ? manifest.apps : [];
   if (!apps.every((d) => typeof d === "string" && DIR.test(d))) return fail("bad app in manifest");
+  const clash = previewNameClash(root);
+  if (clash) return fail(`Worker name ${JSON.stringify(clash)} is also a preview Worker name`);
   const urls = [];
   const errors = [];
   for (const dir of apps) {
@@ -174,29 +209,39 @@ export async function deploy({ artifact: given, root, pr, run }) {
       errors.push(`${dir}: wrangler.jsonc has no usable name`);
       continue;
     }
+    const appDir = join(root, "apps", dir);
+    const aDir = cfg.assets?.directory && resolve(appDir, cfg.assets.directory);
+    if (aDir && cfg.main && resolve(appDir, cfg.main).startsWith(aDir + sep)) {
+      errors.push(`${dir}: main is inside assets.directory (the bundle would be served publicly)`);
+      continue;
+    }
+    const pv = cfg.env?.preview;
+    const refs = [
+      ...(pv?.services ?? []).map((x) => x?.service),
+      ...(pv?.durable_objects?.bindings ?? []).map((x) => x?.script_name).filter(Boolean),
+    ];
+    if (!refs.every((x) => String(x).endsWith("-preview"))) {
+      errors.push(`${dir}: env.preview binds a Worker that is not a -preview Worker`);
+      continue;
+    }
     let entry;
     if (typeof cfg.main === "string") {
       const stem = basename(cfg.main).replace(/\.[cm]?[jt]sx?$/, "");
-      entry = [".js", ".mjs"].map((x) => join(dist, stem + x)).find((f) => existsSync(f));
+      entry = [".js", ".mjs"].map((x) => join(dist, "worker", stem + x)).find((f) => existsSync(f));
       if (!entry) {
         errors.push(`${dir}: no bundle for ${cfg.main}`);
         continue;
       }
     }
     const tmp = mkdtempSync(join(tmpdir(), "preview-cfg-"));
-    let assets = dist;
-    if (entry && cfg.assets) {
-      // The server bundle must not be served as a public asset.
-      assets = join(tmp, "assets");
-      cpSync(dist, assets, { recursive: true, filter: (p) => p !== entry });
-    }
+    const assets = join(dist, "assets");
     const put = (f, x) => (writeFileSync(join(tmp, f), x), join(tmp, f));
     const conf = put("wrangler.json", JSON.stringify(previewConfig(cfg, { entry, assets })));
     const wr = (sub, c, ...x) =>
       run(["wrangler", ...sub.split(" "), "--config", c, "--no-bundle", ...x]);
     const upload = () => wr("versions upload", conf, "--preview-alias", `pr-${pr}`);
     let r = await upload();
-    if (r.code !== 0 && NOT_CREATED.test(r.out)) {
+    if (r.code !== 0 && NOT_CREATED.test(noAnsi(r.out))) {
       // First preview of this app: create the `<name>-preview` Worker once from a stub (never PR
       // code as its live version), then upload the PR code as a preview version.
       const stub = put("stub.js", 'export default { fetch: () => new Response("") };\n');
@@ -217,20 +262,31 @@ export async function deploy({ artifact: given, root, pr, run }) {
   return { ok: errors.length === 0, errors, notices: [], summary };
 }
 
-function runWrangler(args, root) {
+/** Runs `fn` with workflow commands disabled on GitHub Actions: wrangler's output is untrusted. */
+export async function fenced(fn, env = process.env, write = (t) => process.stdout.write(t)) {
+  if (!env.GITHUB_ACTIONS) return fn();
+  const token = randomBytes(16).toString("hex");
+  write(`::stop-commands::${token}\n`);
+  try {
+    return await fn();
+  } finally {
+    write(`::${token}::\n`);
+  }
+}
+
+export function runWrangler(args, root, { bin = ["pnpm", "exec"], write } = {}) {
+  const sink = write ?? ((t) => process.stdout.write(t));
   return new Promise((resolve) => {
-    const child = spawn("pnpm", ["exec", ...args], {
+    const child = spawn(bin[0], [...bin.slice(1), ...args], {
       cwd: root,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let out = "";
-    for (const [from, to] of [
-      [child.stdout, process.stdout],
-      [child.stderr, process.stderr],
-    ]) {
+    // Both streams to one sink, so they stay between the fence lines (see `fenced`).
+    for (const from of [child.stdout, child.stderr]) {
       from.on("data", (/** @type {Buffer} */ b) => {
         out += b.toString();
-        to.write(b);
+        sink(b);
       });
     }
     child.on("error", (e) => resolve({ code: 1, out: e.message }));
@@ -323,7 +379,12 @@ if (isMain() && process.argv.length > 2) {
     console.log(`preview: packed ${apps.length} app(s): ${apps.join(", ")}`);
   } else if (cmd === "deploy") {
     const root = process.cwd();
-    const r = await deploy({ artifact, root, pr, run: (args) => runWrangler(args, root) });
+    const r = await deploy({
+      artifact,
+      root,
+      pr,
+      run: (args) => fenced(() => runWrangler(args, root)),
+    });
     for (const e of r.errors) console.error(`preview: ${e}`);
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, r.summary);
     process.exit(r.ok ? 0 : 1);
