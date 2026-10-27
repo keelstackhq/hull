@@ -1,32 +1,51 @@
 #!/usr/bin/env bash
-# One-time owner bootstrap for a sops secrets repo (spec 2026-10-27 §0, step C4).
-# Run on the owner's computer, never in an agent session. It:
-#   1. generates one age key per consumer (repo:env:provider); each private key goes straight
-#      to the GitHub environment secret or CircleCI context var SOPS_AGE_KEY (stdin, never argv)
-#      and is never printed or written to disk;
-#   2. creates GitHub environments with a `main`-only deployment-branch rule;
-#   3. prompts (hidden) for each bundle value and writes <env>/<bundle>.sops.yaml encrypted to
-#      the owner keys + the consumers of that env, plus access.toml and .sops.yaml;
-#   4. prints a verification block (public keys and names only) to paste into the chat.
+# One-time owner bootstrap for a sops secrets repo (spec 2026-10-27 §0, step C5).
+# Run on the owner's computer, never in an agent session. Needs bash >= 4.4, sops 3.13.3,
+# age-keygen 1.3.x, jq, gh (logged in) and, for CircleCI consumers, curl.
+#
+# Phases (nothing is written before phase 4):
+#   1. validate arguments and tools, run the self-test;
+#   2. preflight: refuse a re-run (existing access.toml, SOPS_AGE_KEY already stored) unless
+#      --rotate; check every existing GitHub environment allows exactly branch `main`;
+#   3. prompt (hidden, one line per value) for every bundle value;
+#   4. create/verify every environment and CircleCI context (with project + main-branch
+#      restrictions) first; then per consumer generate an age key and store the private key as SOPS_AGE_KEY via stdin (never
+#      argv, never printed, never on disk); then write access.toml, .sops.yaml and the encrypted
+#      bundles, commit only those files (--push), and print public data to paste into the chat.
 #
 # Usage:
 #   bootstrap-secrets.sh --self-test
 #   bootstrap-secrets.sh --secrets-dir DIR --owner-pub AGE1 [--owner-pub AGE1]...
-#       --consumer OWNER/REPO:ENV:github|circleci ...
-#       --bundle ENV/NAME=KEY1,KEY2[@NAME1,NAME2] ... [--push]
-# A consumer's name is <repo>-<env> (e.g. keelstack-prod); @names (comma-separated) limits a bundle to those consumers.
-# Env: CIRCLECI_TOKEN and CIRCLECI_ORG_ID only when a consumer uses circleci. gh must be logged in.
+#       --consumer OWNER/REPO:ENV:github
+#       --consumer OWNER/REPO:ENV:circleci:CIRCLECI-PROJECT-ID ...
+#       --bundle ENV/NAME=KEY1,KEY2[@NAME1,NAME2] ... [--push] [--rotate]
+# A consumer's name is <repo>-<env> (e.g. keelstack-prod). @names limits a bundle to those
+# consumers; without @names all consumers of that env get it, which is refused when they belong
+# to more than one repo. --rotate replaces existing CI keys and requires every existing bundle to
+# be listed again (all values are re-entered and re-encrypted).
+# Env: CIRCLECI_TOKEN and CIRCLECI_ORG_ID when a consumer uses circleci.
 set -euo pipefail
 set +x
 umask 077
+if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 4 ]; }; then
+  echo "bootstrap-secrets: needs bash >= 4.4 (macOS: brew install bash)" >&2
+  exit 1
+fi
+shopt -s inherit_errexit
 
 SOPS_VERSION="3.13.3"
+CIRCLECI_API="https://circleci.com/api/v2"
+MAIN_EXPR='pipeline.git.branch == "main"'
 die() { echo "bootstrap-secrets: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null || die "missing $1"; }
 
 check_tools() {
   need sops; need age-keygen; need jq
-  sops --version 2>/dev/null | grep -q "^sops $SOPS_VERSION" || die "need sops $SOPS_VERSION"
+  local v re_sops='^sops 3\.13\.3([[:space:]]|$)' re_age='^v?1\.3\.[0-9]+$'
+  v=$(sops --version 2>/dev/null | head -n1 || true)
+  [[ "$v" =~ $re_sops ]] || die "need sops $SOPS_VERSION (found: ${v:-none})"
+  v=$(age-keygen --version 2>/dev/null | head -n1 || true)
+  [[ "$v" =~ $re_age ]] || die "need age-keygen 1.3.x (found: ${v:-none})"
 }
 
 # Encrypt a JSON object read on stdin to the comma-separated recipients in $2; output on stdout.
@@ -48,44 +67,134 @@ self_test() (
   key=$(grep '^AGE-SECRET-KEY-' "$tdir/k")
   out=$(SOPS_AGE_KEY="$key" sops decrypt --input-type yaml --output-type json /dev/stdin < "$tdir/t.yaml" | jq -r .T)
   [ "$out" = "self-test-value" ] || die "self-test: round trip failed"
-  echo "self-test ok (sops $SOPS_VERSION, age)"
+  echo "self-test ok (sops $SOPS_VERSION, age-keygen $(age-keygen --version))"
 )
 
-store_github() { # repo env ; private key on stdin
-  local custom
-  # An existing environment keeps its reviewers; it must already use custom branch policies.
-  if custom=$(gh api "repos/$1/environments/$2" --jq '.deployment_branch_policy.custom_branch_policies' 2>/dev/null) \
-    && [ -n "$custom" ]; then
-    [ "$custom" = true ] || die "environment $2 in $1 exists without a custom branch rule; set 'Selected branches' first"
+# --- GitHub ---------------------------------------------------------------------------------
+
+# gh_get PATH: body on stdout; returns 4 on HTTP 404; any other error ends the script.
+gh_get() {
+  local out rc=0
+  out=$(gh api "$1" 2>"$TMPD/gh.err" </dev/null) || rc=$?
+  if [ "$rc" -eq 0 ]; then printf '%s' "$out"; return 0; fi
+  if grep -q '(HTTP 404)' "$TMPD/gh.err"; then return 4; fi
+  die "gh api $1 failed: $(head -n1 "$TMPD/gh.err")"
+}
+
+# preflight_github REPO ENV: prints absent | needs-main | ready. Read-only.
+preflight_github() {
+  local body rc=0 pol names total secrets
+  body=$(gh_get "repos/$1/environments/$2") || rc=$?
+  if [ "$rc" -eq 4 ]; then echo absent; return 0; fi
+  [ "$rc" -eq 0 ] || exit 1
+  [ "$(jq -r '.deployment_branch_policy.protected_branches' <<<"$body")" = false ] &&
+    [ "$(jq -r '.deployment_branch_policy.custom_branch_policies' <<<"$body")" = true ] ||
+    die "environment $2 in $1 must use 'Selected branches and tags' (not all branches, not protected branches)"
+  pol=$(gh_get "repos/$1/environments/$2/deployment-branch-policies?per_page=100") || exit 1
+  total=$(jq -r '.total_count' <<<"$pol")
+  [ "$total" -le 100 ] || die "environment $2 in $1 has $total deployment policies; expected only branch main"
+  names=$(jq -r '.branch_policies[] | "\(.type // "branch") \(.name)"' <<<"$pol" | sort | paste -sd, -)
+  secrets=$(gh secret list --env "$2" --repo "$1" --json name </dev/null) || die "gh secret list for $1/$2 failed"
+  if [ "$(jq -r 'any(.[]; .name == "SOPS_AGE_KEY")' <<<"$secrets")" = true ] && [ "$ROTATE" != 1 ]; then
+    die "$1 environment $2 already has SOPS_AGE_KEY; refusing to replace it without --rotate"
+  fi
+  case "$names" in
+    "") echo needs-main ;;
+    "branch main") echo ready ;;
+    *) die "environment $2 in $1 allows '$names'; it must allow exactly branch main" ;;
+  esac
+}
+
+# setup_github REPO ENV STATE: create the environment and its main-only rule if needed.
+setup_github() {
+  if [ "$3" = absent ]; then
+    jq -cn '{deployment_branch_policy: {protected_branches: false, custom_branch_policies: true}}' |
+      gh api -X PUT "repos/$1/environments/$2" --input - >/dev/null
+  fi
+  if [ "$3" != ready ]; then
+    gh api -X POST "repos/$1/environments/$2/deployment-branch-policies" -f name=main -f type=branch </dev/null >/dev/null
+  fi
+}
+
+# --- CircleCI -------------------------------------------------------------------------------
+
+cci() { # METHOD PATH; request body on stdin unless GET
+  if [ "$1" = GET ]; then
+    curl -fsS "$CIRCLECI_API/$2" --header @<(printf 'Circle-Token: %s\n' "$CIRCLECI_TOKEN") </dev/null
   else
-    gh api -X PUT "repos/$1/environments/$2" --input - >/dev/null <<'JSON'
-{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
-JSON
+    curl -fsS -X "$1" "$CIRCLECI_API/$2" -H 'Content-Type: application/json' \
+      --header @<(printf 'Circle-Token: %s\n' "$CIRCLECI_TOKEN") --data-binary @-
   fi
-  gh api "repos/$1/environments/$2/deployment-branch-policies" --jq '.branch_policies[].name' 2>/dev/null \
-    | grep -qx main || gh api -X POST "repos/$1/environments/$2/deployment-branch-policies" -f name=main -f type=branch >/dev/null
-  gh secret set SOPS_AGE_KEY --env "$2" --repo "$1"
 }
 
-circleci_api() { # method path ; body on stdin
-  curl -fsS -X "$1" "https://circleci.com/api/v2/$2" -H 'Content-Type: application/json' \
-    --header @<(printf 'Circle-Token: %s\n' "$CIRCLECI_TOKEN") --data @-
+cci_items() { # PATH: every item of every page, one JSON object per line
+  local sep='?' tok="" body
+  case "$1" in *\?*) sep='&' ;; esac
+  while :; do
+    if [ -n "$tok" ]; then body=$(cci GET "$1${sep}page-token=$tok"); else body=$(cci GET "$1"); fi
+    jq -c '.items[]?' <<<"$body"
+    tok=$(jq -r '.next_page_token // empty' <<<"$body")
+    [ -n "$tok" ] || break
+  done
 }
 
-store_circleci() { # context-name ; private key on stdin
-  [ -n "${CIRCLECI_TOKEN:-}" ] && [ -n "${CIRCLECI_ORG_ID:-}" ] || die "set CIRCLECI_TOKEN and CIRCLECI_ORG_ID"
+# preflight_circleci CONTEXT-NAME: prints the context id or "absent". Read-only.
+preflight_circleci() {
   local id
-  id=$(curl -fsS "https://circleci.com/api/v2/context?owner-id=$CIRCLECI_ORG_ID" \
-    --header @<(printf 'Circle-Token: %s\n' "$CIRCLECI_TOKEN") | jq -r --arg n "$1" '.items[] | select(.name==$n) | .id')
-  if [ -z "$id" ]; then
-    id=$(jq -n --arg n "$1" --arg o "$CIRCLECI_ORG_ID" '{name:$n, owner:{id:$o, type:"organization"}}' \
-      | circleci_api POST context | jq -r .id)
+  id=$(cci_items "context?owner-id=$CIRCLECI_ORG_ID" | jq -r --arg n "$1" 'select(.name == $n) | .id' | head -n1)
+  if [ -z "$id" ]; then echo absent; return 0; fi
+  local vars has
+  # Not inside a condition: errexit must stay on, so a failed lookup ends the run.
+  vars=$(cci_items "context/$id/environment-variable")
+  has=$(jq -s 'any(.[]; .variable == "SOPS_AGE_KEY")' <<<"$vars")
+  if [ "$has" = true ] && [ "$ROTATE" != 1 ]; then
+    die "CircleCI context $1 already has SOPS_AGE_KEY; refusing to replace it without --rotate"
   fi
-  jq -Rs '{value: .}' | circleci_api PUT "context/$id/environment-variable/SOPS_AGE_KEY" >/dev/null
+  echo "$id"
 }
+
+restrictions() { # ID: sorted "type value" lines of every restriction on the context
+  local body
+  body=$(cci GET "context/$1/restrictions")
+  jq -r '(.items // .restrictions // [])[] | "\(.restriction_type) \(.restriction_value)"' <<<"$body" | sort
+}
+
+# setup_circleci NAME ID PROJECT-ID: create the context if needed, apply and read back both
+# restrictions; prints the context id.
+setup_circleci() {
+  local id=$2
+  if [ "$id" = absent ]; then
+    id=$(jq -cn --arg n "$1" --arg o "$CIRCLECI_ORG_ID" '{name: $n, owner: {id: $o, type: "organization"}}' |
+      cci POST context | jq -r '.id // empty')
+    [ -n "$id" ] || die "could not create CircleCI context $1"
+  fi
+  local want have
+  want=$(printf '%s\n' "expression $MAIN_EXPR" "project $3" | sort)
+  have=$(restrictions "$id")
+  # Restrictions of one type are OR'd: any other restriction would widen access, so refuse it.
+  while IFS= read -r line; do
+    [ -z "$line" ] || grep -qxF -- "$line" <<<"$want" ||
+      die "context $1 has an extra restriction '$line'; it must have exactly the project and main-branch restrictions. No key was stored"
+  done <<<"$have"
+  if ! grep -qxF -- "project $3" <<<"$have"; then
+    jq -cn --arg p "$3" '{project_id: $p, restriction_type: "project", restriction_value: $p}' |
+      cci POST "context/$id/restrictions" >/dev/null
+  fi
+  if ! grep -qxF -- "expression $MAIN_EXPR" <<<"$have"; then
+    jq -cn --arg e "$MAIN_EXPR" '{restriction_type: "expression", restriction_value: $e}' |
+      cci POST "context/$id/restrictions" >/dev/null
+  fi
+  have=$(restrictions "$id")
+  [ "$have" = "$want" ] ||
+    die "context $1 does not show exactly the project and main-branch restrictions; no key was stored. Fix them in Organization settings > Contexts and re-run"
+  echo "$id"
+}
+
+# --- main -----------------------------------------------------------------------------------
 
 main() {
   local dir="" push=0 owners=() consumers=() bundles=()
+  ROTATE=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --self-test) self_test; return ;;
@@ -94,79 +203,188 @@ main() {
       --consumer) consumers+=("$2"); shift ;;
       --bundle) bundles+=("$2"); shift ;;
       --push) push=1 ;;
+      --rotate) ROTATE=1 ;;
       *) die "unknown argument $1" ;;
     esac
     shift
   done
+
+  # Phase 1: validate.
   [ -d "$dir/.git" ] || die "--secrets-dir must be a clone of the secrets repo"
   [ ${#owners[@]} -ge 1 ] || die "need at least one --owner-pub"
   [ ${#consumers[@]} -ge 1 ] || die "need at least one --consumer"
+  [ ${#bundles[@]} -ge 1 ] || die "need at least one --bundle"
+  local o re_pub='^age1[02-9ac-hj-np-z]{58}$'
+  for o in "${owners[@]}"; do
+    case "$o" in AGE-SECRET-KEY-*) die "--owner-pub got a PRIVATE key; pass the age1... public key (age-keygen -y)" ;; esac
+    [[ "$o" =~ $re_pub ]] || die "--owner-pub is not an age public key (expected age1 + 58 characters)"
+  done
   check_tools; need gh; self_test >/dev/null
+  TMPD=$(mktemp -d); trap 'rm -rf "$TMPD"' EXIT
 
-  local exp access pubs=() c repo env prov name key pub i
-  exp=$(expires_date)
-  access="version = 1"$'\n'
-  for i in "${!owners[@]}"; do
-    case "${owners[$i]}" in age1*) ;; *) die "--owner-pub must be an age1 public key" ;; esac
-    access+=$'\n'"[[recipient]]"$'\n'"name = \"owner-$((i + 1))\""$'\n'"kind = \"human\""$'\n'"age = \"${owners[$i]}\""$'\n'"expires = \"$exp\""$'\n'
-  done
+  local c repo env prov proj name i n
+  local -a c_repo=() c_env=() c_prov=() c_proj=() c_name=() c_state=()
   for c in "${consumers[@]}"; do
-    IFS=: read -r repo env prov <<<"$c"
-    [[ "$repo" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ && "$env" =~ ^[a-z0-9-]+$ && "$prov" =~ ^(github|circleci)$ ]] \
-      || die "bad --consumer $c"
+    IFS=: read -r repo env prov proj <<<"$c"
+    [[ "$repo" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ && "$env" =~ ^[a-z0-9-]+$ ]] || die "bad --consumer $c"
+    case "$prov" in
+      github) [ -z "$proj" ] || die "bad --consumer $c (github takes no project id)" ;;
+      circleci)
+        [[ "$proj" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] ||
+          die "bad --consumer $c (circleci needs :<project-id>, a UUID from Project settings > Overview)"
+        [ -n "${CIRCLECI_TOKEN:-}" ] && [ -n "${CIRCLECI_ORG_ID:-}" ] || die "set CIRCLECI_TOKEN and CIRCLECI_ORG_ID"
+        need curl ;;
+      *) die "bad --consumer $c (provider must be github or circleci)" ;;
+    esac
     name="${repo#*/}-$env"
-    key=$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')
-    pub=$(printf '%s\n' "$key" | age-keygen -y)
-    if [ "$prov" = github ]; then printf '%s' "$key" | store_github "$repo" "$env"
-    else printf '%s' "$key" | store_circleci "$name"; fi
-    key=""
-    pubs+=("$env $name $pub")
-    access+=$'\n'"[[recipient]]"$'\n'"name = \"$name\""$'\n'"kind = \"ci\""$'\n'"repo = \"$repo\""$'\n'"env = \"$env\""$'\n'"provider = \"$prov\""$'\n'"age = \"$pub\""$'\n'"expires = \"$exp\""$'\n'
+    for i in "${!c_name[@]}"; do [ "${c_name[$i]}" != "$name" ] || die "duplicate consumer $name"; done
+    c_repo+=("$repo"); c_env+=("$env"); c_prov+=("$prov"); c_proj+=("$proj"); c_name+=("$name")
   done
 
-  # One rule per bundle file: recipients = owner keys + the named consumers (default: every
-  # consumer of that env). A consumer never gets a file of another env.
-  local sops_yaml="creation_rules:" b spec only path keys e names recips p k val json
+  local b spec only path keys e k members repos found
+  local -a b_path=() b_keys=() b_members=()
   for b in "${bundles[@]}"; do
-    spec=${b%%@*}; only=""; [ "$spec" != "$b" ] && only=${b#*@}
+    spec=${b%%@*}; only=""; [ "$spec" = "$b" ] || only=${b#*@}
     path=${spec%%=*}; keys=${spec#*=}; e=${path%%/*}
     [[ "$path" =~ ^[a-z0-9-]+/[a-z0-9._-]+$ && -n "$keys" && "$keys" != "$spec" ]] || die "bad --bundle $b"
-    names=$(printf '"owner-%s", ' $(seq 1 ${#owners[@]}))
-    recips=$(IFS=,; echo "${owners[*]}")
-    for p in "${pubs[@]}"; do
-      read -r pe pn pk <<<"$p"
-      [ "$pe" = "$e" ] || continue
-      if [ -n "$only" ] && [[ ",$only," != *",$pn,"* ]]; then continue; fi
-      names+="\"$pn\", "; recips+=",$pk"
+    for k in ${keys//,/ }; do [[ "$k" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "bad key $k in --bundle $b"; done
+    for path_seen in "${b_path[@]}"; do [ "$path_seen" != "$path" ] || die "duplicate --bundle $path"; done
+    members=""
+    if [ -n "$only" ]; then
+      for n in ${only//,/ }; do
+        found=""
+        for i in "${!c_name[@]}"; do
+          if [ "${c_name[$i]}" = "$n" ] && [ "${c_env[$i]}" = "$e" ]; then found=$i; fi
+        done
+        [ -n "$found" ] || die "--bundle $b names $n, which is not a consumer of env $e"
+        members+="$found "
+      done
+    else
+      repos=""
+      for i in "${!c_env[@]}"; do
+        if [ "${c_env[$i]}" = "$e" ]; then members+="$i "; repos+="${c_repo[$i]}"$'\n'; fi
+      done
+      [ -n "$members" ] || die "no consumer of env $e for bundle $path"
+      [ "$(printf '%s' "$repos" | sort -u | wc -l | tr -d ' ')" -eq 1 ] ||
+        die "env $e has consumers in several repos; name them in --bundle $path=...@<names>"
+    fi
+    b_path+=("$path"); b_keys+=("$keys"); b_members+=("$members")
+  done
+
+  # Phase 2: preflight (read-only).
+  if [ -e "$dir/access.toml" ] && [ "$ROTATE" != 1 ]; then
+    die "$dir/access.toml exists: this repo was bootstrapped already. Use hoist secrets grant, or --rotate"
+  fi
+  if [ "$ROTATE" = 1 ] && [ -e "$dir/access.toml" ]; then
+    # Every recipient of the old access.toml must be given again, or it would lose access silently.
+    local old want_names r
+    want_names=$(for i in "${!owners[@]}"; do echo "owner-$((i + 1))"; done; printf '%s\n' "${c_name[@]}")
+    old=$(awk '/^\[\[recipient\]\]/ {r=1; next} /^\[/ {r=0} r && /^name = / {gsub(/^name = "|"$/, ""); print}' "$dir/access.toml")
+    for r in $old; do
+      grep -qxF -- "$r" <<<"$want_names" ||
+        die "--rotate: recipient $r in access.toml is not given again; pass it or use hoist secrets rotate-key"
     done
-    [ "$recips" != "$(IFS=,; echo "${owners[*]}")" ] || die "no consumer of env $e for bundle $path"
-    access+=$'\n'"[[rule]]"$'\n'"path = \"$path.sops.yaml\""$'\n'"recipients = [${names%, }]"$'\n'
-    sops_yaml+=$'\n'"  - path_regex: ^${path//./\\.}\\.sops\\.yaml\$"$'\n'"    age: $recips"
+  fi
+  if [ "$ROTATE" = 1 ]; then
+    local f listed
+    while IFS= read -r f; do
+      listed=""
+      for path in "${b_path[@]}"; do if [ "./$path.sops.yaml" = "$f" ]; then listed=1; fi; done
+      [ -n "$listed" ] || die "--rotate: $f is not listed as --bundle; it would stay encrypted to old keys"
+    done < <(cd "$dir" && find . -name '*.sops.yaml' -not -path './.git/*' | sort)
+  fi
+  for i in "${!c_name[@]}"; do
+    if [ "${c_prov[$i]}" = github ]; then
+      c_state[$i]=$(preflight_github "${c_repo[$i]}" "${c_env[$i]}")
+    else
+      c_state[$i]=$(preflight_circleci "${c_name[$i]}")
+    fi
+  done
+
+  # Phase 3: collect values (memory only).
+  local -a b_json=()
+  local val json j
+  for j in "${!b_path[@]}"; do
     json="{"
-    IFS=, read -ra kk <<<"$keys"
-    for k in "${kk[@]}"; do
-      [[ "$k" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "bad key $k"
-      read -rsp "value for $path#$k: " val; echo >&2
+    for k in ${b_keys[$j]//,/ }; do
+      IFS= read -rsp "value for ${b_path[$j]}#$k (one line): " val || die "no value for ${b_path[$j]}#$k"
+      echo >&2
+      [ -n "$val" ] || die "empty value for ${b_path[$j]}#$k"
       json+="\"$k\":$(printf '%s' "$val" | jq -Rs .),"
       val=""
     done
+    b_json+=("${json%,}}")
+  done
+
+  # Phase 4a: environments and contexts (with restrictions) for every consumer, before any key.
+  for i in "${!c_name[@]}"; do
+    if [ "${c_prov[$i]}" = github ]; then
+      setup_github "${c_repo[$i]}" "${c_env[$i]}" "${c_state[$i]}"
+    else
+      c_state[$i]=$(setup_circleci "${c_name[$i]}" "${c_state[$i]}" "${c_proj[$i]}")
+    fi
+  done
+
+  # Phase 4b: one key per consumer, stored via stdin; then the files.
+  local key pub exp access sops_yaml recips names
+  local -a c_pub=()
+  exp=$(expires_date)
+  STORED=""
+  trap 'rc=$?; rm -rf "$TMPD"; if [ "$rc" -ne 0 ] && [ -n "$STORED" ]; then echo "bootstrap-secrets: keys were already stored for:$STORED; fix the error and re-run with --rotate" >&2; fi' EXIT
+  for i in "${!c_name[@]}"; do
+    key=$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')
+    pub=$(printf '%s\n' "$key" | age-keygen -y)
+    if [ "${c_prov[$i]}" = github ]; then
+      printf '%s' "$key" | gh secret set SOPS_AGE_KEY --env "${c_env[$i]}" --repo "${c_repo[$i]}"
+    else
+      printf '%s' "$key" | jq -cRs '{value: .}' |
+        cci PUT "context/${c_state[$i]}/environment-variable/SOPS_AGE_KEY" >/dev/null
+    fi
+    key=""
+    c_pub[$i]=$pub
+    STORED+=" ${c_name[$i]}"
+  done
+
+  access="version = 1"$'\n'
+  for i in "${!owners[@]}"; do
+    access+=$'\n'"[[recipient]]"$'\n'"name = \"owner-$((i + 1))\""$'\n'"kind = \"human\""$'\n'"age = \"${owners[$i]}\""$'\n'"expires = \"$exp\""$'\n'
+  done
+  for i in "${!c_name[@]}"; do
+    access+=$'\n'"[[recipient]]"$'\n'"name = \"${c_name[$i]}\""$'\n'"kind = \"ci\""$'\n'"repo = \"${c_repo[$i]}\""$'\n'"env = \"${c_env[$i]}\""$'\n'"provider = \"${c_prov[$i]}\""$'\n'"age = \"${c_pub[$i]}\""$'\n'"expires = \"$exp\""$'\n'
+  done
+  sops_yaml="creation_rules:"
+  local -a written=()
+  for j in "${!b_path[@]}"; do
+    path=${b_path[$j]}; e=${path%%/*}
+    names=$(printf '"owner-%s", ' $(seq 1 ${#owners[@]}))
+    recips=$(IFS=,; echo "${owners[*]}")
+    for i in ${b_members[$j]}; do names+="\"${c_name[$i]}\", "; recips+=",${c_pub[$i]}"; done
+    access+=$'\n'"[[rule]]"$'\n'"path = \"$path.sops.yaml\""$'\n'"recipients = [${names%, }]"$'\n'
+    sops_yaml+=$'\n'"  - path_regex: ^${path//./\\.}\\.sops\\.yaml\$"$'\n'"    age: $recips"
     mkdir -p "$dir/$e"
-    printf '%s}' "${json%,}" | encrypt_json "$path.sops.yaml" "$recips" > "$dir/$path.sops.yaml"
-    json=""
+    printf '%s' "${b_json[$j]}" | encrypt_json "$path.sops.yaml" "$recips" > "$dir/$path.sops.yaml"
+    b_json[$j]=""
+    written+=("$path.sops.yaml")
   done
   printf '%s' "$access" > "$dir/access.toml"
   printf '%s\n' "$sops_yaml" > "$dir/.sops.yaml"
 
-  if grep -rq 'AGE-SECRET-KEY-' "$dir" --exclude-dir=.git; then
-    die "a private key reached the repo dir; nothing was committed"
-  fi
+  local scan=0
+  grep -rq 'AGE-SECRET-KEY-' "$dir" --exclude-dir=.git || scan=$?
+  case "$scan" in
+    1) ;;
+    0) die "a private key reached the repo dir; nothing was committed" ;;
+    *) die "could not scan $dir for private keys (grep exit $scan); nothing was committed" ;;
+  esac
   if [ "$push" = 1 ]; then
-    git -C "$dir" add -A && git -C "$dir" commit -qm "chore: bootstrap secrets (owner)" && git -C "$dir" push -q
+    git -C "$dir" add -- access.toml .sops.yaml "${written[@]}"
+    git -C "$dir" commit -qm "chore: bootstrap secrets (owner)" -- access.toml .sops.yaml "${written[@]}"
+    git -C "$dir" push -q
   fi
   echo "--- paste into the chat (public data only) ---"
-  echo "secrets repo: $(git -C "$dir" remote get-url origin 2>/dev/null || echo "(no origin)") @ $(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "(no commit)")"
-  printf 'consumer %s\n' "${pubs[@]}"
-  (cd "$dir" && find . \( -name '*.sops.yaml' -o -name access.toml -o -name .sops.yaml \) -not -path './.git/*' | sort)
+  echo "secrets repo: $(git -C "$dir" remote get-url origin 2>/dev/null | sed -E 's#(://)[^/@]*@#\1#' || true) @ $(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "(no commit)")"
+  for i in "${!c_name[@]}"; do echo "consumer ${c_env[$i]} ${c_name[$i]} ${c_prov[$i]} ${c_pub[$i]}"; done
+  printf 'file %s\n' access.toml .sops.yaml "${written[@]}"
   echo "no private key in the repo dir: ok"
 }
 
