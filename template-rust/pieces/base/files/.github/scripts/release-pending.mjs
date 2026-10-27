@@ -6,9 +6,16 @@
 // no `version`; tags are `[release] tag_format` from hoist.toml, else `{name}@{version}` (a
 // virtual workspace); a package is pending when its tag is missing or points at HEAD.
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 /** Value of a TOML string, boolean or (single- or multi-line) array of strings; else undefined. */
 function value(v) {
@@ -124,7 +131,15 @@ function stage(target) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) {
   const [cmd, arg] = process.argv.slice(2);
   if (cmd === "detect") {
     const list = pending(packages("."), tagSha, git("rev-parse", "HEAD"));

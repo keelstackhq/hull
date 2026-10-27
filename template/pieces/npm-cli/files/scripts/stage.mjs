@@ -10,9 +10,10 @@ import {
   readdirSync,
   rmSync,
   writeFileSync,
+  realpathSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 /** npm platform-arch to Rust target triple; the single source of the platform list. */
 export const TARGETS = {
@@ -149,7 +150,15 @@ export function stage({ pkgDir, artifactsDir, outDir, repository }) {
   return written;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) {
   const args = process.argv.slice(2);
   /** @param {string} name */
   const flag = (name) => {

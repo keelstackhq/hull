@@ -1,9 +1,9 @@
 // Release plan for a pushed tag `<instance>-v<semver>`: which package to release and how.
 // Reads GITHUB_REF_NAME, prints `kind=`, `dir=`, `package=`, `bin=`, `version=`, `npm_dirs=` lines for
 // $GITHUB_OUTPUT; exit 1 with the reason on stderr when nothing may publish. Node built-ins only.
-import { readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFileSync, readdirSync, realpathSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const TAG_RE = /^(.+)-v(\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?)$/;
 
@@ -131,7 +131,15 @@ export function plan(tag, fs) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) {
   const root = process.cwd();
   const fs = {
     /** @param {string} rel */

@@ -2,9 +2,9 @@
 // and prints `rust=true` or `rust=false`. Rust is needed when an affected package (other than the
 // root `//`) has a Cargo.toml, or when a root Cargo file changed (git diff BASE...HEAD).
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const ROOT_CARGO_FILES = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"];
 
@@ -32,14 +32,22 @@ function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) main();
 {% elif "rust-tool" in pieces %}// Decides whether the Rust steps of CI run. Reads `turbo query affected --packages` JSON on stdin
 // and prints `rust=true` or `rust=false`. Rust is needed when an affected package (other than the
 // root `//`) has a Cargo.toml, or when a root Cargo file changed (git diff BASE...HEAD).
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const ROOT_CARGO_FILES = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"];
 
@@ -67,5 +75,13 @@ function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) main();
 {% endif %}
