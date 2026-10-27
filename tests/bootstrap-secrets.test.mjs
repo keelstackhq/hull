@@ -382,7 +382,7 @@ test("re-run guard: existing access.toml or stored key needs --rotate", { skip }
     noWrites(t);
     // --rotate refuses when an existing bundle is not listed again
     mkdirSync(join(t.repo, "prod"));
-    writeFileSync(join(t.repo, "prod", "old.sops.yaml"), "x: 1\n");
+    writeFileSync(join(t.repo, "prod", "old.sops.yaml"), "B: ENC[AES256_GCM,data:x,type:str]\n");
     r = t.run(["--consumer", "acme/site:prod:github", "--bundle", "prod/x=A", "--rotate"], "v\n");
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /old\.sops\.yaml is not listed/);
@@ -705,6 +705,102 @@ test("a pasted private key or an empty value is refused without echoing it", { s
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /empty value for prod\/x#A/);
     noWrites(t);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
+
+test("a failed encryption leaves no half-written bundle", { skip }, () => {
+  const t = setup();
+  try {
+    // a sops wrapper that fails only when encrypting prod/bad.sops.yaml
+    const wrap = join(t.tmp, "wrap");
+    mkdirSync(wrap);
+    const real = execFileSync("bash", ["-c", "command -v sops"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(wrap, "sops"),
+      `#!/usr/bin/env bash\ncase "$*" in *"--filename-override prod/bad.sops.yaml"*) printf 'partial'; exit 1 ;; esac\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(wrap, "sops"), 0o755);
+    t.absent("acme/site", "prod");
+    const r = spawnSync(
+      "bash",
+      [
+        SCRIPT,
+        "--secrets-dir",
+        t.repo,
+        "--owner-pub",
+        t.owner,
+        "--consumer",
+        "acme/site:prod:github",
+        "--bundle",
+        "prod/good=A",
+        "--bundle",
+        "prod/bad=B",
+      ],
+      {
+        env: {
+          ...process.env,
+          STUB: t.stub,
+          PATH: `${wrap}:${join(t.tmp, "bin")}:${process.env.PATH}`,
+        },
+        input: "a\nb\n",
+        encoding: "utf8",
+      },
+    );
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /encrypting prod\/bad\.sops\.yaml failed; that file was not changed/);
+    assert.equal(existsSync(join(t.repo, "prod", "bad.sops.yaml")), false);
+    assert.equal(existsSync(join(t.repo, "prod", "bad.sops.yaml.tmp")), false);
+    assert.doesNotMatch(r.stdout + r.stderr, /AGE-SECRET-KEY-/);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
+
+test("--rotate refuses when a listed bundle drops one of its old keys", { skip }, () => {
+  const t = setup();
+  try {
+    writeFileSync(
+      join(t.repo, "access.toml"),
+      'version = 1\n\n[[recipient]]\nname = "owner-1"\n\n[[recipient]]\nname = "site-prod"\n',
+    );
+    mkdirSync(join(t.repo, "prod"));
+    const old =
+      "A: ENC[AES256_GCM,data:x,type:str]\nB: ENC[AES256_GCM,data:y,type:str]\nsops:\n    version: 3.13.3\n";
+    writeFileSync(join(t.repo, "prod", "x.sops.yaml"), old);
+    const r = t.run(
+      ["--consumer", "acme/site:prod:github", "--bundle", "prod/x=A", "--rotate"],
+      "v\n",
+    );
+    assert.notEqual(r.status, 0);
+    assert.match(
+      r.stderr,
+      /key B of \.\/prod\/x\.sops\.yaml is not listed .*its value would be lost/,
+    );
+    assert.equal(readFileSync(join(t.repo, "prod", "x.sops.yaml"), "utf8"), old);
+    noWritesExceptAccess(t);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
+
+test("when only the push fails, the message says to run git push", { skip }, () => {
+  const t = setup();
+  try {
+    t.absent("acme/site", "prod");
+    execFileSync("git", ["-C", t.repo, "remote", "set-url", "origin", join(t.tmp, "missing.git")]);
+    const r = t.run(
+      ["--consumer", "acme/site:prod:github", "--bundle", "prod/x=A", "--push"],
+      "v\n",
+    );
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /only the push failed: run git -C ".*secrets" push/);
+    assert.doesNotMatch(r.stderr, /re-run with --rotate/);
+    const files = execFileSync("git", ["-C", t.repo, "show", "--name-only", "--format=", "HEAD"], {
+      encoding: "utf8",
+    });
+    assert.match(files, /access\.toml/);
   } finally {
     rmSync(t.tmp, { recursive: true, force: true });
   }

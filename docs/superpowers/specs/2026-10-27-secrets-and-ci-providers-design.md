@@ -585,11 +585,11 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    own head (expected yes; CAN-1 confirms `risk-check` still blocks the merge).
 12. CircleCI has no way to run a protected (default-branch) config for a PR pipeline (basis of
    keeping previews on GitHub, §8); recheck the CircleCI docs before HU-5.
-13. The CircleCI context-restriction API shape (`POST /context/{id}/restrictions` with
+13. **CAN-1 verifies:** the CircleCI context-restriction API shape (`POST /context/{id}/restrictions` with
    `restriction_type`/`restriction_value`, and the list response) as used by
    `bootstrap-secrets.sh`; the script reads the restrictions back and refuses to store the key if it
    cannot see both, so a wrong guess fails closed (then add them in the UI and re-run; no key was stored
-   for any consumer, since all environments and contexts are set up and checked before the first key).
+   for any consumer, since all environments and contexts are set up and checked before the first key). The mismatch error prints the raw API read-back, so the owner's paste shows the real shape.
 
 ## 13. Owner-only steps
 

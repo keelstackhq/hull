@@ -90,7 +90,8 @@ preflight_github() {
   [ "$(jq -r '.deployment_branch_policy.protected_branches' <<<"$body")" = false ] &&
     [ "$(jq -r '.deployment_branch_policy.custom_branch_policies' <<<"$body")" = true ] ||
     die "environment $2 in $1 must use 'Selected branches and tags' (not all branches, not protected branches)"
-  pol=$(gh_get "repos/$1/environments/$2/deployment-branch-policies?per_page=100") || exit 1
+  pol=$(gh_get "repos/$1/environments/$2/deployment-branch-policies?per_page=100") ||
+    die "could not read the deployment branch policies of environment $2 in $1"
   total=$(jq -r '.total_count' <<<"$pol")
   [ "$total" -le 100 ] || die "environment $2 in $1 has $total deployment policies; expected only branch main"
   names=$(jq -r '.branch_policies[] | "\(.type // "branch") \(.name)"' <<<"$pol" | sort | paste -sd, -)
@@ -184,9 +185,11 @@ setup_circleci() {
     jq -cn --arg e "$MAIN_EXPR" '{restriction_type: "expression", restriction_value: $e}' |
       cci POST "context/$id/restrictions" >/dev/null
   fi
-  have=$(restrictions "$id")
+  local raw
+  raw=$(cci GET "context/$id/restrictions")
+  have=$(jq -r '(.items // .restrictions // [])[] | "\(.restriction_type) \(.restriction_value)"' <<<"$raw" | sort)
   [ "$have" = "$want" ] ||
-    die "context $1 does not show exactly the project and main-branch restrictions; no key was stored. Fix them in Organization settings > Contexts and re-run"
+    die "context $1 does not show exactly the project and main-branch restrictions; no key was stored. Fix them in Organization settings > Contexts and re-run. API read-back: $(jq -c . <<<"$raw" 2>/dev/null || printf '%s' "$raw")"
   echo "$id"
 }
 
@@ -221,6 +224,7 @@ main() {
   done
   check_tools; need gh; self_test >/dev/null
   TMPD=$(mktemp -d); trap 'rm -rf "$TMPD"' EXIT
+  SECRETS_DIR=$dir
 
   local c repo env prov proj name i n
   local -a c_repo=() c_env=() c_prov=() c_proj=() c_name=() c_state=()
@@ -280,18 +284,30 @@ main() {
     local old want_names r
     want_names=$(for i in "${!owners[@]}"; do echo "owner-$((i + 1))"; done; printf '%s\n' "${c_name[@]}")
     old=$(awk '/^\[\[recipient\]\]/ {r=1; next} /^\[/ {r=0} r && /^name = / {gsub(/^name = "|"$/, ""); print}' "$dir/access.toml")
-    for r in $old; do
+    while IFS= read -r r; do
+      [ -n "$r" ] || continue
       grep -qxF -- "$r" <<<"$want_names" ||
         die "--rotate: recipient $r in access.toml is not given again; pass it or use hoist secrets rotate-key"
-    done
+    done <<<"$old"
   fi
   if [ "$ROTATE" = 1 ]; then
-    local f listed
+    local f files listed old_keys ok
+    # Not a process substitution: a failing find must end the run (errexit + pipefail).
+    files=$(cd "$dir" && find . -name '*.sops.yaml' -not -path './.git/*' | sort)
     while IFS= read -r f; do
+      [ -n "$f" ] || continue
       listed=""
-      for path in "${b_path[@]}"; do if [ "./$path.sops.yaml" = "$f" ]; then listed=1; fi; done
+      for j in "${!b_path[@]}"; do if [ "./${b_path[$j]}.sops.yaml" = "$f" ]; then listed=$j; fi; done
       [ -n "$listed" ] || die "--rotate: $f is not listed as --bundle; it would stay encrypted to old keys"
-    done < <(cd "$dir" && find . -name '*.sops.yaml' -not -path './.git/*' | sort)
+      # Key names are plaintext in sops YAML: every old key must be listed again, or its value is lost.
+      old_keys=$(awk '/^[A-Za-z_][A-Za-z0-9_]*:/ { k = $1; sub(/:$/, "", k); if (k != "sops") print k }' "$dir/$f")
+      while IFS= read -r k; do
+        [ -n "$k" ] || continue
+        ok=""
+        for kk in ${b_keys[$listed]//,/ }; do if [ "$kk" = "$k" ]; then ok=1; fi; done
+        [ -n "$ok" ] || die "--rotate: key $k of $f is not listed in --bundle ${b_path[$listed]}=...; its value would be lost"
+      done <<<"$old_keys"
+    done <<<"$files"
   fi
   for i in "${!c_name[@]}"; do
     if [ "${c_prov[$i]}" = github ]; then
@@ -330,7 +346,13 @@ main() {
   local -a c_pub=()
   exp=$(expires_date)
   STORED=""
-  trap 'rc=$?; rm -rf "$TMPD"; if [ "$rc" -ne 0 ] && [ -n "$STORED" ]; then echo "bootstrap-secrets: keys were already stored for:$STORED; fix the error and re-run with --rotate" >&2; fi' EXIT
+  STAGE=keys
+  trap 'rc=$?; rm -rf "$TMPD"
+    if [ "$rc" -ne 0 ] && [ "$STAGE" = pushing ]; then
+      echo "bootstrap-secrets: keys are stored and the files are committed; only the push failed: run git -C \"$SECRETS_DIR\" push" >&2
+    elif [ "$rc" -ne 0 ] && [ -n "$STORED" ]; then
+      echo "bootstrap-secrets: keys were already stored for:$STORED; fix the error and re-run with --rotate" >&2
+    fi' EXIT
   for i in "${!c_name[@]}"; do
     key=$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')
     pub=$(printf '%s\n' "$key" | age-keygen -y)
@@ -362,12 +384,17 @@ main() {
     access+=$'\n'"[[rule]]"$'\n'"path = \"$path.sops.yaml\""$'\n'"recipients = [${names%, }]"$'\n'
     sops_yaml+=$'\n'"  - path_regex: ^${path//./\\.}\\.sops\\.yaml\$"$'\n'"    age: $recips"
     mkdir -p "$dir/$e"
-    printf '%s' "${b_json[$j]}" | encrypt_json "$path.sops.yaml" "$recips" > "$dir/$path.sops.yaml"
+    # Temp file in the same dir, then mv: a failed encryption never leaves a half-written bundle.
+    if ! printf '%s' "${b_json[$j]}" | encrypt_json "$path.sops.yaml" "$recips" > "$dir/$path.sops.yaml.tmp"; then
+      rm -f "$dir/$path.sops.yaml.tmp"
+      die "encrypting $path.sops.yaml failed; that file was not changed"
+    fi
+    mv -f "$dir/$path.sops.yaml.tmp" "$dir/$path.sops.yaml"
     b_json[$j]=""
     written+=("$path.sops.yaml")
   done
-  printf '%s' "$access" > "$dir/access.toml"
-  printf '%s\n' "$sops_yaml" > "$dir/.sops.yaml"
+  printf '%s' "$access" > "$dir/access.toml.tmp" && mv -f "$dir/access.toml.tmp" "$dir/access.toml"
+  printf '%s\n' "$sops_yaml" > "$dir/.sops.yaml.tmp" && mv -f "$dir/.sops.yaml.tmp" "$dir/.sops.yaml"
 
   local scan=0
   grep -rq 'AGE-SECRET-KEY-' "$dir" --exclude-dir=.git || scan=$?
@@ -379,7 +406,9 @@ main() {
   if [ "$push" = 1 ]; then
     git -C "$dir" add -- access.toml .sops.yaml "${written[@]}"
     git -C "$dir" commit -qm "chore: bootstrap secrets (owner)" -- access.toml .sops.yaml "${written[@]}"
+    STAGE=pushing
     git -C "$dir" push -q
+    STAGE=done
   fi
   echo "--- paste into the chat (public data only) ---"
   echo "secrets repo: $(git -C "$dir" remote get-url origin 2>/dev/null | sed -E 's#(://)[^/@]*@#\1#' || true) @ $(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "(no commit)")"
