@@ -32,6 +32,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false # no pnpm in this job (packageManager would turn the cache on)
       - name: Is this version released yet?
         id: decide
         run: node scripts/release-tag.mjs
@@ -54,6 +55,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false # no pnpm in this job (packageManager would turn the cache on)
       - name: Tag the commit
         id: tag
         env:
