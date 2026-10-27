@@ -1,7 +1,7 @@
 // Release decision for a push to main. The version comes from the first `## v<X.Y.Z> — <rest>`
 // heading of CHANGELOG.md; `<rest>` is a date (released) or `unreleased` (accumulating).
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync, readdirSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain } from "./lib/is-main.mjs";
@@ -78,11 +78,13 @@ export function previousTag(version, remoteTags) {
   return best ? `v${best.join(".")}` : "";
 }
 
-const PIN_MARKER = "TODO(hoist-release)";
-const ZERO_PIN = /@0{40}\b/; // a placeholder commit SHA, with or without the marker
+const MARKER = /TODO\s*\(\s*hoist-release\s*\)/i;
+// A placeholder commit SHA (7+ zeros) or the literal `@<sha>`, with or without the marker.
+const PLACEHOLDER = /@\s*(?:0{7,}(?![0-9a-f])|<sha>)/i;
 
 /** Paths (relative to `root`) under template/, template-rust/ and rigging/ holding a placeholder pin. */
 export function pendingReleasePins(root) {
+  if (!existsSync(join(root, "template"))) throw new Error(`no template/ under ${root}`);
   const hits = [];
   const walk = (rel) => {
     let entries;
@@ -96,7 +98,7 @@ export function pendingReleasePins(root) {
       if (e.isDirectory()) walk(p);
       else if (e.isFile()) {
         const text = readFileSync(join(root, p), "utf8");
-        if (text.includes(PIN_MARKER) || ZERO_PIN.test(text)) hits.push(p);
+        if (MARKER.test(text) || PLACEHOLDER.test(text)) hits.push(p);
       }
     }
   };
@@ -133,7 +135,7 @@ if (isMain(import.meta.url)) {
           const pending = pendingReleasePins(root);
           if (pending.length) {
             console.error(
-              `release-tag: ${PIN_MARKER} pins block the release of ${tag}:\n${pending.join("\n")}`,
+              `release-tag: placeholder pins (TODO(hoist-release), zero SHA or @<sha>) block the release of ${tag}:\n${pending.join("\n")}`,
             );
             process.exit(1);
           }
