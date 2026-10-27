@@ -3,9 +3,8 @@
 // refuses it); such apps are skipped with a notice that names the one-time first deploy. Any other
 // failure fails the job. Never deploys production. Node built-ins only.
 import { spawn } from "node:child_process";
-import { appendFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { appendFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export const TURBO_ARGS = [
   "turbo",
@@ -60,7 +59,17 @@ export function report(log, exitCode) {
   return { ok, urls, notCreated, failed, notices, summary };
 }
 
-if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? "")).href) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) {
   const child = spawn("pnpm", TURBO_ARGS, { stdio: ["ignore", "pipe", "pipe"] });
   // One log for both streams: a garbled line can only turn a skip into a failure (fail closed).
   let log = "";

@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 // Writes docs/agents/index.md: the map of commands, packages and docs that agents load.
 // Node built-ins only. Deterministic: sorted paths, no dates, "\n" endings.
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+  realpathSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const BUDGET = 8192;
 
@@ -132,6 +140,16 @@ function main(argv) {
   writeFileSync(file, text);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) {
   main(process.argv.slice(2));
 }

@@ -4,7 +4,7 @@
 // Bash, and a default branch not named main or master. Node built-ins only.
 // Any internal error allows the call and prints one stderr line; settings deny rules stay as the
 // second layer.
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -332,4 +332,14 @@ function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+/** Entry check, fail-safe: only a different real file (an import) skips main(). */
+const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return true;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return true;
+  }
+};
+if (isMain()) main();

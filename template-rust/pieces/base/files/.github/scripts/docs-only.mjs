@@ -2,7 +2,8 @@
 // not empty and every changed path is documentation; anything else, an unknown base or a git
 // error prints `skip=false`. Node built-ins only: the runner's preinstalled node runs it.
 import { execFileSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const ZERO = /^0+$/;
 
@@ -33,7 +34,17 @@ function changed(base) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) {
   const skip = decide(changed(process.env.BASE));
   process.stdout.write(`skip=${skip}\n`);
 }

@@ -3,8 +3,8 @@
 // `//` affected, which would make docs-only PRs install everything. So root tasks are ignored here
 // and the root counts as affected only when a root config file changed (git diff BASE...HEAD).
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 // Keep in sync with the `//#format:check` inputs in turbo.json (a subset: docs and AI files are
 // formatted by `pnpm format:check` locally and in full runs, but never trigger a run alone).
@@ -48,4 +48,14 @@ function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isMain()) main();

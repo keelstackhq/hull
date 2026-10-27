@@ -286,11 +286,12 @@ test("rust-tool without rust-cli renders Cargo.toml, rust-toolchain.toml, rust-a
     await read(dir, "rust-toolchain.toml"),
     '[toolchain]\nchannel = "stable"\ncomponents = ["clippy", "rustfmt"]\n',
   );
-  // sha256 of the file rendered at 5ea2f12, before the rust-cli branch existed
+  // sha256 of the file rendered at 5ea2f12 (before the rust-cli branch existed), re-pinned for the
+  // realpath entry guard
   const sha = createHash("sha256")
     .update(await read(dir, ".github/scripts/rust-affected.mjs"))
     .digest("hex");
-  assert.equal(sha, "150e7c559d512a5456c8feaf3db3dc0ee20477467c7c7aabdc6d7cc25cb8dbee");
+  assert.equal(sha, "ba729fb9d2fe8451dd495d6db2fbf1035443f2ba6c209423a487c05e73dde09d");
   const tauri = await renderCombo(["base", "preact-app:web", "tauri-app:desktop"]);
   assert.equal(
     await read(tauri.dir, "Cargo.toml"),
