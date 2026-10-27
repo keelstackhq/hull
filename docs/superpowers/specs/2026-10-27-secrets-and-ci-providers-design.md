@@ -257,15 +257,19 @@ get `kind = "kms"` recipients; `check` treats them like `ci` recipients. Not bui
   tag (`workflow_run` runs with the default-branch ref, so `preview-deploy` passes; a workflow pushed
   on an agent's branch does not). `workflow_run`: the triggering run's head repository must be this
   repository (no fork artifacts).
-- CircleCI: accepts the default branch only. Refused when `CIRCLE_PR_REPONAME` differs from
-  `CIRCLE_PROJECT_REPONAME` (fork), when `CIRCLE_BRANCH` is not the default branch, or whenever
-  `CIRCLE_TAG` is set: every tag is refused, because releases are GitHub-only (§8). No override flag.
+- CircleCI: accepts the default branch (`main`) only. Refused when `CIRCLE_PR_REPONAME` differs
+  from `CIRCLE_PROJECT_REPONAME` (fork), when `CIRCLE_BRANCH` is not the default branch, or
+  whenever `CIRCLE_TAG` is set: every tag is refused, because releases are GitHub-only (§8). No
+  override flag.
 - Release tags are trusted only because a tag ruleset lets just the owner create `*-v*` tags
   (§0 P2); without it an agent could push a tag and reach the `release` environment.
-- **Release tag** (GitHub only): the guard accepts `<name>-v<semver>` (e.g. `cli-v1.2.0`), which is
-  a subset of the owner's `release-tags` ruleset glob `*-v*` with no `/` (GitHub's `*` does not match
-  `/`; the `release` environment rule uses the same glob). So every tag the guard accepts can only
-  have been created by the owner. Every other tag is refused (fail closed). `template-rust`'s `{name}@{version}` tags therefore never decrypt; such a repo sets
+- **Release tag** (GitHub only): the guard accepts exactly
+  `^[a-z0-9][a-z0-9._-]*-v<semver>$`, i.e. `<name>-v<semver>` with `<name>` in
+  `[a-z0-9][a-z0-9._-]*` (no `/`, no `@`), e.g. `cli-v1.2.0`. That set is a subset of the owner's
+  `release-tags` ruleset glob `*-v*` without `/` (GitHub's `*` does not match `/`; the `release`
+  environment rule uses the same glob), so every tag the guard accepts can only have been created by
+  the owner. Every other tag is refused (fail closed), e.g. `@keelstackhq/cli-v1.2.0`, `cli@1.2.0`,
+  `v1.2.0`. `template-rust`'s `{name}@{version}` tags therefore never decrypt; such a repo sets
   `[release] tag_format = "{name}-v{version}"` in its `hoist.toml` before it becomes a secrets
   consumer.
 - The guards are defence in depth; the binding controls are the environment branch rules (§5.2) and
@@ -352,9 +356,10 @@ consumer repos.
 Org context `secrets-read` (`SECRETS_READ_APP_ID`, `SECRETS_READ_APP_KEY`), project restriction
 to the consumer projects. Per environment a context `<repo>-<env>` (e.g. `keelstack-prod`) holding
 `SOPS_AGE_KEY`, with a project restriction and an expression restriction
-`pipeline.git.branch == "main"` on **every** env context (no tag pipeline ever decrypts on CircleCI). Security-group restrictions exist only for OAuth-connected orgs;
-GitHub-App orgs use project and expression restrictions (CircleCI docs, 2026). Project settings:
-build forked PRs on, pass secrets to forks **off**.
+`pipeline.git.branch == "main"` on **every** env context, i.e. the default branch (`main`) only: no
+tag pipeline ever decrypts on CircleCI. Security-group restrictions exist only for OAuth-connected
+orgs; GitHub-App orgs use project and expression restrictions (CircleCI docs, 2026). Project
+settings: build forked PRs on, pass secrets to forks **off**.
 
 ## 6. CircleCI provider
 
@@ -668,10 +673,10 @@ hull docs/superpowers/specs/2026-10-27-secrets-and-ci-providers-design.md.
 - CI decrypts only with `hoist secrets exec` (the `keelstackhq/hoist/secrets` action, the
   `secrets-run` reusable workflow, or the CircleCI `secrets-exec` command), in jobs whose workflow
   and executed code come from main, a release tag or a `workflow_run` deploying an artifact; never
-  on `pull_request`, `pull_request_target`, `issue_comment` or forks. Every GitHub environment holding
-  `SOPS_AGE_KEY` is restricted to `main` (or, for `release`, `<name>-v<semver>` tags protected by an
-  owner-only tag ruleset), every CircleCI context to `main`, and consumers pin the action by commit
-  SHA.
+  on `pull_request`, `pull_request_target`, `issue_comment` or forks. Every GitHub environment
+  holding `SOPS_AGE_KEY` is restricted to the default branch (`main`) (or, for `release`,
+  `<name>-v<semver>` tags protected by an owner-only tag ruleset), every CircleCI context to `main`,
+  and consumers pin the action by commit SHA.
 - Agents never hold an age private key or see plaintext; decrypting commands are owner- or CI-only.
   Changes to secrets.toml, .sops.yaml, access.toml, *.sops.yaml, workflows and .circleci/** are
   owner-approved (bosun R-secrets).
