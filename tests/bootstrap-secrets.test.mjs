@@ -805,3 +805,28 @@ test("when only the push fails, the message says to run git push", { skip }, () 
     rmSync(t.tmp, { recursive: true, force: true });
   }
 });
+
+for (const file of ["access.toml", ".sops.yaml"]) {
+  test(`a failed write of ${file} stops the run before any commit`, { skip }, () => {
+    const t = setup();
+    try {
+      t.absent("acme/site", "prod");
+      mkdirSync(join(t.repo, `${file}.tmp`)); // a directory: the redirect fails
+      const r = t.run(
+        ["--consumer", "acme/site:prod:github", "--bundle", "prod/x=A", "--push"],
+        "v\n",
+      );
+      assert.notEqual(r.status, 0);
+      assert.match(
+        r.stderr,
+        new RegExp(`writing ${file.replace(".", "\\.")} failed; nothing was committed`),
+      );
+      assert.equal(existsSync(join(t.repo, "access.toml")), false);
+      assert.equal(existsSync(join(t.repo, ".sops.yaml")), false);
+      const log = spawnSync("git", ["-C", t.repo, "log", "--oneline"], { encoding: "utf8" });
+      assert.notEqual(log.status, 0); // no commit at all on the fresh clone
+    } finally {
+      rmSync(t.tmp, { recursive: true, force: true });
+    }
+  });
+}

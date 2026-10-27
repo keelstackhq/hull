@@ -393,8 +393,11 @@ main() {
     b_json[$j]=""
     written+=("$path.sops.yaml")
   done
-  printf '%s' "$access" > "$dir/access.toml.tmp" && mv -f "$dir/access.toml.tmp" "$dir/access.toml"
-  printf '%s\n' "$sops_yaml" > "$dir/.sops.yaml.tmp" && mv -f "$dir/.sops.yaml.tmp" "$dir/.sops.yaml"
+  # `a && b` would hide a failed write from errexit; fail explicitly instead.
+  printf '%s' "$access" > "$dir/access.toml.tmp" || die "writing access.toml failed; nothing was committed"
+  printf '%s\n' "$sops_yaml" > "$dir/.sops.yaml.tmp" || die "writing .sops.yaml failed; nothing was committed"
+  mv -f "$dir/access.toml.tmp" "$dir/access.toml"
+  mv -f "$dir/.sops.yaml.tmp" "$dir/.sops.yaml"
 
   local scan=0
   grep -rq 'AGE-SECRET-KEY-' "$dir" --exclude-dir=.git || scan=$?
