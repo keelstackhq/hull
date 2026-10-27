@@ -830,3 +830,94 @@ for (const file of ["access.toml", ".sops.yaml"]) {
     }
   });
 }
+
+const TAG_LIST = "api repos/acme/site/rulesets?includes_parents=true&per_page=100";
+const tagRuleset = (over = {}) => ({
+  id: 7,
+  target: "tag",
+  enforcement: "active",
+  conditions: { ref_name: { include: ["refs/tags/*-v*"], exclude: [] } },
+  rules: [
+    { type: "creation" },
+    { type: "update" },
+    { type: "deletion" },
+    { type: "non_fast_forward" },
+  ],
+  ...over,
+});
+
+test("--check-rulesets passes with an active release-tag ruleset", { skip }, () => {
+  const t = setup();
+  try {
+    t.gh(
+      TAG_LIST,
+      JSON.stringify([
+        { id: 3, target: "branch", enforcement: "active" },
+        { id: 7, target: "tag", enforcement: "active" },
+      ]),
+    );
+    t.gh("api repos/acme/site/rulesets/7?includes_parents=true", JSON.stringify(tagRuleset()));
+    const r = spawnSync("bash", [SCRIPT, "--check-rulesets", "acme/site"], {
+      env: { ...process.env, STUB: t.stub, PATH: `${join(t.tmp, "bin")}:${process.env.PATH}` },
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /tag ruleset acme\/site: ok/);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
+
+for (const [label, over] of [
+  ["no creation restriction", { rules: [{ type: "update" }, { type: "deletion" }] }],
+  ["another tag pattern", { conditions: { ref_name: { include: ["refs/tags/v*"], exclude: [] } } }],
+]) {
+  test(`--check-rulesets fails with ${label}`, { skip }, () => {
+    const t = setup();
+    try {
+      t.gh(TAG_LIST, JSON.stringify([{ id: 7, target: "tag", enforcement: "active" }]));
+      t.gh(
+        "api repos/acme/site/rulesets/7?includes_parents=true",
+        JSON.stringify(tagRuleset(over)),
+      );
+      const r = spawnSync("bash", [SCRIPT, "--check-rulesets", "acme/site"], {
+        env: { ...process.env, STUB: t.stub, PATH: `${join(t.tmp, "bin")}:${process.env.PATH}` },
+        encoding: "utf8",
+      });
+      assert.notEqual(r.status, 0);
+      assert.match(r.stdout, /tag ruleset acme\/site: missing/);
+      assert.match(r.stderr, /spec §0 P2/);
+    } finally {
+      rmSync(t.tmp, { recursive: true, force: true });
+    }
+  });
+}
+
+test("--check-rulesets reports unknown when the rulesets cannot be read", { skip }, () => {
+  const t = setup();
+  try {
+    t.ghErr(TAG_LIST, "gh: Server Error (HTTP 500)\n");
+    const r = spawnSync("bash", [SCRIPT, "--check-rulesets", "acme/site"], {
+      env: { ...process.env, STUB: t.stub, PATH: `${join(t.tmp, "bin")}:${process.env.PATH}` },
+      encoding: "utf8",
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
+
+test("the bootstrap paste block reports each consumer repo's tag ruleset", { skip }, () => {
+  const t = setup();
+  try {
+    t.absent("acme/site", "prod");
+    t.gh(TAG_LIST, JSON.stringify([{ id: 7, target: "tag", enforcement: "active" }]));
+    t.gh("api repos/acme/site/rulesets/7?includes_parents=true", JSON.stringify(tagRuleset()));
+    const r = t.run(["--consumer", "acme/site:prod:github", "--bundle", "prod/x=A"], "v\n");
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /tag ruleset acme\/site: ok/);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});

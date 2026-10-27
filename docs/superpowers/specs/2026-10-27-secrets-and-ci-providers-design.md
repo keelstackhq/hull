@@ -43,7 +43,7 @@ owner runs only when adding a consumer, which is outside this implementation.
 | # | Step | Agents verify |
 |---|---|---|
 | P1 | github.com → Settings → Applications → Claude → Configure: add `secrets-shared` and `hull-canary-circleci` to the Claude GitHub App | `list_repos` lists both; `add_repo` attaches them |
-| P2 | Rulesets (repo → Settings → Rules → New branch ruleset, target default branch): `secrets-shared`: require PR + Code Owners review, block force pushes, required check `ci-ok`; `hull-canary-circleci`: require PR, block force pushes, required check `ci-ok` with source "GitHub Actions" | GitHub API `GET /repos/{r}/rulesets` (read access) shows the rules |
+| P2 | Rulesets (repo → Settings → Rules → New branch ruleset, target default branch): `secrets-shared`: require PR + Code Owners review, block force pushes, required check `ci-ok`; `hull-canary-circleci`: require PR, block force pushes, required check `ci-ok` with source "GitHub Actions". **Release-tag ruleset in every consumer repo** (`keelstack`, `hull-canary-circleci`, and each later consumer), so only the owner can create `*-v*` tags: the `exec` guard's release-tag path (§4.2) and the `release` environment's `*-v*` deployment rule assume agents can never push one. On a phone use github.com in the browser (the GitHub app has no ruleset settings; switch to the desktop site if the Rules page does not show): repo → Settings → Rules → Rulesets → New ruleset → **New tag ruleset**; Ruleset name `release-tags`; Enforcement status **Active**; Bypass list → Add bypass → **Repository admin** only; Targets → Add target → Include by pattern → `*-v*`; Rules: tick **Restrict creations**, **Restrict updates**, **Restrict deletions**, **Block force pushes** → Create. (A repo whose release workflow creates the tag itself, D-008, adds that workflow's GitHub App to the bypass list too, never a role agents hold.) | GitHub API `GET /repos/{r}/rulesets` (read access) shows the branch rules. Tag ruleset: agents read the ruleset (target `tag`, active, include `refs/tags/*-v*`, creation/update/deletion rules); the owner can confirm with `bash scripts/owner/bootstrap-secrets.sh --check-rulesets keelstackhq/keelstack keelstackhq/hull-canary-circleci` (exit 0 = ok), and the C5 paste block already shows `tag ruleset <repo>: ok/missing` per consumer repo |
 | P3 | app.circleci.com → project `hull-canary-circleci` → Project settings: Advanced → enable "dynamic config using setup workflows", "Build forked pull requests" on, "Pass secrets to builds from forked pull requests" off, "Prevent unregistered users from triggering builds" off (merge queue, §12 item 9); Triggers: PRs, default-branch pushes, "Pushes to merge queues". Organization settings → Contexts: `secrets-read` → Project restriction = the canary project (the script already restricted `hull-canary-circleci-prod`; check that both of its restrictions are listed) | CAN-1: setup+`ci-ok` runs on a PR, on `main` and on a merge-queue branch; a deploy job on a non-main branch fails with a context authorization error (the restriction works) |
 | P4 | Repo settings of `hull-canary-circleci` → Merge queue on for `main` (so CAN-1 can test §7.3) | CAN-1 queues a PR and sees `ci-ok` mirrored on the queue SHA |
 
@@ -259,6 +259,8 @@ get `kind = "kms"` recipients; `check` treats them like `ci` recipients. Not bui
   repository (no fork artifacts).
 - CircleCI: refused when `CIRCLE_PR_REPONAME` differs from `CIRCLE_PROJECT_REPONAME` (fork), or when
   `CIRCLE_BRANCH` is not the default branch and `CIRCLE_TAG` is not a release tag. No override flag.
+- Release tags are trusted only because a tag ruleset lets just the owner create `*-v*` tags
+  (§0 P2); without it an agent could push a tag and reach the `release` environment.
 - The guards are defence in depth; the binding controls are the environment branch rules (§5.2) and
   context expression restrictions (§5.3), because a branch-pushed workflow can skip hoist and read
   `SOPS_AGE_KEY` directly if its environment allows that branch.
@@ -613,6 +615,10 @@ All human steps are in §0; this list maps them to the design for reference.
    secrets; contexts with project and expression restrictions (§5.3); weekly scheduled trigger for
    desktop/nightly; a personal API token for `hoist secrets grant --provider circleci` (local only).
 7. Rulesets: unchanged names. In circleci mode set `ci-ok`'s expected source to GitHub Actions.
+   Every consumer repo gets the `release-tags` tag ruleset (§0 P2): `*-v*` tags can be created,
+   moved or deleted only by the owner (Repository admin bypass), because the `exec` release-tag path
+   and the `release` environment's `*-v*` deployment rule trust any such tag. Checked by
+   `bootstrap-secrets.sh --check-rulesets` and by agents through the rulesets API.
 8. Create the canary repo `keelstackhq/hull-canary-circleci` (circleci mode) and its CircleCI project.
 9. Tag/release: splice 0.3.0, hoist (secrets), hoard (standalone), hull (owner tags, D-008).
 10. Optional later: CircleCI namespace and orbs (§6.6); KMS recipients (§3.6).

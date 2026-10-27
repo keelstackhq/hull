@@ -15,6 +15,7 @@
 #
 # Usage:
 #   bootstrap-secrets.sh --self-test
+#   bootstrap-secrets.sh --check-rulesets OWNER/REPO...   (read-only; exit 1 if a release-tag ruleset is missing)
 #   bootstrap-secrets.sh --secrets-dir DIR --owner-pub AGE1 [--owner-pub AGE1]...
 #       --consumer OWNER/REPO:ENV:github
 #       --consumer OWNER/REPO:ENV:circleci:CIRCLECI-PROJECT-ID ...
@@ -117,6 +118,26 @@ setup_github() {
   fi
 }
 
+# tag_ruleset REPO: prints ok | missing | unknown. "ok" = an active tag ruleset (the repo's own or
+# an inherited org one) whose include list has refs/tags/*-v* (or ~ALL) and that restricts tag
+# creation, update and deletion, so only its bypass actors (the owner) can create release tags.
+tag_ruleset() {
+  local list ids id r
+  if ! list=$(gh_get "repos/$1/rulesets?includes_parents=true&per_page=100"); then echo unknown; return 0; fi
+  ids=$(jq -r '.[] | select(.target == "tag" and .enforcement == "active") | .id' <<<"$list")
+  for id in $ids; do
+    r=$(gh_get "repos/$1/rulesets/$id?includes_parents=true") || continue
+    if jq -e '
+      ((.conditions.ref_name.include // []) | any(. == "refs/tags/*-v*" or . == "~ALL"))
+      and ([.rules[]?.type] | (index("creation") != null and index("update") != null and index("deletion") != null))
+    ' <<<"$r" >/dev/null; then
+      echo ok
+      return 0
+    fi
+  done
+  echo missing
+}
+
 # --- CircleCI -------------------------------------------------------------------------------
 
 cci() { # METHOD PATH; request body on stdin unless GET
@@ -201,6 +222,20 @@ main() {
   while [ $# -gt 0 ]; do
     case "$1" in
       --self-test) self_test; return ;;
+      --check-rulesets)
+        # Read-only: every repo after the flag must have the release-tag ruleset (§0 P2).
+        shift
+        [ $# -ge 1 ] || die "--check-rulesets needs OWNER/REPO arguments"
+        need gh; need jq
+        TMPD=$(mktemp -d); trap 'rm -rf "$TMPD"' EXIT
+        local bad=0 st
+        for repo in "$@"; do
+          st=$(tag_ruleset "$repo")
+          echo "tag ruleset $repo: $st"
+          [ "$st" = ok ] || bad=1
+        done
+        [ "$bad" = 0 ] || die "release-tag ruleset missing or unreadable; see spec §0 P2"
+        return ;;
       --secrets-dir) dir=$2; shift ;;
       --owner-pub) owners+=("$2"); shift ;;
       --consumer) consumers+=("$2"); shift ;;
@@ -416,6 +451,10 @@ main() {
   echo "--- paste into the chat (public data only) ---"
   echo "secrets repo: $(git -C "$dir" remote get-url origin 2>/dev/null | sed -E 's#(://)[^/@]*@#\1#' || true) @ $(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "(no commit)")"
   for i in "${!c_name[@]}"; do echo "consumer ${c_env[$i]} ${c_name[$i]} ${c_prov[$i]} ${c_pub[$i]}"; done
+  # Informational here (P2 may come after C5); --check-rulesets fails when one is missing.
+  printf '%s\n' "${c_repo[@]}" | sort -u | while IFS= read -r repo; do
+    echo "tag ruleset $repo: $(tag_ruleset "$repo") (needed before any release; spec §0 P2)"
+  done
   printf 'file %s\n' access.toml .sops.yaml "${written[@]}"
   echo "no private key in the repo dir: ok"
 }
