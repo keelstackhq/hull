@@ -830,3 +830,137 @@ for (const file of ["access.toml", ".sops.yaml"]) {
     }
   });
 }
+
+const TAG_LIST = "api repos/acme/site/rulesets?includes_parents=true&per_page=100";
+const TAG_DETAIL = "api repos/acme/site/rulesets/7?includes_parents=true";
+const ADMIN = { actor_type: "RepositoryRole", actor_id: 5, bypass_mode: "always" };
+const tagRuleset = (over = {}) => ({
+  id: 7,
+  target: "tag",
+  enforcement: "active",
+  conditions: { ref_name: { include: ["refs/tags/*-v*"], exclude: [] } },
+  rules: [
+    { type: "creation" },
+    { type: "update" },
+    { type: "deletion" },
+    { type: "non_fast_forward" },
+  ],
+  bypass_actors: [ADMIN],
+  ...over,
+});
+
+// --check-rulesets needs only gh and jq: a stub gh, no sops/age.
+function checkRulesets(list, detail, extra = []) {
+  const tmp = mkdtempSync(join(tmpdir(), "rules-"));
+  try {
+    const bin = join(tmp, "bin");
+    const stub = join(tmp, "stub");
+    mkdirSync(bin);
+    mkdirSync(join(stub, "resp"), { recursive: true });
+    writeFileSync(join(bin, "gh"), GH);
+    chmodSync(join(bin, "gh"), 0o755);
+    if (list instanceof Error)
+      writeFileSync(join(stub, "resp", `${keyOf(TAG_LIST)}.err`), list.message);
+    else
+      writeFileSync(
+        join(stub, "resp", keyOf(TAG_LIST)),
+        typeof list === "string" ? list : JSON.stringify(list),
+      );
+    if (detail) writeFileSync(join(stub, "resp", keyOf(TAG_DETAIL)), JSON.stringify(detail));
+    return spawnSync("bash", [SCRIPT, "--check-rulesets", ...extra, "acme/site"], {
+      env: { ...process.env, STUB: stub, PATH: `${bin}:${process.env.PATH}` },
+      encoding: "utf8",
+    });
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+const LIST = [
+  { id: 3, target: "branch", enforcement: "active" },
+  { id: 7, target: "tag", enforcement: "active" },
+];
+
+test("--check-rulesets passes with an active, admin-only release-tag ruleset", () => {
+  const r = checkRulesets(LIST, tagRuleset());
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /tag ruleset acme\/site: ok/);
+});
+
+for (const [label, over] of [
+  ["no creation restriction", { rules: [{ type: "update" }, { type: "deletion" }] }],
+  ["another tag pattern", { conditions: { ref_name: { include: ["refs/tags/v*"], exclude: [] } } }],
+  [
+    "*-v* minus an exclude",
+    { conditions: { ref_name: { include: ["refs/tags/*-v*"], exclude: ["refs/tags/cli-v*"] } } },
+  ],
+  [
+    "~ALL minus *-v*",
+    { conditions: { ref_name: { include: ["~ALL"], exclude: ["refs/tags/*-v*"] } } },
+  ],
+  [
+    "a Write-role bypass",
+    { bypass_actors: [ADMIN, { actor_type: "RepositoryRole", actor_id: 4 }] },
+  ],
+  [
+    "an app bypass that was not allowed",
+    { bypass_actors: [ADMIN, { actor_type: "Integration", actor_id: 4242 }] },
+  ],
+  ["a team bypass", { bypass_actors: [{ actor_type: "Team", actor_id: 9 }] }],
+  ["an inactive ruleset", { enforcement: "evaluate" }],
+]) {
+  test(`--check-rulesets fails with ${label}`, () => {
+    const list = over.enforcement
+      ? [{ id: 7, target: "tag", enforcement: over.enforcement }]
+      : LIST;
+    const r = checkRulesets(list, tagRuleset(over));
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /tag ruleset acme\/site: missing/);
+    assert.match(r.stderr, /spec §0 P2/);
+  });
+}
+
+test("--check-rulesets accepts an app bypass only with --allow-app", () => {
+  const ruleset = tagRuleset({
+    bypass_actors: [ADMIN, { actor_type: "Integration", actor_id: 4242 }],
+  });
+  const r = checkRulesets(LIST, ruleset, ["--allow-app", "4242"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /tag ruleset acme\/site: ok/);
+  const bad = checkRulesets(LIST, ruleset, ["--allow-app", "abc"]);
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /numeric GitHub App id/);
+});
+
+test("--check-rulesets fails closed as unknown", () => {
+  // bypass list hidden from a non-admin caller
+  const { bypass_actors: _hidden, ...noBypass } = tagRuleset();
+  let r = checkRulesets(LIST, noBypass);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  assert.match(r.stderr, /bypass list not visible/);
+  // API error
+  r = checkRulesets(new Error("gh: Server Error (HTTP 500)\n"));
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  // a response that is not a JSON array: no raw jq error
+  for (const body of ['{"message":"Upgrade to GitHub Pro"}', "not json"]) {
+    r = checkRulesets(body);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+    assert.doesNotMatch(r.stderr, /jq: error/);
+  }
+});
+
+test("the bootstrap paste block reports each consumer repo's tag ruleset quietly", { skip }, () => {
+  const t = setup();
+  try {
+    t.absent("acme/site", "prod");
+    t.ghErr(TAG_LIST, "gh: Server Error (HTTP 500)\n");
+    const r = t.run(["--consumer", "acme/site:prod:github", "--bundle", "prod/x=A"], "v\n");
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /tag ruleset acme\/site: unknown \(info only/);
+    assert.doesNotMatch(r.stderr, /HTTP 500/);
+  } finally {
+    rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
