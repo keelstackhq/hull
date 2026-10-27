@@ -133,8 +133,10 @@ function stage(target) {
 
 /** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
 const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
   try {
-    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
   } catch {
     return false;
   }

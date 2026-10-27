@@ -334,8 +334,10 @@ function main() {
 
 /** Entry check, fail-safe: only a different real file (an import) skips main(). */
 const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return true;
   try {
-    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
   } catch {
     return true;
   }

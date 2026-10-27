@@ -291,7 +291,7 @@ test("rust-tool without rust-cli renders Cargo.toml, rust-toolchain.toml, rust-a
   const sha = createHash("sha256")
     .update(await read(dir, ".github/scripts/rust-affected.mjs"))
     .digest("hex");
-  assert.equal(sha, "f2e9bcc52c62d7a37698c6be91ff3d95acb546b65f2612c59844e6b7b8316efa");
+  assert.equal(sha, "ba729fb9d2fe8451dd495d6db2fbf1035443f2ba6c209423a487c05e73dde09d");
   const tauri = await renderCombo(["base", "preact-app:web", "tauri-app:desktop"]);
   assert.equal(
     await read(tauri.dir, "Cargo.toml"),
