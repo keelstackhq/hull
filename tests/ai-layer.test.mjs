@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { loadCombos } from "../scripts/lib/combos.mjs";
 import { REAL_TEMPLATE, lineCount, renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -15,7 +16,7 @@ const AGENTS_LIST = [
   ["reviewer", "reviewer.md"],
   ["ci-fixer", "ci-fixer.md"],
 ];
-const combosJson = JSON.parse(readFileSync(new URL("../scripts/combos.json", import.meta.url)));
+const combosJson = loadCombos();
 const COMBOS = [
   ...combosJson.combos.filter((c) => !c.scheduled && !c.template).map((c) => c.pieces),
   ["base", "docs"],

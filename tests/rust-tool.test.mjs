@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import YAML from "yaml";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
+import { loadCombos } from "../scripts/lib/combos.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
 import { assertSameBranches } from "./invariants.mjs";
@@ -189,7 +190,7 @@ test("base AGENTS.md lists rust-tool; AGENTS + CLAUDE stay within 80 lines", asy
 });
 
 test("site combo includes rust-tool", async () => {
-  const combos = JSON.parse(await readFile(new URL("../scripts/combos.json", import.meta.url)));
+  const combos = loadCombos();
   assert.ok(combos.combos.find((c) => c.name === "site").pieces.includes("rust-tool:tool"));
 });
 

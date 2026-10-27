@@ -1,0 +1,1 @@
+{ "name": "desktop", "pieces": ["base", "preact-app:web", "tauri-app:desktop"], "scheduled": true }

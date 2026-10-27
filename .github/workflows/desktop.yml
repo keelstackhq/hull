@@ -23,7 +23,7 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
       - name: Render the desktop combo
         run: |
-          args=$(node -e 'const { vars, combos } = JSON.parse(require("fs").readFileSync("scripts/combos.json", "utf8")); const c = combos.find((x) => x.name === "desktop"); process.stdout.write([...c.pieces.map((p) => "--piece " + p), ...Object.entries(vars).map(([k, v]) => "--data " + k + "=" + v)].join(" "))')
+          args=$(node -e 'import("./scripts/lib/combos.mjs").then(({ loadCombos }) => { const { vars, combos } = loadCombos(); const c = combos.find((x) => x.name === "desktop"); process.stdout.write([...c.pieces.map((p) => "--piece " + p), ...Object.entries(vars).map(([k, v]) => "--data " + k + "=" + v)].join(" ")) })')
           node scripts/render.mjs new --template template --out "$RUNNER_TEMP/desktop" $args
       - name: Install Tauri system packages
         run: |

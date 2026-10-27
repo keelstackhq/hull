@@ -9,12 +9,11 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { snapshotTemplate, spliceNewArgs } from "../scripts/lib/splice.mjs";
 import { renderNew } from "../scripts/render.mjs";
-import { comboTemplate, comboVars } from "../scripts/lib/combos.mjs";
+import { comboTemplate, comboVars, loadCombos } from "../scripts/lib/combos.mjs";
 
 const BIN = process.env.SPLICE_BIN;
 const skip = BIN ? false : "SPLICE_BIN is unset (hull CI sets it; see scripts/lib/splice.mjs)";
 const TEMPLATE = fileURLToPath(new URL("../template", import.meta.url));
-const COMBOS = new URL("../scripts/combos.json", import.meta.url);
 
 /** relative path → sha256 and exec bit, without `.splice/` and `.git/` (splice runs `git init`). */
 async function tree(dir) {
@@ -36,7 +35,7 @@ const splice = (args) => spawnSync(BIN, args, { encoding: "utf8" });
 test("splice and the dev renderer produce identical trees for every combo", { skip }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "hull-parity-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const { vars, combos } = JSON.parse(await readFile(COMBOS, "utf8"));
+  const { vars, combos } = loadCombos();
   const sources = new Map();
   for (const c of combos) {
     const template = fileURLToPath(new URL(`../${comboTemplate(c)}`, import.meta.url));

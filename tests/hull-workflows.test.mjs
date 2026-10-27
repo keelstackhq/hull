@@ -18,7 +18,10 @@ test("hull's own workflows are valid YAML with jobs", async () => {
 });
 
 const hullCi = async () => YAML.parse(await readFile(DIR + "ci.yml", "utf8")).jobs.ci.steps;
-const combosJson = () => readFile(new URL("../scripts/combos.json", import.meta.url), "utf8");
+const combosJson = async () => {
+  const { loadCombos } = await import("../scripts/lib/combos.mjs");
+  return JSON.stringify(loadCombos());
+};
 
 test("hull ci.yml Rust condition matches rust-tool and rust-cli combos only", async () => {
   const step = (await hullCi()).find((s) => s.id === "rust");

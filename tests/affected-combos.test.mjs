@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { affectedCombos } from "../scripts/affected-combos.mjs";
+import { loadCombos } from "../scripts/lib/combos.mjs";
 
 const combos = [
   { name: "base", pieces: ["base"] },
@@ -17,15 +17,13 @@ test("base change selects all", () =>
   assert.deepEqual(affectedCombos(["template/pieces/base/files/a"], combos), ["base", "web"]));
 
 test("rust-cli, npm-cli and ts-lib changes select the cli and lib combos", () => {
-  const real = JSON.parse(
-    readFileSync(new URL("../scripts/combos.json", import.meta.url), "utf8"),
-  ).combos;
+  const real = loadCombos().combos;
   assert.deepEqual(affectedCombos(["template/pieces/rust-cli/files/x"], real), ["cli"]);
   assert.deepEqual(affectedCombos(["template/pieces/npm-cli/files/x"], real), ["cli"]);
   assert.deepEqual(affectedCombos(["template/pieces/ts-lib/files/x"], real), ["lib"]);
   assert.deepEqual(
     affectedCombos(["template/pieces/base/files/.github/workflows/release.yml"], real),
-    ["base", "web", "site", "docs", "cli", "lib"],
+    ["base", "cli", "docs", "lib", "site", "web"],
   );
 });
 
@@ -34,7 +32,8 @@ test("renderer, manifest, workflow and root package changes select all", () => {
     "scripts/render.mjs",
     "scripts/lib/plan.mjs",
     "scripts/dogfood.mjs",
-    "scripts/combos.json",
+    "scripts/combos/web.json",
+    "scripts/combos/_vars.json",
     "template/splice.toml",
     "package.json",
     "pnpm-lock.yaml",
@@ -54,7 +53,7 @@ test("other template/ files select all", () =>
   assert.deepEqual(affectedCombos(["template/README.md"], combos), ["base", "web"]));
 
 const cli = fileURLToPath(new URL("../scripts/affected-combos.mjs", import.meta.url));
-const names = JSON.parse(readFileSync(new URL("../scripts/combos.json", import.meta.url), "utf8"))
+const names = loadCombos()
   .combos.filter((c) => !c.scheduled)
   .map((c) => c.name);
 
@@ -84,9 +83,7 @@ test("scheduled combos are never selected, even for base or all-changing files",
 });
 
 test("real combos: hono-worker selects web, astro-site selects site", () => {
-  const real = JSON.parse(
-    readFileSync(fileURLToPath(new URL("../scripts/combos.json", import.meta.url)), "utf8"),
-  ).combos;
+  const real = loadCombos().combos;
   assert.deepEqual(affectedCombos(["template/pieces/hono-worker/files/x"], real), ["web"]);
   assert.deepEqual(affectedCombos(["template/pieces/astro-site/files/x"], real), ["site"]);
   assert.deepEqual(affectedCombos(["template/pieces/preact-app/files/x"], real), ["web"]);

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import YAML from "yaml";
 import { affectedCombos } from "../scripts/affected-combos.mjs";
+import { loadCombos } from "../scripts/lib/combos.mjs";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
 import { REAL_TEMPLATE, assertInstanceNotes, lineCount, renderCombo } from "./helpers.mjs";
@@ -17,7 +18,7 @@ const sha = async (file) =>
     .update(await readFile(file))
     .digest("hex");
 const PIECES = ["base", "preact-app:web", "tauri-app:desktop"];
-const combos = JSON.parse(await readFile(new URL("../scripts/combos.json", import.meta.url)));
+const combos = loadCombos();
 
 test("piece manifest", async () => {
   const p = (await loadTemplate(REAL_TEMPLATE)).pieces.get("tauri-app");
@@ -167,14 +168,14 @@ test("desktop combo is scheduled and never selected by affected-combos", () => {
   assert.deepEqual(affectedCombos(everything, combos.combos).includes("web"), true);
 });
 
-test("hull desktop.yml derives its pieces from scripts/combos.json", async () => {
+test("hull desktop.yml derives its pieces from the scripts/combos/ fragments", async () => {
   const wf = YAML.parse(
     await readFile(new URL("../.github/workflows/desktop.yml", import.meta.url), "utf8"),
   );
   assert.ok("workflow_dispatch" in wf.on);
   assert.ok(wf.on.schedule[0].cron);
   const runs = wf.jobs.desktop.steps.map((s) => s.run ?? "").join("\n");
-  assert.match(runs, /scripts\/combos\.json/);
+  assert.match(runs, /loadCombos/);
   assert.match(runs, /name === "desktop"/);
   assert.ok(!runs.includes("--piece tauri-app"), "pieces are not repeated");
   for (const p of ["libwebkit2gtk-4.1-dev", "libappindicator3-dev", "librsvg2-dev", "patchelf"])

@@ -1,0 +1,1 @@
+{ "name": "rust", "template": "template-rust", "pieces": ["base", "rust-cli:cli"], "vars": {} }

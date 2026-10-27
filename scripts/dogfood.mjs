@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { CI_TASKS, RUST_CI_STEPS } from "./lib/ci-tasks.mjs";
-import { comboTemplate, comboVars, isRustTemplate } from "./lib/combos.mjs";
+import { comboTemplate, comboVars, isRustTemplate, loadCombos } from "./lib/combos.mjs";
 import { snapshotTemplate, spliceCommand, spliceNewArgs } from "./lib/splice.mjs";
 import { renderNew } from "./render.mjs";
 
 const HULL = fileURLToPath(new URL("..", import.meta.url));
-const COMBOS = new URL("./combos.json", import.meta.url);
 
 /** The CI command every rendered combo runs (parity with generated CI). */
 export const ciCommand = () => ["pnpm", "turbo", "run", ...CI_TASKS];
@@ -109,7 +108,7 @@ function run(cmd, args, cwd, prefix = cwd.split(/[\\/]/).pop()) {
 export async function dogfood(opts) {
   const renderer = opts.renderer ?? "splice";
   if (!RENDERERS.has(renderer)) throw new Error(`unknown renderer ${renderer}; use splice or dev`);
-  const { vars, combos } = JSON.parse(await readFile(COMBOS, "utf8"));
+  const { vars, combos } = loadCombos();
   const root = resolve(opts.root ?? join(tmpdir(), "hull-dogfood"));
   const [spliceBin, ...spliceArgs] = opts.splice ?? spliceCommand();
   /** @type {Map<string, string>} template dir → splice source */

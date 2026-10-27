@@ -1,0 +1,1 @@
+{ "name": "web", "pieces": ["base", "preact-app:web", "ui-storybook", "hono-worker:api"] }
