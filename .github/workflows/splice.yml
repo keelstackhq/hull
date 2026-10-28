@@ -1,7 +1,8 @@
 name: splice
 
 # Weekly `splice update --all` (template + channels such as org decisions). Opens or refreshes
-# one PR on `splice/update`. Without SPLICE_BOT_TOKEN, github.token is used and its PRs get no CI.
+# one PR on `splice/update`. Without an App or SPLICE_BOT_TOKEN, github.token is used and its PRs
+# get no CI.
 on:
   schedule: [{ cron: "17 6 * * 1" }]
   workflow_dispatch:
@@ -12,6 +13,8 @@ permissions:
 
 jobs:
   update:
+    # Session mode: set the repo variable SPLICE_BOT=off and let an agent session open the PR.
+    if: vars.SPLICE_BOT != 'off'
     environment: splice-bot
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -19,7 +22,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: keelstackhq/splice/action@v1
+      # Optional GitHub App (vars.SPLICE_APP_CLIENT_ID, secret SPLICE_APP_KEY in this environment):
+      # its token, scoped to this repo, makes the PR run CI. Else SPLICE_BOT_TOKEN, else
+      # github.token.
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        if: vars.SPLICE_APP_CLIENT_ID != ''
+        with:
+          client-id: ${{ vars.SPLICE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SPLICE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      - uses: keelstackhq/splice/action@5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0 # v0.3.0
         with:
           scope: all
-          token: ${{ secrets.SPLICE_BOT_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || secrets.SPLICE_BOT_TOKEN || github.token }}
