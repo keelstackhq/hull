@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Start timer
         run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           filter: blob:none
@@ -46,9 +46,9 @@ jobs:
             echo "::warning::turbo query affected failed (exit $code); running everything"
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         if: steps.affected.outputs.skip != 'true'
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         if: steps.affected.outputs.skip != 'true'
         with:
           node-version-file: .node-version
@@ -57,7 +57,7 @@ jobs:
         if: steps.affected.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile --prefer-offline
       # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM
-      - uses: keelstackhq/hoard@v0
+      - uses: keelstackhq/hoard@06291684834e8d8a82b8d3f5e7c9f5677497f4e2 # v0.4.0
         if: steps.affected.outputs.skip != 'true'
       - name: Rust affected?
         id: rust
@@ -77,11 +77,11 @@ jobs:
         id: toolchain
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         with:
           key: ${{ hashFiles('rust-toolchain.toml') }}
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         if: steps.affected.outputs.skip != 'true' && steps.rust.outputs.rust == 'true'
         with:
           tool: cargo-nextest@0.9.148,cargo-deny@0.20.2

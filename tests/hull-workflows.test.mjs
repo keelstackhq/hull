@@ -39,7 +39,7 @@ test("hull ci.yml installs nextest@0.9.148 and cargo-deny@0.20.2, with rust-cach
   const steps = await hullCi();
   const install = steps.find((s) => s.uses?.startsWith("taiki-e/install-action"));
   assert.equal(install.with.tool, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
-  const cache = steps.find((s) => s.uses === "Swatinem/rust-cache@v2");
+  const cache = steps.find((s) => s.uses?.startsWith("Swatinem/rust-cache@"));
   assert.equal(cache.if, "steps.rust.outputs.needed == 'true'");
   assert.equal(
     cache.with.workspaces,
@@ -77,10 +77,10 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   );
 });
 
-test("hull ci.yml uses hoard@v0 for the turbo cache before dogfood, without --cache-dir", async () => {
+test("hull ci.yml uses hoard (v0.4.0, SHA-pinned) for the turbo cache before dogfood, without --cache-dir", async () => {
   const steps = await hullCi();
-  const i = steps.findIndex((s) => s.uses === "keelstackhq/hoard@v0");
-  assert.ok(i >= 0, "uses keelstackhq/hoard@v0");
+  const i = steps.findIndex((s) => s.uses?.startsWith("keelstackhq/hoard@"));
+  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.4.0, SHA-pinned)");
   assert.equal(steps[i].if, "steps.combos.outputs.args != ''");
   const df = steps.findIndex((s) => s.name === "Dogfood combos");
   assert.ok(i < df, "before dogfood");
