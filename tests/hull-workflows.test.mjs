@@ -65,12 +65,15 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   assert.ok(wf.on.schedule?.length, "scheduled");
   assert.ok("workflow_dispatch" in wf.on);
   assert.deepEqual(wf.permissions, { contents: "write", "pull-requests": "write" });
-  const [checkout, bot] = wf.jobs.update.steps;
+  const [checkout, , bot] = wf.jobs.update.steps;
   assert.match(checkout.uses, /^actions\/checkout@/);
   assert.equal(checkout.with["persist-credentials"], false);
   assert.equal(bot.uses, "keelstackhq/splice/action@v1");
   assert.equal(bot.with.scope, "all");
-  assert.equal(bot.with.token, "${{ secrets.SPLICE_BOT_TOKEN || github.token }}");
+  assert.equal(
+    bot.with.token,
+    "${{ steps.app.outputs.token || secrets.SPLICE_BOT_TOKEN || github.token }}",
+  );
 });
 
 test("hull ci.yml uses hoard@v0 for the turbo cache before dogfood, without --cache-dir", async () => {

@@ -1116,7 +1116,12 @@ the bosun target matrix (`cargo build --release --locked --target <t>`; each bin
 `dist/<bin>-<t>`). `publish` (environment `release`, `contents: write`, `id-token: write`) runs
 `hoist release publish --assets dist`. `prepare` runs `hoist release prepare`. Node is set up
 only in the release jobs that run hoist. The update bot `splice.yml` (owned) is the one splice's
-README gives. The generated README names the two channel adds after `splice new`:
+README gives. Token order for the bot and for `prepare`: a GitHub App token
+(`actions/create-github-app-token`, SHA-pinned, scoped to the repo; `vars.SPLICE_APP_CLIENT_ID` /
+`vars.HOIST_RELEASE_APP_CLIENT_ID` hold the App's Client ID, the key is an environment secret), else
+the PAT secret, else `github.token`, whose PRs get no CI. `vars.SPLICE_BOT == 'off'` skips the bot
+job (session mode: an agent session runs `splice update --all` and opens the PR).
+The generated README names the two channel adds after `splice new`:
 `rigging --piece claude` and `decisions//channel --track main --piece import-project` (D-004;
 its section lands in the seed `docs/agents/project.md`, which `CLAUDE.md` imports). Checked
 with splice 0.2.0 on the rendered `rust` combo on 2026-10-23: both add cleanly, `splice check`

@@ -155,12 +155,23 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      # A PR pushed with the default GITHUB_TOKEN runs no checks; the optional secret
+      # A PR pushed with the default GITHUB_TOKEN runs no checks. Either a GitHub App
+      # (vars.HOIST_RELEASE_APP_CLIENT_ID, secret HOIST_RELEASE_APP_KEY) or the secret
       # HOIST_RELEASE_TOKEN (Contents and Pull requests: write) makes the release PR run CI.
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        if: vars.HOIST_RELEASE_APP_CLIENT_ID != ''
+        with:
+          client-id: ${{ vars.HOIST_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HOIST_RELEASE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      # The checkout keeps this token in .git/config (hoist pushes the release branch with it), so
+      # every later step can read it: install nothing here beyond the pinned hoist.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.HOIST_RELEASE_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || secrets.HOIST_RELEASE_TOKEN || github.token }}
       - name: Rust toolchain (from rust-toolchain.toml)
         run: rustup toolchain install
       - uses: actions/setup-node@v5
@@ -169,4 +180,4 @@ jobs:
       - run: npm install -g "@keelstackhq/hoist@$HOIST_VERSION"
       - run: hoist release prepare
         env:
-          GH_TOKEN: ${{ secrets.HOIST_RELEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.HOIST_RELEASE_TOKEN || github.token }}
