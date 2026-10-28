@@ -46,6 +46,7 @@ test("circleci-only render has no ci.yml or desktop.yml, but release, preview an
     "preview-deploy.yml",
     "preview.yml",
     "release.yml",
+    "splice.yml",
   ]);
 });
 

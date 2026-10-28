@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import YAML from "yaml";
 import { CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
+import { comboVars, isRustTemplate, loadCombos } from "../scripts/lib/combos.mjs";
 import { renderCombo } from "./helpers.mjs";
 
 const read = (dir, rel) => readFile(join(dir, rel), "utf8");
@@ -110,12 +111,28 @@ test("package.json name is the scope", async () => {
   for (const t of CI_TASKS) assert.ok(shared.scripts[t], t);
 });
 
-test("base post: install after new, then agents-index after install on new/add/update", async () => {
+test("base post: install on new, lockfile-only refresh on update, then agents-index", async () => {
   const { loadTemplate } = await import("../scripts/lib/manifest.mjs");
   const { REAL_TEMPLATE } = await import("./helpers.mjs");
   const base = (await loadTemplate(REAL_TEMPLATE)).pieces.get("base");
   assert.deepEqual(base.post, [
     { run: "pnpm install --no-frozen-lockfile", when: ["new"] },
+    // a catalog bump arrives via the pnpm-workspace.yaml merge; the bot's PR needs a matching lockfile
+    { run: "pnpm install --lockfile-only --ignore-scripts", when: ["update"] },
     { run: "node scripts/agents-index.mjs", when: ["new", "add", "update"] },
   ]);
+});
+
+test("base owns splice.yml, rendered in every template combo incl. circleci-only", async () => {
+  const { vars, combos } = loadCombos();
+  const ts = combos.filter((c) => !isRustTemplate(c));
+  assert.ok(ts.some((c) => c.name === "web-circleci-only"));
+  const root = new URL("..", import.meta.url).pathname;
+  const want = await read(root, "template/pieces/base/files/.github/workflows/splice.yml");
+  for (const c of ts) {
+    const { dir, result } = await renderCombo(c.pieces, comboVars(c, vars));
+    const ch = result.changes.find((x) => x.path === ".github/workflows/splice.yml");
+    assert.equal(ch?.class, "owned", c.name);
+    assert.equal(await read(dir, ".github/workflows/splice.yml"), want, c.name);
+  }
 });
