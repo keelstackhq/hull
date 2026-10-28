@@ -1,0 +1,6 @@
+id = "circleci-only"
+description = "CircleCI as the only CI provider: the ci workflow leaves GitHub, a status mirror turns ci/circleci: ci-ok into the required ci-ok"
+requires = ["circleci"]
+
+[files]
+owned = [".github/workflows/circleci-status.yml"]

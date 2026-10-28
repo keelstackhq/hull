@@ -27,6 +27,12 @@ test("loadCombos returns exactly the combos hull CI renders, sorted by name", ()
       pieces: ["base", "circleci", "rust-cli:cli"],
       vars: {},
     },
+    {
+      name: "rust-circleci-only",
+      template: "template-rust",
+      pieces: ["base", "circleci", "circleci-only", "rust-cli:cli"],
+      vars: {},
+    },
     { name: "site", pieces: ["base", "astro-site:site", "rust-tool:tool"] },
     { name: "web", pieces: ["base", "preact-app:web", "ui-storybook", "hono-worker:api"] },
     { name: "web-circleci", pieces: ["base", "circleci", "preact-app:web", "hono-worker:api"] },
