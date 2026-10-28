@@ -75,6 +75,7 @@ test("mirror: job-level if filters context, non-pending state and the CircleCI b
   assert.match(cond, /github\.event\.context == 'ci\/circleci: bosun-ok'/);
   assert.match(cond, /github\.event\.state != 'pending'/);
   assert.match(cond, /github\.event\.sender\.login == 'circleci-app\[bot\]'/);
+  assert.match(cond, /github\.event\.sender\.type == 'Bot'/);
 });
 
 test("mirror: permissions are exactly statuses: write, timeout at most 2 minutes", () => {

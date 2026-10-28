@@ -17,6 +17,7 @@ jobs:
       (github.event.context == 'ci/circleci: ci-ok' || github.event.context == 'ci/circleci: bosun-ok')
       && github.event.state != 'pending'
       && github.event.sender.login == 'circleci-app[bot]'
+      && github.event.sender.type == 'Bot'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

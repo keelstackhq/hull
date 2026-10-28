@@ -4,7 +4,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CI_PLAN } from "./lib/ci-tasks.mjs";
+import { CI_PLAN, RUST_CI_PLAN } from "./lib/ci-tasks.mjs";
 import { isMain } from "./lib/is-main.mjs";
 
 export const GITHUB_CI_PATH = fileURLToPath(
@@ -13,6 +13,14 @@ export const GITHUB_CI_PATH = fileURLToPath(
 
 export const CIRCLECI_OK_PATH = fileURLToPath(
   new URL("../template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml", import.meta.url),
+);
+
+export const RUST_GITHUB_CI_PATH = fileURLToPath(
+  new URL("../template-rust/pieces/base/files/.github/workflows/ci.yml", import.meta.url),
+);
+
+export const RUST_CIRCLECI_OK_PATH = fileURLToPath(
+  new URL("../template-rust/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml", import.meta.url),
 );
 
 const header = `name: ci
@@ -75,10 +83,51 @@ export function circleciOk(plan = CI_PLAN) {
   return `executor: node\nsteps:\n${steps}`;
 }
 
+const rustHeader = `name: ci
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: \${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE: \${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+    steps:
+`;
+
+/** The `template-rust` GitHub workflow text for `RUST_CI_PLAN` (same footer as `githubCi`). */
+export function rustGithubCi(plan = RUST_CI_PLAN) {
+  const steps = plan.map((s) => `      # step: ${s.id}\n${s.github}`).join("");
+  return `${rustHeader}${steps}${footer}`;
+}
+
+/** The `template-rust` CircleCI `ci-ok` job for `RUST_CI_PLAN`. */
+export function rustCircleciOk(plan = RUST_CI_PLAN) {
+  const steps = plan.map((s) => `  # step: ${s.id}\n${s.circleci}`).join("");
+  return `executor: rust\nsteps:\n${steps}`;
+}
+
 async function main() {
   const files = [
     [GITHUB_CI_PATH, githubCiTemplate(), "ci.yml.jinja"],
     [CIRCLECI_OK_PATH, circleciOk(), "ci-ok.yml"],
+    [RUST_GITHUB_CI_PATH, rustGithubCi(), "template-rust ci.yml"],
+    [RUST_CIRCLECI_OK_PATH, rustCircleciOk(), "template-rust ci-ok.yml"],
   ];
   if (process.argv.includes("--check")) {
     for (const [path, text, name] of files) {

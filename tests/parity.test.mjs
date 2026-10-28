@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ciCommand, comboSteps } from "../scripts/dogfood.mjs";
+import { ciCommand, comboSteps, rustComboSteps } from "../scripts/dogfood.mjs";
 import { CI_PLAN, CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
 
 const base = fileURLToPath(new URL("../template/pieces/base/files/", import.meta.url));
@@ -125,4 +125,11 @@ test("cargo-nextest pin equal in template ci.yml, hull ci.yml and the renovate r
   assert.deepEqual(pins(tmpl), ["0.9.148"]);
   assert.deepEqual(pins(hull), ["0.9.148"]);
   assert.deepEqual(pins("      tool: cargo-nextest@0.9.148,cargo-deny@0.20.2\n"), ["0.9.148"]);
+});
+
+test("rustComboSteps packs and checks .circleci only with the circleci piece", () => {
+  const has = (steps) =>
+    steps.some(([c, a]) => c === "node" && a[0].endsWith("circleci-check.mjs"));
+  assert.ok(has(rustComboSteps("dev", ["base", "circleci", "rust-cli:cli"], "/d")));
+  assert.ok(!has(rustComboSteps("dev", ["base", "rust-cli:cli"], "/d")));
 });

@@ -1,0 +1,13 @@
+id = "circleci"
+description = "CircleCI as a second CI provider for Rust repos: setup config and a ci-ok job generated from the Rust CI plan"
+requires = ["base"]
+
+[files]
+owned = [
+  ".circleci/config.yml",
+  ".circleci/src/@config.yml",
+  ".circleci/src/executors/rust.yml",
+  ".circleci/src/jobs/ci-ok.yml",
+  ".circleci/src/workflows/ci.yml",
+  ".circleci/scripts/scm-base.sh",
+]
