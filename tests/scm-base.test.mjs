@@ -38,16 +38,29 @@ const scmBase = (cwd, branch, ...args) =>
     env: { ...process.env, CIRCLE_BRANCH: branch },
   }).trim();
 
-test("merge queue branch prints the sha after pr-<n>-", () => {
-  const sha = "0123456789abcdef0123456789abcdef01234567";
+test("merge queue branch prints its base sha when it is a default-branch ancestor of HEAD", () => {
+  const { dir, c1 } = repo();
+  assert.equal(scmBase(dir, `gh-readonly-queue/main/pr-12-${c1}`, "ignored"), c1);
+});
+
+test("a forged merge queue branch name cannot pick the base", () => {
   const { dir } = repo();
-  assert.equal(scmBase(dir, `gh-readonly-queue/main/pr-12-${sha}`, "ignored"), sha);
+  const head = git(dir, "rev-parse", "HEAD");
+  git(dir, "commit", "-q", "--allow-empty", "-m", "f2");
+  const f1 = head; // on feature only, not on origin/main
+  const now = git(dir, "rev-parse", "HEAD");
+  for (const sha of [now, f1, "0123456789abcdef0123456789abcdef01234567"]) {
+    assert.throws(() => scmBase(dir, `gh-readonly-queue/main/pr-12-${sha}`), `accepted ${sha}`);
+  }
 });
 
 test("default branch prints the pipeline base revision argument", () => {
   const { dir } = repo();
-  assert.equal(scmBase(dir, "main", "abc123"), "abc123");
-  assert.throws(() => scmBase(dir, "main", "abc$(id)"));
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+  assert.equal(scmBase(dir, "main", sha), sha);
+  for (const bad of ["abc$(id)", "abc123", sha.toUpperCase()]) {
+    assert.throws(() => scmBase(dir, "main", bad), `accepted ${bad}`);
+  }
 });
 
 test("default branch without a base revision compares with the parent commit", () => {
@@ -55,6 +68,13 @@ test("default branch without a base revision compares with the parent commit", (
   git(dir, "checkout", "-q", "main");
   assert.equal(scmBase(dir, "main"), c1);
   assert.equal(scmBase(dir, "main", ""), c1);
+});
+
+test("default branch with an empty base on a root commit fails", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hull-scm-base-"));
+  git(dir, "init", "-q", "-b", "main");
+  git(dir, "commit", "-q", "--allow-empty", "-m", "root");
+  assert.throws(() => scmBase(dir, "main", ""));
 });
 
 test("a merge queue branch whose suffix is not a 40-hex sha fails without echoing it", () => {
