@@ -15,5 +15,9 @@ run = "cargo generate-lockfile"
 when = ["new"]
 
 [[post]]
+run = "cargo update --workspace"
+when = ["update"]
+
+[[post]]
 run = "node scripts/agents-index.mjs"
 when = ["new", "add", "update"]
