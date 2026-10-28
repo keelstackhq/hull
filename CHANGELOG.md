@@ -56,9 +56,9 @@ Keep `unreleased` while changes accumulate.
   CircleCI `ci-ok` / `bosun-ok` as GitHub statuses), for `template/` and template-rust. Base
   `.gitignore` gains `.rust-cache-key`. CircleCI desktop builds (circleci-only with tauri-app) need
   a weekly scheduled trigger on `main` in CircleCI Project Settings → Triggers. The READMEs' CI
-  time section now covers CircleCI-only repos; README is seed, so existing repos do not get it. Rust-affected PRs
-  that change `Cargo.lock` rebuild nextest from source on CircleCI (minutes) until its release
-  checksum is verifiable.
+  time section now covers CircleCI-only repos; README is seed, so existing repos do not get it. On CircleCI,
+  cargo-nextest 0.9.148 and cargo-deny 0.20.2 come from pinned, sha256-checked release binaries,
+  checked on every run.
 - New seed `scripts/ci-extra.sh` (no-op) in both templates and a last CI step `ci-extra` on GitHub
   and CircleCI (skipped on docs-only and unaffected PRs). The base `ci` script is unchanged.
 - The docs piece pins the `keelstack` pack `@keelstackhq/docspack` 0.1.1 in `docs/packs.json`
