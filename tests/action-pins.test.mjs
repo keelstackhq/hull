@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
-import { allUses, findUses, HOIST_EXEMPT, ROOT } from "../scripts/lib/actions.mjs";
+import {
+  allUses,
+  findUses,
+  HOIST_EXEMPT,
+  renderedFiles,
+  ROOT,
+  scanYaml,
+  sourceFiles,
+} from "../scripts/lib/actions.mjs";
 
 const PINNED = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\/[^@\s]+)?@[0-9a-f]{40}$/;
 const COMMENT = /^# v\d+\.\d+\.\d+$/;
@@ -23,6 +31,40 @@ test("the stable-branch comment is accepted only for dtolnay/rust-toolchain", ()
   assert.ok(okPin(`actions/checkout@${sha}`, "# v5.1.0"));
 });
 
+/** Violations of the pin rule in a YAML string, as `ref` strings. */
+function violations(yaml) {
+  return scanYaml(yaml)
+    .filter(
+      (u) =>
+        !u.ref.startsWith("./") &&
+        !(HOIST_EXEMPT.test(u.ref) && u.comment.startsWith("# TODO(hoist-release)")) &&
+        !okPin(u.ref, u.comment),
+    )
+    .map((u) => u.ref);
+}
+
+test("scanYaml parses YAML: flow maps, reusable workflows, composite actions, quotes, comments", () => {
+  assert.deepEqual(violations("jobs:\n  a:\n    steps:\n      - { uses: evil/act@main }\n"), [
+    "evil/act@main",
+  ]);
+  assert.deepEqual(violations("jobs:\n  x:\n    uses: o/r/.github/workflows/w.yml@v1\n"), [
+    "o/r/.github/workflows/w.yml@v1",
+  ]);
+  assert.deepEqual(violations("runs:\n  using: composite\n  steps:\n    - uses: o/r@v1\n"), [
+    "o/r@v1",
+  ]);
+  assert.deepEqual(
+    violations(`jobs:\n  a:\n    steps:\n      - uses: "o/r@${sha}" # v1.2.3\n`),
+    [],
+  );
+  assert.deepEqual(violations(`jobs:\n  a:\n    steps:\n      - uses: o/r@${sha}\n`), [
+    `o/r@${sha}`,
+  ]);
+  assert.deepEqual(violations("jobs:\n  a:\n    steps:\n      - uses: ./local\n"), []);
+  const u = scanYaml(`a:\n  - uses: o/r@${sha}   # v1.2.3\n`);
+  assert.deepEqual(u, [{ line: 2, ref: `o/r@${sha}`, comment: "# v1.2.3" }]);
+});
+
 test("findUses reads plain, quoted and raw-block lines", () => {
   assert.deepEqual(findUses("      - uses: a/b@v1\n"), [{ line: 1, ref: "a/b@v1", comment: "" }]);
   assert.deepEqual(findUses('  "      - uses: a/b@v1 # v1.0.0",\n')[0], {
@@ -33,9 +75,10 @@ test("findUses reads plain, quoted and raw-block lines", () => {
   assert.equal(findUses("  statuses: write\n").length, 0);
 });
 
-test("every workflow `uses:` is a full commit SHA with a version comment", async () => {
+test("every parsed workflow/action `uses` (plain files, hull's own, rendered combos) is pinned", async () => {
   const uses = await allUses();
   assert.ok(uses.length > 60, `found ${uses.length} uses`);
+  assert.ok(uses.some((u) => u.file.startsWith("rendered:")));
   for (const u of uses) {
     const at = `${u.file}:${u.line} ${u.ref}`;
     if (u.ref.startsWith("./")) continue;
@@ -81,4 +124,19 @@ test("docs/actions.md on disk equals actionsDoc()", async () => {
   const disk = await readFile(ROOT + "docs/actions.md", "utf8");
   assert.equal(disk, await actionsDoc(), "run: pnpm docs:actions");
   assert.match(disk, /fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09/);
+});
+
+test("every template workflow/action source is exercised by a rendered combo", async () => {
+  const rendered = new Set(
+    (await renderedFiles()).flatMap((r) => r.files.map((f) => f.split("/").pop())),
+  );
+  const srcs = (await sourceFiles()).filter((f) => !f.startsWith(ROOT + ".github/"));
+  assert.ok(srcs.length > 5);
+  for (const f of srcs) {
+    const name = f
+      .split("/")
+      .pop()
+      .replace(/\.jinja$/, "");
+    assert.ok(rendered.has(name), `${f} is not rendered by any combo`);
+  }
 });

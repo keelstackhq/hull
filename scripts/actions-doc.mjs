@@ -4,16 +4,15 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { isMain } from "./lib/is-main.mjs";
-import { ROOT, findUses, walk } from "./lib/actions.mjs";
+import { ACTION, ROOT, WORKFLOW, findUses, walk } from "./lib/actions.mjs";
 
-const WORKFLOW = /(^|\/)\.github\/workflows\/[^/]+\.ya?ml(\.jinja)?$/;
 const code = (s) => `\`${s}\``;
 
 /** @param {string[]} files absolute @returns {Promise<Map<string, {ref: string, comment: string}>>} */
 async function actionsIn(files) {
   const found = new Map();
   for (const f of files) {
-    if (!WORKFLOW.test(f)) continue;
+    if (!WORKFLOW.test(f) && !ACTION.test(f)) continue;
     for (const u of findUses(await readFile(f, "utf8"))) {
       if (u.ref.startsWith("./")) continue;
       const [name, ref] = u.ref.split("@");
@@ -46,6 +45,7 @@ export async function actionsDoc() {
     "Every action is pinned by full commit SHA with its version in a comment; use this list for an org allowlist.",
     "Renovate (`helpers:pinGitHubActionDigests`, via `renovate/default.json`) keeps the SHAs current in generated repos.",
     "hull itself has no Renovate config: its pins (including the `.yml.jinja` files and `scripts/lib/ci-tasks.mjs`, then `pnpm gen:ci`) are bumped by hand.",
+    "`dtolnay/rust-toolchain` follows the `stable` branch (its pin is a branch-head SHA, not a release tag) and is bumped by hand; `toolchain: stable` is set explicitly.",
     "",
   ];
   const all = new Map();
@@ -70,7 +70,9 @@ export async function actionsDoc() {
     "",
     ...section("### rigging", await actionsIn(await walk(join(ROOT, "rigging")))),
   );
-  const hull = await walk(join(ROOT, ".github/workflows"));
+  const hull = (await walk(join(ROOT, ".github"))).filter(
+    (f) => WORKFLOW.test(f) || ACTION.test(f),
+  );
   out.push("## hull's own workflows", "");
   for (const f of hull.sort())
     out.push(...section(`### ${relative(ROOT, f)}`, await actionsIn([f])));
