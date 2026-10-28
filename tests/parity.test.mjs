@@ -155,12 +155,10 @@ test("parity: the ci-extra hook is in both GitHub workflows, both CircleCI jobs 
     const yml = await readFile(`${dir}.github/workflows/ci.yml.jinja`, "utf8");
     assert.ok(yml.includes(hook));
   }
+  // `pnpm run ci` stays shell-neutral (Windows cmd has no `[ -f ]`), so the hook is not in it
   const pkg = await readFile(`${base}package.json.jinja`, "utf8");
-  assert.ok(
-    pkg.includes(
-      `"ci": "turbo run ${tasks} --affected && (if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi)"`,
-    ),
-  );
+  assert.ok(pkg.includes(`"ci": "turbo run ${tasks} --affected",`));
+  assert.ok(!pkg.includes("ci-extra"));
 
   const after = (steps) => steps.map(([c, a]) => [c, ...a].join(" "));
   const web = after(comboSteps("/c", ["base"], "/d"));

@@ -412,8 +412,9 @@ deny, nextest, doc-tests, ci-extra, duration` (no turbo, no hoard; `scm-base.sh`
 templates' `base`), run last as `if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi`
 (file modes are not carried, so it is never executed directly; a repo may delete the file). It sits
 inside the early exit: GitHub uses the same `if:` as the run steps, CircleCI places it after the
-affected / docs-only halt, so a docs-only or unaffected PR never runs it. Dogfood and the base `ci`
-script run it too.
+affected / docs-only halt, so a docs-only or unaffected PR never runs it. Dogfood runs it too. The
+base `package.json` `ci` script does not: it must stay shell-neutral (`[ -f ]` fails in Windows
+`cmd`), and leaving `scripts.ci` unchanged spares consumers who edited it a json-merge conflict.
 
 ### 6.3 CircleCI files and which piece owns them
 
