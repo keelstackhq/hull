@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.4.0 — unreleased
+## v0.4.0 — 2026-10-28
 
 **Upgrade: move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the `preview` environment
 (Deployment branches → `main`), then delete the repository-level `CLOUDFLARE_*` secrets.**
