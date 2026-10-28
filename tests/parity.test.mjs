@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { ciCommand, comboSteps, rustComboSteps } from "../scripts/dogfood.mjs";
-import { CI_PLAN, CI_TASKS } from "../scripts/lib/ci-tasks.mjs";
+import { CI_PLAN, CI_TASKS, RUST_CI_PLAN } from "../scripts/lib/ci-tasks.mjs";
 
 const base = fileURLToPath(new URL("../template/pieces/base/files/", import.meta.url));
 const tasks = CI_TASKS.join(" ");
@@ -19,7 +19,7 @@ test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", async 
   assert.ok(plan.includes(`query affected --tasks ${tasks} >`));
 
   const pkg = await readFile(`${base}package.json.jinja`, "utf8");
-  const ci = pkg.match(/"ci": "turbo run ([a-z: ]+?) --affected"/);
+  const ci = pkg.match(/"ci": "turbo run ([a-z: ]+?) --affected/);
   assert.equal(ci?.[1], tasks);
 
   assert.deepEqual(ciCommand(), ["pnpm", "turbo", "run", ...CI_TASKS]);
@@ -132,4 +132,39 @@ test("rustComboSteps packs and checks .circleci only with the circleci piece", (
     steps.some(([c, a]) => c === "node" && a[0].endsWith("circleci-check.mjs"));
   assert.ok(has(rustComboSteps("dev", ["base", "circleci", "rust-cli:cli"], "/d")));
   assert.ok(!has(rustComboSteps("dev", ["base", "rust-cli:cli"], "/d")));
+});
+
+test("parity: the ci-extra hook is in both GitHub workflows, both CircleCI jobs and dogfood", async () => {
+  const hook = "bash scripts/ci-extra.sh";
+  const guard = "[ -f scripts/ci-extra.sh ]";
+  const rustBase = fileURLToPath(new URL("../template-rust/pieces/base/files/", import.meta.url));
+  for (const plan of [CI_PLAN, RUST_CI_PLAN]) {
+    const ids = plan.map((s) => s.id);
+    assert.equal(ids.at(-2), "ci-extra");
+    assert.equal(ids.at(-1), "duration");
+    const step = plan.find((s) => s.id === "ci-extra");
+    for (const body of [step.github, step.circleci]) {
+      assert.ok(body.includes(hook) && body.includes(guard), body);
+    }
+  }
+  assert.match(
+    CI_PLAN.find((s) => s.id === "ci-extra").github,
+    /if: steps\.affected\.outputs\.skip != 'true'/,
+  );
+  for (const dir of [base, rustBase]) {
+    const yml = await readFile(`${dir}.github/workflows/ci.yml.jinja`, "utf8");
+    assert.ok(yml.includes(hook));
+  }
+  // `pnpm run ci` stays shell-neutral (Windows cmd has no `[ -f ]`), so the hook is not in it
+  const pkg = await readFile(`${base}package.json.jinja`, "utf8");
+  assert.ok(pkg.includes(`"ci": "turbo run ${tasks} --affected",`));
+  assert.ok(!pkg.includes("ci-extra"));
+
+  const after = (steps) => steps.map(([c, a]) => [c, ...a].join(" "));
+  const web = after(comboSteps("/c", ["base"], "/d"));
+  for (const cmds of [web, after(rustComboSteps("dev", ["base"], "/d"))]) {
+    const i = cmds.findIndex((s) => s.startsWith("bash ") && s.includes("scripts/ci-extra.sh"));
+    assert.ok(i > cmds.findIndex((s) => /turbo run|cargo test/.test(s)), cmds.join("\n"));
+    assert.ok(i < cmds.indexOf("node scripts/agents-index.mjs --check"));
+  }
 });

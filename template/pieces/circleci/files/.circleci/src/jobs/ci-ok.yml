@@ -148,6 +148,10 @@ steps:
       - save_cache:
           key: rust-v2-{{ checksum ".rust-cache-key" }}
           paths: [~/.cargo/registry, target]
+  # step: ci-extra
+  - run:
+      name: Repo CI extras (scripts/ci-extra.sh)
+      command: if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi
   # step: duration
   - hoard:
       step: stop

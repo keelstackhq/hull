@@ -57,6 +57,7 @@ test("RUST_CI_PLAN: step ids in both generated files equal the plan, in order", 
     "deny",
     "nextest",
     "doc-tests",
+    "ci-extra",
     "duration",
   ]);
 });
@@ -72,7 +73,7 @@ test("gen-ci writes the checked-in template-rust files", () => {
   assert.equal(r.status, 0, String(r.stderr));
 });
 
-test("template-rust ci.yml without '# step:' lines is byte-identical to the previous file", async () => {
+test("template-rust ci.yml without '# step:' lines equals the golden file fixtures/rust-ci.yml.before", async () => {
   const before = await readFile(new URL("./fixtures/rust-ci.yml.before", import.meta.url), "utf8");
   assert.equal(github.replace(stepLine, ""), before);
 });
@@ -199,4 +200,15 @@ test("rust-circleci combo renders GitHub and CircleCI files and packs well forme
     "workflows:\n  ci: " + JSON.stringify(YAML.parse(await read("src/workflows/ci.yml"))),
   ].join("\n");
   assert.deepEqual(structuralProblems(packed), []);
+});
+
+test("ci-ok.yml runs the ci-extra hook after the docs-only halt, guarded, before duration", () => {
+  const halt = ciOk.indexOf("circleci-agent step halt");
+  const hook = ciOk.indexOf("[ -f scripts/ci-extra.sh ]");
+  assert.ok(halt > 0 && hook > halt && hook < ciOk.indexOf("# step: duration"));
+  assert.ok(ciOk.indexOf("# step: doc-tests") < ciOk.indexOf("# step: ci-extra"));
+  assert.match(
+    github,
+    /- name: Repo CI extras[^\n]*\n {8}if: steps\.affected\.outputs\.skip != 'true'\n/,
+  );
 });

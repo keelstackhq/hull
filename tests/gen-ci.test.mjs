@@ -18,7 +18,7 @@ test("gen-ci --check passes on the checked-in ci.yml", () => {
   assert.equal(r.status, 0, r.stderr);
 });
 
-test("generated ci.yml without '# step:' lines is byte-identical to the previous file", async () => {
+test("generated ci.yml without '# step:' lines equals the golden file fixtures/ci.yml.before", async () => {
   const before = await readFile(fixture, "utf8");
   assert.equal(githubCi().replace(stepLine, ""), before);
   const source = await readFile(GITHUB_CI_PATH, "utf8");
@@ -54,6 +54,7 @@ test("step ids in ci.yml equal CI_PLAN ids in order", async () => {
     "rust-cache",
     "rust-tools",
     "run-affected",
+    "ci-extra",
     "duration",
   ]);
 });

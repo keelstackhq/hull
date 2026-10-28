@@ -128,8 +128,8 @@ test("rust steps are guarded by the decision step, which only runs when rust-aff
   const idx = (s) => steps.indexOf(s);
   const toolchain = steps.find((s) => s.id === "toolchain");
   assert.ok(idx(decision) < idx(toolchain) && idx(toolchain) < idx(rustSteps[0]));
-  assert.ok(idx(rustSteps.at(-1)) < steps.length - 2);
-  assert.match(steps.at(-2).run, /^pnpm turbo run /);
+  assert.ok(idx(rustSteps.at(-1)) < steps.length - 3);
+  assert.match(steps.at(-3).run, /^pnpm turbo run /);
   assert.equal(byPath(result)[".github/scripts/rust-affected.mjs"], "owned");
   // the decision script is owned and rendered only with rust-tool (plain ci.yml is shared by all combos)
   const base = await renderCombo(["base"]);

@@ -26,7 +26,7 @@ const varsFor = (pieces) => ({
   ...comboVars,
   ...(pieces.includes("secrets") ? { context_prefix: "hullci" } : {}),
 });
-/** Always-loaded bytes ceiling: measured max 3,764 (web) plus 10 %, rounded up. */
+/** Always-loaded bytes ceiling (max measured 4,141: base + rust-cli + npm-cli, 2026-10-28). */
 const CEILING = 4150;
 
 /** Parse flat `key: value` frontmatter. */
@@ -117,7 +117,7 @@ test("AGENTS.md sends local notes to project.md or a package AGENTS.md, not CLAU
   const text = await read((await renderCombo(["base"])).dir, "AGENTS.md");
   assert.match(
     text,
-    /put local changes in seed files, `docs\/agents\/project\.md` or a package's\n {2}`AGENTS\.md`\./,
+    /put\n {2}local changes in seed files, `docs\/agents\/project\.md` or a package's `AGENTS\.md`\./,
   );
   assert.ok(!/below the import/.test(text));
 });

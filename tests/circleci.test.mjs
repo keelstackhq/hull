@@ -319,3 +319,12 @@ test("the hoard start step carries TODO(hoard-restore) until hoard can skip its 
   );
   assert.match(yml, /# TODO\(hoard-restore\)[^\n]*\n(?:\s*#[^\n]*\n)*\s*- hoard:\n\s*step: start/);
 });
+
+test("ci-ok.yml runs the ci-extra hook after the affected halt, guarded, last before duration", () => {
+  const halt = ciOk.indexOf("circleci-agent step halt");
+  const hook = ciOk.indexOf("[ -f scripts/ci-extra.sh ]");
+  const duration = ciOk.indexOf("# step: duration");
+  assert.ok(halt > 0 && hook > halt && hook < duration);
+  assert.ok(ciOk.indexOf("# step: run-affected") < ciOk.indexOf("# step: ci-extra"));
+  assert.match(ciOk, /bash scripts\/ci-extra\.sh/);
+});

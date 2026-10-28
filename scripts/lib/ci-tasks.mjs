@@ -4,6 +4,8 @@ export const CI_TASKS = Object.freeze(["lint", "format:check", "typecheck", "tes
 const yml = (...lines) => `${lines.join("\n")}\n`;
 const tasks = CI_TASKS.join(" ");
 const notSkipped = "steps.affected.outputs.skip != 'true'";
+const extraRun = "if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi";
+const extraName = "Repo CI extras (scripts/ci-extra.sh)";
 const ifRust = `${notSkipped} && steps.rust.outputs.rust == 'true'`;
 
 /**
@@ -137,6 +139,14 @@ const GITHUB_STEPS = [
       "      - name: Run affected tasks",
       `        if: ${notSkipped}`,
       `        run: pnpm turbo run ${tasks} --affected --output-logs=errors-only`,
+    ),
+  },
+  {
+    id: "ci-extra",
+    github: yml(
+      `      - name: ${extraName}`,
+      `        if: ${notSkipped}`,
+      `        run: ${extraRun}`,
     ),
   },
   {
@@ -326,6 +336,7 @@ const CIRCLECI = {
       "      paths: [~/.cargo/registry, target]",
     ),
   ),
+  "ci-extra": yml("  - run:", `      name: ${extraName}`, `      command: ${extraRun}`),
   duration: yml(
     "  - hoard:",
     "      step: stop",
@@ -473,6 +484,15 @@ export const RUST_CI_PLAN = Object.freeze(
       circleci: RUST_CIRCLECI_TOOLS,
     },
     ...RUST_RUN_NAMES.map(rustRun),
+    {
+      id: "ci-extra",
+      github: yml(
+        `      - name: ${extraName}`,
+        `        if: ${NOT_DOCS}`,
+        `        run: ${extraRun}`,
+      ),
+      circleci: CIRCLECI["ci-extra"],
+    },
     {
       id: "duration",
       github: GITHUB_STEPS.at(-1).github,

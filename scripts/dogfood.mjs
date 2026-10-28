@@ -21,6 +21,12 @@ const CHECK_CIRCLECI = fileURLToPath(new URL("./circleci-check.mjs", import.meta
 const RUST_PIECES = new Set(["rust-tool", "rust-cli"]);
 const VITE_PIECES = new Set(["preact-app", "ui-storybook", "astro-site"]);
 
+// repo-specific hook of generated repos (seed scripts/ci-extra.sh); a repo may delete it
+const CI_EXTRA = [
+  "bash",
+  ["-c", "if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi"],
+];
+
 /** Steps run in a rendered template-rust combo (spec §15): no pnpm, no turbo. */
 export function rustComboSteps(renderer = "dev", pieces = [], dir = ".") {
   const ci = RUST_CI_STEPS.map((s) => {
@@ -36,7 +42,7 @@ export function rustComboSteps(renderer = "dev", pieces = [], dir = ".") {
           ["cargo", ["generate-lockfile"]],
           ["node", ["scripts/agents-index.mjs"]],
         ];
-  const steps = [...setup, ...ci, ["node", ["scripts/agents-index.mjs", "--check"]]];
+  const steps = [...setup, ...ci, CI_EXTRA, ["node", ["scripts/agents-index.mjs", "--check"]]];
   // pack .circleci/src with the pinned CLI and check it (S§12 item 3)
   if (pieces.some((p) => p.split(":")[0] === "circleci"))
     steps.push(["node", [CHECK_CIRCLECI, dir]]);
@@ -61,6 +67,7 @@ export function comboSteps(cacheDir, pieces = [], dir = ".", renderer = "dev") {
           // the base [[post]] hook, which the dev renderer does not run
           ["node", ["scripts/agents-index.mjs"]],
           turbo(cmd, args, cacheDir),
+          CI_EXTRA,
           ["node", ["scripts/agents-index.mjs", "--check"]],
         ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
@@ -81,7 +88,7 @@ const turbo = (cmd, args, cacheDir) => [
 ];
 
 function spliceSteps(cmd, args, cacheDir) {
-  return [turbo(cmd, args, cacheDir), ["node", ["scripts/agents-index.mjs", "--check"]]];
+  return [turbo(cmd, args, cacheDir), CI_EXTRA, ["node", ["scripts/agents-index.mjs", "--check"]]];
 }
 
 const RENDERERS = new Set(["splice", "dev"]);

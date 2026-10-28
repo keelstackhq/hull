@@ -8,6 +8,8 @@ import { dogfood } from "../scripts/dogfood.mjs";
 import { CI_TASKS, RUST_CI_STEPS } from "../scripts/lib/ci-tasks.mjs";
 import { comboTemplate, comboVars } from "../scripts/lib/combos.mjs";
 
+const EXTRA = "bash -c if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi";
+
 test("a render failure fails that combo without throwing", async () => {
   const root = await mkdtemp(join(tmpdir(), "hull-df-"));
   const results = await dogfood({
@@ -76,6 +78,7 @@ test("base combo runs git init, install, index write, turbo, index check in orde
     "pnpm install --no-frozen-lockfile --prefer-offline",
     "node scripts/agents-index.mjs",
     `pnpm turbo run ${CI_TASKS.join(" ")} --cache-dir=/c`,
+    EXTRA,
     "node scripts/agents-index.mjs --check",
   ]);
 });
@@ -93,6 +96,7 @@ test("splice renderer (default): splice new (git init + post hooks), then turbo,
   assert.deepEqual(calls, [
     `splice new ${src} ${join(root, "site")} --ref HEAD --piece astro-site:site --piece rust-tool:tool --data scope=hullci --yes --json`,
     `pnpm turbo run ${CI_TASKS.join(" ")} --cache-dir=/c`,
+    EXTRA,
     "node scripts/agents-index.mjs --check",
     `node ${fileURLToPath(new URL("../scripts/check-single-vite.mjs", import.meta.url))} ${join(root, "site")}`,
   ]);
@@ -143,6 +147,7 @@ test("rust combo (template-rust): no pnpm or turbo; cargo steps, index write and
     "cargo generate-lockfile",
     "node scripts/agents-index.mjs",
     ...RUST_CI_STEPS,
+    EXTRA,
     "node scripts/agents-index.mjs --check",
   ]);
 });
@@ -160,6 +165,7 @@ test("rust combo with splice: renders template-rust without vars, then the cargo
   assert.deepEqual(calls, [
     `splice new ${src} ${join(root, "rust")} --ref HEAD --piece rust-cli:cli --yes --json`,
     ...RUST_CI_STEPS,
+    EXTRA,
     "node scripts/agents-index.mjs --check",
   ]);
 });

@@ -1,24 +1,24 @@
 {
   "web": {
-    "ci.yml": "2220eb83f31de93a2ad8d2b8fd6cc2eb2176fce75e4e51404cfb98fb37bd77f8",
+    "ci.yml": "94c26565c8e44e6d8778ca575d6bb3fdc4c61ecdd96c4fdc83085170ca60221d",
     "preview-deploy.yml": "115f775371fead8503699f8302a9589b87fe6731423051e91b436984fcd2225a",
     "preview.yml": "d31787a4b1532bc561c67e4e7ee791e9a705a18230ecc4a8eb6a47a4e90fc0a1",
     "release.yml": "9c9162357fe2e8540169386992055628e4ec247bec0c3c1d38935b30bfea280c"
   },
   "desktop": {
-    "ci.yml": "2220eb83f31de93a2ad8d2b8fd6cc2eb2176fce75e4e51404cfb98fb37bd77f8",
+    "ci.yml": "94c26565c8e44e6d8778ca575d6bb3fdc4c61ecdd96c4fdc83085170ca60221d",
     "desktop.yml": "04aacca2266a940e6ce1a1b26386ac7af117a70e592fbf07cbe3c5a7f6ccd0a0",
     "preview-deploy.yml": "115f775371fead8503699f8302a9589b87fe6731423051e91b436984fcd2225a",
     "preview.yml": "d31787a4b1532bc561c67e4e7ee791e9a705a18230ecc4a8eb6a47a4e90fc0a1",
     "release.yml": "9c9162357fe2e8540169386992055628e4ec247bec0c3c1d38935b30bfea280c"
   },
   "rust": {
-    "ci.yml": "1ffff90aac8c8639e2ef1ca70de25edd039db0fe3b5a349c4c6b927b2e89917d",
+    "ci.yml": "53d3dcd363a163db85ae4620e252fe777aef7639f6e1d070566600777477de8f",
     "release.yml": "d3b21b5bc1046dcec0b495d77721f21338c6bbb8c44a5a8d29e271d7bed95039",
     "splice.yml": "6645271e3fe94066bd5567f24d2f4b626ce83bb60195ef93ad6172200b860270"
   },
   "rust-circleci": {
-    "ci.yml": "1ffff90aac8c8639e2ef1ca70de25edd039db0fe3b5a349c4c6b927b2e89917d",
+    "ci.yml": "53d3dcd363a163db85ae4620e252fe777aef7639f6e1d070566600777477de8f",
     "release.yml": "d3b21b5bc1046dcec0b495d77721f21338c6bbb8c44a5a8d29e271d7bed95039",
     "splice.yml": "6645271e3fe94066bd5567f24d2f4b626ce83bb60195ef93ad6172200b860270"
   }
