@@ -1,5 +1,8 @@
 [workspace]
 resolver = "3"
+# No "apps/*" here: cargo rejects a member glob that matches no crate (checked 2026-10-28).
+# Add such globs once a crate exists there; splice keeps local edits to members, but they
+# conflict when the template changes this array (toml merge treats arrays as whole values).
 members = ["crates/*"]
 
 [workspace.package]

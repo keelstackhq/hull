@@ -83,6 +83,9 @@ test("rendered rust combo: no Node toolchain files, a cargo workspace with crate
   assert.ok(!existsSync(join(dir, "crates/cli/deny.toml")), "deny.toml lives at the root only");
   const ws = await readFile(join(dir, "Cargo.toml"), "utf8");
   assert.match(ws, /members = \["crates\/\*"\]/);
+  // why members has no "apps/*" (cargo rejects a glob that matches no crate), right above it
+  assert.match(ws, /# [^\n]*matches no crate[^\n]*\n(# [^\n]*\n)*members = /);
+  assert.match(ws, /# [^\n]*conflict[^\n]*\n(# [^\n]*\n)*members = /);
   assert.match(ws, /rust-version = "1\.99\.1"/);
   const tc = await readFile(join(dir, "rust-toolchain.toml"), "utf8");
   assert.match(tc, /channel = "1\.99\.1"/);
