@@ -375,6 +375,7 @@ blocks in base files (`docspack` devDependency, SessionStart sync, `docs-lookup`
 {
   "version": 1,
   "packs": {
+    "keelstack": { "package": "@keelstackhq/docspack", "source": "vendor", "version": "0.1.1" },
     "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
     "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
     "cloudflare": { "package": "@docspack-community/cloudflare", "source": "community", "build": "cloudflare" },
@@ -385,10 +386,16 @@ blocks in base files (`docspack` devDependency, SessionStart sync, `docs-lookup`
 
 `source` is `vendor` (published by the tool's authors) or `community`. A community entry names
 either `build` (a curated source of `docspack build <source>`) or `recipe` (a folder in hull's
-`community-packs/`). On 2026-10-14 no `@docspack-community/*` package is published; hull keeps the
-recipes, and publishing them is a blocked task (needs the npm scope). `pnpm docs:packs` (script in
-the docs piece) prints which listed packs are installed, missing, or unpublished; it never edits
-files.
+`community-packs/`). An optional `version` pins a pack to an exact semver (never a range); its hint
+is then `pnpm add -D -E <package>@<version>`, and a non-exact version makes the entry invalid. The
+pin only shapes the hint: `installed` is checked by name, so a Renovate bump past the pin is not
+reported. `keelstack` is the keelstack.dev docs pack, pinned to 0.1.1 (`npm view` on 2026-10-28:
+latest 0.1.1, published 2026-10-28T06:32Z, no dependencies). It is younger than 3 days, so
+`pnpm-workspace.yaml` excludes `@keelstackhq/docspack@0.1.1` until 2026-10-31 (a consumer with
+its own `minimumReleaseAgeExclude` gets a whole-array merge conflict on `splice update`). On
+2026-10-14 no `@docspack-community/*` package is published; hull keeps the recipes, and
+publishing them is a blocked task (needs the npm scope). `pnpm docs:packs` (script in the docs
+piece) prints which listed packs are installed, missing, or unpublished; it never edits files.
 
 ### 6.9 AI layer (owned, in `base`)
 

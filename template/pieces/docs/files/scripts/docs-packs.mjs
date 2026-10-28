@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NAME_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+const VERSION_RE = /^\d+\.\d+\.\d+$/;
 
 /**
  * Ask npm whether a package exists. `unpublished` only on a 404; any other failure is `unknown`.
@@ -22,18 +23,23 @@ export function lookupPublished(name, run = spawnSync) {
 }
 
 /**
- * @param {Record<string, { package: string, source: string, build?: string, recipe?: string }>} packs
+ * @param {Record<string, { package: string, source: string, build?: string, recipe?: string, version?: string }>} packs
  * @param {Set<string>} installed
  * @param {{ unpublished?: Set<string> }} [opts] package names npm answered 404 for (--online)
- * @returns {{ tool: string, package: string, state: "installed" | "missing" | "unpublished" | "invalid" }[]}
+ * @returns {{ tool: string, package: string, version?: string, state: "installed" | "missing" | "unpublished" | "invalid" }[]}
  */
 export function docsPacksReport(packs, installed, opts = {}) {
   return Object.entries(packs).map(([tool, p]) => {
     let state = "missing";
     if (!NAME_RE.test(p.package)) state = "invalid";
+    else if (
+      p.version !== undefined &&
+      !(typeof p.version === "string" && VERSION_RE.test(p.version))
+    )
+      state = "invalid";
     else if (installed.has(p.package)) state = "installed";
     else if (opts.unpublished?.has(p.package)) state = "unpublished";
-    return { tool, package: p.package, state };
+    return { tool, package: p.package, version: p.version, state };
   });
 }
 
@@ -61,11 +67,13 @@ function main(argv) {
   for (const r of docsPacksReport(packs, installed, { unpublished })) {
     const note =
       r.state === "missing"
-        ? `  run: pnpm add -D ${r.package}`
+        ? r.version
+          ? `  run: pnpm add -D -E ${r.package}@${r.version}`
+          : `  run: pnpm add -D ${r.package}`
         : r.state === "unpublished"
           ? "  not on npm yet; see the pack's source in docs/packs.json"
           : r.state === "invalid"
-            ? "  invalid package name in docs/packs.json"
+            ? "  invalid package name or non-exact version in docs/packs.json"
             : "";
     console.log(`${r.state.padEnd(11)} ${r.tool} (${r.package})${note}`);
   }

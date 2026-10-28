@@ -35,12 +35,13 @@ test("packs.json shape", async () => {
   assert.deepEqual(Object.keys(doc).sort(), ["packs", "version"]);
   for (const [tool, p] of Object.entries(doc.packs)) {
     assert.match(p.package, NAME_RE, tool);
-    const allowed = ["package", "source", "build", "recipe"];
+    const allowed = ["package", "source", "build", "recipe", "version"];
     assert.deepEqual(
       Object.keys(p).filter((k) => !allowed.includes(k)),
       [],
       `${tool}: unknown keys`,
     );
+    if ("version" in p) assert.match(p.version, /^\d+\.\d+\.\d+$/, `${tool}: exact version`);
     for (const k of ["build", "recipe"]) if (k in p) assert.equal(typeof p[k], "string", tool);
     assert.ok(["vendor", "community"].includes(p.source), tool);
     if (p.source === "community") {
@@ -177,4 +178,45 @@ test("lookupPublished: 404 unpublished, other failures unknown, success publishe
   assert.deepEqual(args, ["view", "--", name, "version"]);
   const r = docsPacksReport({ x: { package: "Evil Name", source: "vendor" } }, new Set());
   assert.equal(r[0].state, "invalid");
+});
+
+test("keelstack pack is pinned to an exact version", async () => {
+  const { dir } = await renderCombo(["base", "docs"]);
+  const doc = await packsOf(dir);
+  assert.deepEqual(doc.packs.keelstack, {
+    package: "@keelstackhq/docspack",
+    source: "vendor",
+    version: "0.1.1",
+  });
+});
+
+test("docs-packs hints an exact pinned add when a version is set, rejects ranges", async () => {
+  const { dir } = await renderCombo(["base", "docs"]);
+  const r = spawnSync("node", [join(dir, "scripts/docs-packs.mjs")], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+  assert.match(r.stdout, /pnpm add -D -E @keelstackhq\/docspack@0\.1\.1/);
+  assert.match(r.stdout, /pnpm add -D @cascivo\/docspack(\s|$)/);
+  const { docsPacksReport } = await import(pathToFileURL(join(dir, "scripts/docs-packs.mjs")));
+  const states = docsPacksReport(
+    {
+      ok: { package: "@keelstackhq/docspack", source: "vendor", version: "0.1.1" },
+      range: { package: "@keelstackhq/docspack", source: "vendor", version: "^0.1.1" },
+      num: { package: "@keelstackhq/docspack", source: "vendor", version: 1 },
+      empty: { package: "@keelstackhq/docspack", source: "vendor", version: "" },
+      none: { package: "@cascivo/docspack", source: "vendor" },
+    },
+    new Set(),
+  );
+  assert.deepEqual(
+    states.map((x) => [x.tool, x.state, x.version]),
+    [
+      ["ok", "missing", "0.1.1"],
+      ["range", "invalid", "^0.1.1"],
+      ["num", "invalid", 1],
+      ["empty", "invalid", ""],
+      ["none", "missing", undefined],
+    ],
+  );
 });

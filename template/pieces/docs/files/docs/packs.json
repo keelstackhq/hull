@@ -1,6 +1,7 @@
 {
   "version": 1,
   "packs": {
+    "keelstack": { "package": "@keelstackhq/docspack", "source": "vendor", "version": "0.1.1" },
     "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
     "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
     "cloudflare": {
