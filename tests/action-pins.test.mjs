@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { comboTemplate, loadCombos } from "../scripts/lib/combos.mjs";
 import {
   allUses,
   findUses,
   HOIST_EXEMPT,
-  renderedFiles,
   ROOT,
   scanYaml,
-  sourceFiles,
+  uncoveredSources,
 } from "../scripts/lib/actions.mjs";
 
 const PINNED = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\/[^@\s]+)?@[0-9a-f]{40}$/;
@@ -126,17 +126,19 @@ test("docs/actions.md on disk equals actionsDoc()", async () => {
   assert.match(disk, /fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09/);
 });
 
-test("every template workflow/action source is exercised by a rendered combo", async () => {
-  const rendered = new Set(
-    (await renderedFiles()).flatMap((r) => r.files.map((f) => f.split("/").pop())),
+// Coverage is file-level: every workflow/action source (template, template-rust, rigging) must be
+// rendered by at least one combo. It does not check each jinja branch.
+test("every template workflow/action source is rendered by a combo of its own template", async () => {
+  assert.deepEqual(await uncoveredSources(loadCombos().combos), []);
+});
+
+test("coverage mutation: without the template-rust combos its workflow sources are uncovered", async () => {
+  const kept = loadCombos().combos.filter((c) => comboTemplate(c) !== "template-rust");
+  assert.ok(kept.length > 0 && kept.length < loadCombos().combos.length);
+  const missing = await uncoveredSources(kept);
+  assert.ok(missing.includes("template-rust/pieces/base/files/.github/workflows/ci.yml.jinja"));
+  assert.ok(
+    missing.every((f) => f.startsWith("template-rust/")),
+    missing.join(),
   );
-  const srcs = (await sourceFiles()).filter((f) => !f.startsWith(ROOT + ".github/"));
-  assert.ok(srcs.length > 5);
-  for (const f of srcs) {
-    const name = f
-      .split("/")
-      .pop()
-      .replace(/\.jinja$/, "");
-    assert.ok(rendered.has(name), `${f} is not rendered by any combo`);
-  }
 });

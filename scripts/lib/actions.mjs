@@ -77,8 +77,8 @@ export async function sourceFiles() {
 }
 
 /** Render every combo; returns [{ label, dir, files }] with the rendered workflow/action files. */
-export async function renderedFiles() {
-  const { vars, combos } = loadCombos();
+export async function renderedFiles(combos = loadCombos().combos) {
+  const { vars } = loadCombos();
   const out = [];
   for (const c of combos) {
     const dir = join(await mkdtemp(join(tmpdir(), "hull-pins-")), "out");
@@ -89,7 +89,7 @@ export async function renderedFiles() {
       vars: comboVars(c, vars),
     });
     const files = (await walk(dir)).filter(isUsesFile);
-    out.push({ label: c.name, dir, files });
+    out.push({ label: c.name, dir, files, combo: c });
   }
   return out;
 }
@@ -114,3 +114,33 @@ export async function allUses() {
 }
 
 export const HOIST_EXEMPT = /^keelstackhq\/hoist\/secrets@0{40}$/;
+
+/**
+ * Workflow/action sources (relative to the repo root) that no combo in `combos` renders from its
+ * own template and piece. File-level: a source counts as covered when a combo of the same template
+ * includes its piece and the rendered tree has the file (minus `.jinja`), not per jinja branch.
+ * @param {import("./combos.mjs").Combo[]} combos
+ * @returns {Promise<string[]>}
+ */
+export async function uncoveredSources(combos) {
+  const rendered = await renderedFiles(combos);
+  const covered = new Set();
+  for (const f of await sourceFiles()) {
+    const src = relative(ROOT, f);
+    if (src.startsWith(".github/")) continue;
+    const m = /^([^/]+)\/pieces\/([^/]+)\/files\/(.+?)(\.jinja)?$/.exec(src);
+    if (!m) continue; // not a rendered piece file: reported below
+    const [, tpl, piece, rel] = m;
+    const hit = rendered.some(
+      (r) =>
+        comboTemplate(r.combo) === tpl &&
+        r.combo.pieces.some((p) => p.split(":")[0] === piece) &&
+        r.files.some((x) => relative(r.dir, x) === rel || relative(r.dir, x).endsWith(`/${rel}`)),
+    );
+    if (hit) covered.add(src);
+  }
+  const all = (await sourceFiles())
+    .map((f) => relative(ROOT, f))
+    .filter((f) => !f.startsWith(".github/"));
+  return all.filter((f) => !covered.has(f));
+}
