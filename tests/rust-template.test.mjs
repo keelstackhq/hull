@@ -10,6 +10,7 @@ import YAML from "yaml";
 import { RUST_CI_STEPS } from "../scripts/lib/ci-tasks.mjs";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
 import { outputPath, overlaps } from "../scripts/lib/ownership.mjs";
+import { renderString } from "../scripts/lib/render-file.mjs";
 import { checkSubset } from "../scripts/lib/subset.mjs";
 import { renderNew } from "../scripts/render.mjs";
 import { lineCount } from "./helpers.mjs";
@@ -17,6 +18,10 @@ import { lineCount } from "./helpers.mjs";
 const RUST = fileURLToPath(new URL("../template-rust", import.meta.url));
 const HULL = fileURLToPath(new URL("../template", import.meta.url));
 const BASE = join(RUST, "pieces/base/files");
+const ciText = async () =>
+  renderString(await readFile(join(BASE, ".github/workflows/ci.yml.jinja"), "utf8"), {
+    pieces: ["base"],
+  });
 const t = await loadTemplate(RUST);
 
 async function walk(dir) {
@@ -46,7 +51,7 @@ test("template-rust manifest: format 1, hull-rust, base, min_splice 0.2.0, no va
   assert.equal(t.base, "base");
   assert.equal(t.minSplice, "0.2.0");
   assert.deepEqual(Object.keys(t.vars ?? {}), []);
-  assert.deepEqual([...t.pieces.keys()].sort(), ["base", "circleci", "rust-cli"]);
+  assert.deepEqual([...t.pieces.keys()].sort(), ["base", "circleci", "circleci-only", "rust-cli"]);
 });
 
 test("template-rust invariants: one class per path, subset, no {{ in paths", async () => {
@@ -96,7 +101,7 @@ test("AGENTS.md <= 60 and CLAUDE.md <= 20 lines, for base and the rust combo", a
 });
 
 test("RUST_CI_STEPS parity: ci.yml, AGENTS.md, verify skill and the index list the same steps", async () => {
-  const wf = YAML.parse(await readFile(join(BASE, ".github/workflows/ci.yml"), "utf8"));
+  const wf = YAML.parse(await ciText());
   const cargoRuns = wf.jobs.ci.steps.map((s) => s.run).filter((r) => r?.startsWith("cargo "));
   assert.deepEqual(cargoRuns, [...RUST_CI_STEPS]);
   const agents = await readFile(join(BASE, "AGENTS.md.jinja"), "utf8");
@@ -112,7 +117,7 @@ test("RUST_CI_STEPS parity: ci.yml, AGENTS.md, verify skill and the index list t
 });
 
 test("ci.yml: one job + ci-ok, every later step checks skip, no Node setup, no path filters", async () => {
-  const wf = YAML.parse(await readFile(join(BASE, ".github/workflows/ci.yml"), "utf8"));
+  const wf = YAML.parse(await ciText());
   assert.deepEqual(Object.keys(wf.jobs), ["ci", "ci-ok"]);
   assert.deepEqual(Object.keys(wf.on).sort(), ["merge_group", "pull_request", "push"]);
   assert.equal(wf.on.pull_request, null);

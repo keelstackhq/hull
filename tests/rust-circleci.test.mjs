@@ -17,6 +17,7 @@ import {
 } from "../scripts/gen-ci.mjs";
 import { RUST_CI_PLAN, RUST_CI_STEPS } from "../scripts/lib/ci-tasks.mjs";
 import { loadCombos } from "../scripts/lib/combos.mjs";
+import { renderString } from "../scripts/lib/render-file.mjs";
 import { renderNew } from "../scripts/render.mjs";
 
 const RUST = fileURLToPath(new URL("../template-rust", import.meta.url));
@@ -27,7 +28,7 @@ const stepLine = /^ *# step: .*\n/gm;
 const ids = (text) => [...text.matchAll(/^ *# step: (\S+)$/gm)].map((m) => m[1]);
 const planIds = RUST_CI_PLAN.map((s) => s.id);
 
-const github = await readFile(RUST_GITHUB_CI_PATH, "utf8");
+const github = renderString(await readFile(RUST_GITHUB_CI_PATH, "utf8"), { pieces: ["base"] });
 const ciOk = await read("src/jobs/ci-ok.yml");
 const rendered = await (async () => {
   const out = join(await mkdtemp(join(tmpdir(), "hull-rust-circleci-")), "out");

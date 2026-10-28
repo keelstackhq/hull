@@ -148,6 +148,27 @@ test("rendered combos: no pull_request_target, issue_comment or status workflow 
     assert.ok(seen.has(f), f);
 });
 
+test("rendered template-rust circleci-only: the status workflow has no secrets, environment or untrusted leak", async () => {
+  const { renderNew } = await import("../scripts/render.mjs");
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const out = join(await mkdtemp(join(tmpdir(), "hull-rust-wf-")), "out");
+  await renderNew({
+    template: join(ROOT, "template-rust"),
+    out,
+    pieces: ["base", "circleci", "circleci-only", "rust-cli:cli"],
+    vars: {},
+  });
+  const wfDir = join(out, ".github/workflows");
+  assert.deepEqual(readdirSync(wfDir).sort(), ["circleci-status.yml", "release.yml", "splice.yml"]);
+  const text = readFileSync(join(wfDir, "circleci-status.yml"), "utf8");
+  const wf = YAML.parse(text);
+  assert.deepEqual(triggers(wf), ["status"]);
+  assert.ok(!/SOPS_AGE_KEY/.test(text));
+  for (const [id, job] of Object.entries(wf.jobs)) assert.equal(job.environment, undefined, id);
+  assert.deepEqual(untrustedViolations("circleci-status.yml", wf), []);
+});
+
 test("the untrusted-trigger check catches each kind of leak", () => {
   const wf = (job, on = { pull_request: null }) => ({ on, jobs: { j: { steps: [], ...job } } });
   const leaks = [
