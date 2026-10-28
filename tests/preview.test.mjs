@@ -233,6 +233,9 @@ test("preview-deploy with secrets: hoist secrets action, SHA-pinned, env preview
   assert.equal(d.with["app-id"], "${{ vars.SECRETS_READ_APP_ID }}");
   assert.equal(d.with["app-key"], "${{ secrets.SECRETS_READ_APP_KEY }}");
   assert.equal(d.with["age-key"], "${{ secrets.SOPS_AGE_KEY }}");
+  // workflow_run: hoist's exec needs the triggering workflow's file, else it exits 2
+  assert.equal(d.with["workflow-run-path"], ".github/workflows/preview.yml");
+  assert.deepEqual(withSecrets.on.workflow_run.workflows, ["preview"]);
   assert.equal(d.env.PR_NUMBER, "${{ steps.pr.outputs.number }}");
   assert.equal(withSecrets.jobs.deploy.environment, "preview");
   assert.doesNotMatch(JSON.stringify(withSecrets), /secrets\.CLOUDFLARE/);
