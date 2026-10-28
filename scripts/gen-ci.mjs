@@ -1,13 +1,18 @@
 #!/usr/bin/env node
-// Writes the GitHub Actions workflow of generated repos from CI_PLAN (secrets-ci design §6.2).
-// `--check` exits 1 when the checked-in file differs from the generated one.
-import { readFile, writeFile } from "node:fs/promises";
+// Writes the GitHub Actions workflow and the CircleCI `ci-ok` job of generated repos from CI_PLAN
+// (secrets-ci design §6.2). `--check` exits 1 when a checked-in file differs from the generated one.
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CI_PLAN } from "./lib/ci-tasks.mjs";
 import { isMain } from "./lib/is-main.mjs";
 
 export const GITHUB_CI_PATH = fileURLToPath(
   new URL("../template/pieces/base/files/.github/workflows/ci.yml", import.meta.url),
+);
+
+export const CIRCLECI_OK_PATH = fileURLToPath(
+  new URL("../template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml", import.meta.url),
 );
 
 const header = `name: ci
@@ -55,17 +60,31 @@ export function githubCi(plan = CI_PLAN) {
   return `${header}${steps}${footer}`;
 }
 
+/** The CircleCI `ci-ok` job (body of `.circleci/src/jobs/ci-ok.yml`) for `CI_PLAN`. */
+export function circleciOk(plan = CI_PLAN) {
+  const steps = plan.map((s) => `  # step: ${s.id}\n${s.circleci}`).join("");
+  return `executor: node\nsteps:\n${steps}`;
+}
+
 async function main() {
-  const text = githubCi();
+  const files = [
+    [GITHUB_CI_PATH, githubCi(), "ci.yml"],
+    [CIRCLECI_OK_PATH, circleciOk(), "ci-ok.yml"],
+  ];
   if (process.argv.includes("--check")) {
-    const current = await readFile(GITHUB_CI_PATH, "utf8").catch(() => "");
-    if (current !== text) {
-      console.error("ci.yml is out of date; run `pnpm gen:ci`");
-      process.exit(1);
+    for (const [path, text, name] of files) {
+      const current = await readFile(path, "utf8").catch(() => "");
+      if (current !== text) {
+        console.error(`${name} is out of date; run \`pnpm gen:ci\``);
+        process.exit(1);
+      }
     }
     return;
   }
-  await writeFile(GITHUB_CI_PATH, text);
+  for (const [path, text] of files) {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, text);
+  }
 }
 
 if (isMain(import.meta.url)) await main();

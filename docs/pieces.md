@@ -90,7 +90,7 @@ Merge strategies:
 
 ## circleci
 
-CircleCI as a second CI provider: TURBO_SCM_BASE script (config and jobs follow)
+CircleCI as a second CI provider: setup config, ci-ok job generated from the CI plan, hoard command
 
 - Multiple instances: no
 - Target: repo root
@@ -102,6 +102,12 @@ Variables:
 
 Files (owned):
 
+- `.circleci/config.yml`
+- `.circleci/src/@config.yml`
+- `.circleci/src/executors/node.yml`
+- `.circleci/src/commands/hoard.yml`
+- `.circleci/src/jobs/ci-ok.yml`
+- `.circleci/src/workflows/ci.yml`
 - `.circleci/scripts/scm-base.sh`
 
 Files (shared):

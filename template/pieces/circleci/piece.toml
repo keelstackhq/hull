@@ -1,6 +1,14 @@
 id = "circleci"
-description = "CircleCI as a second CI provider: TURBO_SCM_BASE script (config and jobs follow)"
+description = "CircleCI as a second CI provider: setup config, ci-ok job generated from the CI plan, hoard command"
 requires = ["base"]
 
 [files]
-owned = [".circleci/scripts/scm-base.sh"]
+owned = [
+  ".circleci/config.yml",
+  ".circleci/src/@config.yml",
+  ".circleci/src/executors/node.yml",
+  ".circleci/src/commands/hoard.yml",
+  ".circleci/src/jobs/ci-ok.yml",
+  ".circleci/src/workflows/ci.yml",
+  ".circleci/scripts/scm-base.sh",
+]

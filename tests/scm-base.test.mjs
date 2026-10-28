@@ -43,14 +43,15 @@ test("merge queue branch prints its base sha when it is a default-branch ancesto
   assert.equal(scmBase(dir, `gh-readonly-queue/main/pr-12-${c1}`, "ignored"), c1);
 });
 
-test("a forged merge queue branch name cannot pick the base", () => {
+test("a forged merge queue branch name cannot pick the base: it falls back to the merge-base", () => {
   const { dir } = repo();
   const head = git(dir, "rev-parse", "HEAD");
   git(dir, "commit", "-q", "--allow-empty", "-m", "f2");
   const f1 = head; // on feature only, not on origin/main
   const now = git(dir, "rev-parse", "HEAD");
+  const c1 = git(dir, "merge-base", "HEAD", "origin/main");
   for (const sha of [now, f1, "0123456789abcdef0123456789abcdef01234567"]) {
-    assert.throws(() => scmBase(dir, `gh-readonly-queue/main/pr-12-${sha}`), `accepted ${sha}`);
+    assert.equal(scmBase(dir, `gh-readonly-queue/main/pr-12-${sha}`), c1, `accepted ${sha}`);
   }
 });
 
@@ -77,17 +78,15 @@ test("default branch with an empty base on a root commit fails", () => {
   assert.throws(() => scmBase(dir, "main", ""));
 });
 
-test("a merge queue branch whose suffix is not a 40-hex sha fails without echoing it", () => {
-  const { dir } = repo();
+test("a merge queue branch whose suffix is not a 40-hex sha falls back without echoing it", () => {
+  const { dir, c1 } = repo();
   for (const suffix of ["", "deadbeef", "$(id)", "0123456789ABCDEF0123456789abcdef01234567"]) {
-    let err;
-    try {
-      scmBase(dir, `gh-readonly-queue/main/pr-12-${suffix}`);
-    } catch (e) {
-      err = e;
-    }
-    assert.ok(err, `accepted suffix ${JSON.stringify(suffix)}`);
-    if (suffix) assert.ok(!String(err.stderr).includes(suffix));
+    const out = execFileSync("sh", [SCRIPT], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, CIRCLE_BRANCH: `gh-readonly-queue/main/pr-12-${suffix}` },
+    }).trim();
+    assert.equal(out, c1, JSON.stringify(suffix));
   }
 });
 

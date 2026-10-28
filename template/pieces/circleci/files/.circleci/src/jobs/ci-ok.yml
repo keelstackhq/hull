@@ -1,0 +1,160 @@
+executor: node
+steps:
+  # step: timer
+  - run: echo "export CI_START=$(date +%s)" >> "$BASH_ENV"
+  # step: checkout
+  - checkout:
+      method: blobless
+  - run:
+      name: Turbo diff base (scm-base.sh)
+      command: |
+        git fetch --no-tags origin main
+        echo "export TURBO_SCM_HEAD=$CIRCLE_SHA1" >> "$BASH_ENV"
+        base=$(sh .circleci/scripts/scm-base.sh '<< pipeline.git.base_revision >>')
+        echo "export TURBO_SCM_BASE=$base" >> "$BASH_ENV"
+  # step: agents-index
+  - run:
+      name: Agents index current?
+      command: node scripts/agents-index.mjs --check
+  # step: affected
+  - run:
+      name: Anything affected?
+      environment:
+        TURBO_VERSION: 2.11.8
+        # sha256 of the registry tarball linux-64-2.11.8.tgz, computed 2026-10-28
+        TURBO_SHA256: 8ddaeded8c2b85a65da10b8214593f255a9c963dc71588b48a1faca0b0eb63db
+      command: |
+        t="$(mktemp -d)"
+        curl -fsSL -o "$t/turbo.tgz" "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz"
+        echo "$TURBO_SHA256  $t/turbo.tgz" | sha256sum -c - || exit 1
+        tar -xzf "$t/turbo.tgz" -C "$t" --strip-components=2 turbo-linux-x64/bin/turbo
+        set +e
+        "$t/turbo" query affected --tasks lint format:check typecheck test build > "$t/affected.json"
+        code=$?
+        set -e
+        if [ "$code" -eq 0 ]; then
+          node .github/scripts/affected.mjs < "$t/affected.json" > "$t/out"
+          if grep -qx "skip=true" "$t/out"; then circleci-agent step halt; fi
+        else
+          echo "turbo query affected failed (exit $code); running everything"
+        fi
+  # step: setup-pnpm-node
+  - run:
+      name: pnpm (corepack, version from packageManager)
+      command: |
+        mkdir -p "$HOME/.local/bin"
+        corepack enable --install-directory "$HOME/.local/bin"
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+  # step: install
+  - when:
+      condition:
+        not:
+          equal: [main, << pipeline.git.branch >>]
+      steps:
+      - restore_cache:
+          keys:
+            - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+            - pnpm-v1-
+  - run:
+      name: Install
+      command: pnpm install --frozen-lockfile --prefer-offline
+  - when:
+      condition:
+        equal: [main, << pipeline.git.branch >>]
+      steps:
+      - save_cache:
+          key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths: [~/.local/share/pnpm/store]
+  # step: turbo-cache
+  # TODO(hoard-restore): pass `restore: false` on the default branch once hoard has it (spec §12 item 15).
+  # hoard 0.4.0, verified 2026-10-28; sha256 is the linux-x64 musl archive
+  - hoard:
+      step: start
+      version: 0.4.0
+      sha256: aade187a9a04f0273c8f382265116d77cba234977141f91aefe2072610a24484
+  # step: rust-affected
+  - run:
+      name: Rust affected?
+      command: |
+        echo skip > .rust-cache-key
+        [ -f .github/scripts/rust-affected.mjs ] || exit 0
+        t="$(mktemp -d)"
+        rust=false
+        if pnpm turbo query affected --packages > "$t/rust.json"; then
+          node .github/scripts/rust-affected.mjs < "$t/rust.json" > "$t/out"
+          if grep -qx "rust=true" "$t/out"; then rust=true; fi
+        else
+          echo "turbo query affected --packages failed; running Rust steps"
+          rust=true
+        fi
+        if [ "$rust" = true ]; then
+          echo "export RUST=true" >> "$BASH_ENV"
+          { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key
+        fi
+  # step: rust-toolchain
+  - run:
+      name: Rust toolchain (from rust-toolchain.toml)
+      command: |
+        [ "$RUST" = true ] || exit 0
+        # rustup 1.29.2, verified 2026-10-28 (static.rust-lang.org rustup-init.sha256)
+        curl -fsSL -o /tmp/rustup-init "https://static.rust-lang.org/rustup/archive/1.29.2/x86_64-unknown-linux-gnu/rustup-init"
+        echo "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4  /tmp/rustup-init" | sha256sum -c - || exit 1
+        chmod +x /tmp/rustup-init
+        /tmp/rustup-init -y --profile minimal --default-toolchain none
+        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+        . "$HOME/.cargo/env"
+        rustup toolchain install
+  # step: rust-cache
+  - when:
+      condition:
+        not:
+          equal: [main, << pipeline.git.branch >>]
+      steps:
+      - restore_cache:
+          keys:
+            - rust-v2-{{ checksum ".rust-cache-key" }}
+  # step: rust-tools
+  - run:
+      name: cargo-nextest and cargo-deny
+      command: |
+        [ "$RUST" = true ] || exit 0
+        # Tools live in $HOME/.hull-tools, which no cache ever restores or saves, and come first on
+        # PATH: a binary from a cache (CircleCI caches are not branch-scoped) is never trusted.
+        tools="$HOME/.hull-tools"
+        mkdir -p "$tools/bin"
+        echo "export PATH=\"$tools/bin:\$PATH\"" >> "$BASH_ENV"
+        # cargo-nextest 0.9.148 linux-gnu release asset; sha256 computed 2026-10-28 by downloading
+        # https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.148/cargo-nextest-0.9.148-x86_64-unknown-linux-gnu.tar.gz
+        # (no checksum file is published)
+        t="$(mktemp -d)"
+        curl -fsSL -o "$t/nextest.tgz" "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.148/cargo-nextest-0.9.148-x86_64-unknown-linux-gnu.tar.gz"
+        echo "223ba936714cc861a9cdedad5a8eb664dfdd69d6fbdf6cea6aa8184f523290dc  $t/nextest.tgz" | sha256sum -c - || exit 1
+        tar -xzf "$t/nextest.tgz" -C "$t" cargo-nextest
+        install -m 755 "$t/cargo-nextest" "$tools/bin/cargo-nextest"
+        # cargo-deny 0.20.2 musl, sha256 from the release's .sha256 asset, 2026-10-28
+        curl -fsSL -o "$t/deny.tgz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"
+        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  $t/deny.tgz" | sha256sum -c - || exit 1
+        tar -xzf "$t/deny.tgz" -C "$t" --strip-components=1 cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny
+        install -m 755 "$t/cargo-deny" "$tools/bin/cargo-deny"
+  # step: run-affected
+  - run:
+      name: Run affected tasks
+      command: pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only
+  - run: mkdir -p ~/.cargo/registry target
+  - when:
+      condition:
+        equal: [main, << pipeline.git.branch >>]
+      steps:
+      - save_cache:
+          key: rust-v2-{{ checksum ".rust-cache-key" }}
+          paths: [~/.cargo/registry, target]
+  # step: duration
+  - hoard:
+      step: stop
+      version: 0.4.0
+  - run:
+      name: Job duration
+      when: always
+      command: |
+        secs=$(( $(date +%s) - ${CI_START:-$(date +%s)} ))
+        echo "ci job: ${secs} s (budget: 75 s typical PR, 30 s docs-only)"
