@@ -223,6 +223,12 @@ function usesSecret(node, key = "") {
   return false;
 }
 
+/** An `environment:` counts only as a literal name or `{ name: <literal> }`, never an expression. */
+function literalEnvironment(e) {
+  const name = e && typeof e === "object" ? e.name : e;
+  return typeof name === "string" && name !== "" && !name.includes("${{");
+}
+
 /**
  * Jobs that reference a secret other than secrets.GITHUB_TOKEN but declare no `environment:`.
  * A secret in workflow-level `env:` applies to every job.
@@ -231,7 +237,7 @@ function envlessSecretJobs(rel, wf) {
   const wfWide = usesSecret(wf.env);
   const bad = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {}))
-    if ((wfWide || usesSecret(job)) && !job.environment)
+    if ((wfWide || usesSecret(job)) && !literalEnvironment(job.environment))
       bad.push(`${rel} job ${id}: secrets without environment`);
   return bad;
 }
@@ -277,4 +283,14 @@ test("the environment check catches each form of secret use", () => {
   const wide = { env: { T: "${{ secrets.X }}" }, jobs: { a: {}, b: { environment: "e" } } };
   assert.equal(envlessSecretJobs("x", wide).length, 1);
   assert.deepEqual(envlessSecretJobs("x", job({ environment: "e", secrets: "inherit" })), []);
+  assert.deepEqual(
+    envlessSecretJobs("x", job({ environment: { name: "e" }, secrets: "inherit" })),
+    [],
+  );
+  for (const environment of ["${{ inputs.env }}", { name: "${{ inputs.env }}" }, { url: "u" }])
+    assert.equal(
+      envlessSecretJobs("x", job({ environment, env: { T: "${{ secrets.X }}" } })).length,
+      1,
+      JSON.stringify(environment),
+    );
 });
