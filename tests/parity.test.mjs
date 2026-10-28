@@ -9,7 +9,7 @@ const base = fileURLToPath(new URL("../template/pieces/base/files/", import.meta
 const tasks = CI_TASKS.join(" ");
 
 test("parity: generated ci.yml, base ci script and dogfood use CI_TASKS", async () => {
-  const yml = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
+  const yml = await readFile(`${base}.github/workflows/ci.yml.jinja`, "utf8");
   const turbo = yml.match(/pnpm turbo run ([a-z: ]+?) --affected/);
   assert.equal(turbo?.[1], tasks);
   const query = yml.match(/query affected --tasks ([a-z: ]+?) >/);
@@ -59,7 +59,7 @@ test("comboSteps runs cargo generate-lockfile for the rust-cli combo before turb
 });
 
 test("dogfood and generated ci.yml both run `node scripts/agents-index.mjs --check`", async () => {
-  const ci = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
+  const ci = await readFile(`${base}.github/workflows/ci.yml.jinja`, "utf8");
   assert.match(ci, /^\s+run: node scripts\/agents-index\.mjs --check$/m);
   const cmds = comboSteps("/c", ["base"], "/d").map(([c, a]) => [c, ...a].join(" "));
   assert.ok(cmds.includes("node scripts/agents-index.mjs --check"));
@@ -87,7 +87,7 @@ test("cargo-deny pin equal in template ci.yml, release.yml and the renovate rege
     const yml = await readFile(`${base}.github/workflows/${file}`, "utf8");
     return [...yml.matchAll(regex)].map((m) => m.groups.currentValue);
   };
-  const found = await pins("ci.yml");
+  const found = await pins("ci.yml.jinja");
   assert.deepEqual(found, ["0.20.2"]);
   assert.deepEqual(await pins("release.yml"), found);
   const hull = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
@@ -120,7 +120,7 @@ test("cargo-nextest pin equal in template ci.yml, hull ci.yml and the renovate r
   assert.deepEqual(mgr.managerFilePatterns, ["/^\\.github/workflows/.*\\.ya?ml$/"]);
   const regex = new RegExp(mgr.matchStrings[0], "g");
   const pins = (text) => [...text.matchAll(regex)].map((m) => m.groups.currentValue);
-  const tmpl = await readFile(`${base}.github/workflows/ci.yml`, "utf8");
+  const tmpl = await readFile(`${base}.github/workflows/ci.yml.jinja`, "utf8");
   const hull = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
   assert.deepEqual(pins(tmpl), ["0.9.148"]);
   assert.deepEqual(pins(hull), ["0.9.148"]);

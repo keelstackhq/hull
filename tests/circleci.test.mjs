@@ -31,9 +31,13 @@ test("piece requires base and owns exactly the S§6.3 paths (no glob, none in an
     ".circleci/src/commands/hoard.yml",
     ".circleci/src/executors/node.yml",
     ".circleci/src/jobs/ci-ok.yml",
+    ".circleci/src/jobs/desktop.yml",
     ".circleci/src/workflows/ci.yml",
+    ".circleci/src/workflows/desktop.yml",
   ]);
-  for (const p of owned) assert.equal(classOf(p), "owned", p);
+  // the desktop pair renders only with circleci-only + tauri-app (circleci-only.test.mjs)
+  for (const p of owned.filter((x) => !x.endsWith("/desktop.yml")))
+    assert.equal(classOf(p), "owned", p);
   const pieces = fileURLToPath(new URL("../template/pieces/", import.meta.url));
   for (const other of (await readdir(pieces)).filter((d) => d !== "circleci")) {
     const t = await readFile(join(pieces, other, "piece.toml"), "utf8");
@@ -67,7 +71,7 @@ test("ci workflow: no branch or path filters; the job is named ci-ok", async () 
   assert.deepEqual(wf.jobs, ["ci-ok"]);
   for (const f of ["src/workflows/ci.yml", "config.yml"])
     assert.doesNotMatch(await read(f), /filters|paths-ignore/);
-  assert.equal((await readdir(join(FILES, "src/jobs"))).join(), "ci-ok.yml");
+  assert.equal((await readdir(join(web.dir, ".circleci/src/jobs"))).join(), "ci-ok.yml");
 });
 
 test("every downloaded binary is pinned and checked with sha256sum -c", async () => {
@@ -132,7 +136,12 @@ test("rendered .circleci/src packs to a well-formed config (structural check)", 
 
 test("the secrets-exec command is not in the circleci piece (HU-5)", async () => {
   const all = await readdir(FILES, { recursive: true });
-  assert.ok(!all.some((f) => /secrets-exec|desktop|deploy/.test(f)), all.join());
+  // the desktop pair is the only circleci-only extra (HU-3); no deploy job or secrets command yet
+  assert.ok(!all.some((f) => /secrets-exec|deploy/.test(f)), all.join());
+  assert.deepEqual(all.filter((f) => /desktop/.test(f)).toSorted(), [
+    "src/jobs/desktop.yml.jinja",
+    "src/workflows/desktop.yml.jinja",
+  ]);
   assert.doesNotMatch(ciOk, /secrets-exec/);
 });
 

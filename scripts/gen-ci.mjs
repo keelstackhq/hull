@@ -8,7 +8,7 @@ import { CI_PLAN } from "./lib/ci-tasks.mjs";
 import { isMain } from "./lib/is-main.mjs";
 
 export const GITHUB_CI_PATH = fileURLToPath(
-  new URL("../template/pieces/base/files/.github/workflows/ci.yml", import.meta.url),
+  new URL("../template/pieces/base/files/.github/workflows/ci.yml.jinja", import.meta.url),
 );
 
 export const CIRCLECI_OK_PATH = fileURLToPath(
@@ -60,6 +60,15 @@ export function githubCi(plan = CI_PLAN) {
   return `${header}${steps}${footer}`;
 }
 
+/**
+ * The checked-in template source: the workflow behind the `circleci-only` guard (no trailing
+ * newline after `endif`, so the normal render ends in exactly one newline and the circleci-only
+ * render is empty, secrets-ci design §6.1).
+ */
+export function githubCiTemplate(plan = CI_PLAN) {
+  return `{% if "circleci-only" in pieces %}{% else %}{% raw %}${githubCi(plan)}{% endraw %}{% endif %}`;
+}
+
 /** The CircleCI `ci-ok` job (body of `.circleci/src/jobs/ci-ok.yml`) for `CI_PLAN`. */
 export function circleciOk(plan = CI_PLAN) {
   const steps = plan.map((s) => `  # step: ${s.id}\n${s.circleci}`).join("");
@@ -68,7 +77,7 @@ export function circleciOk(plan = CI_PLAN) {
 
 async function main() {
   const files = [
-    [GITHUB_CI_PATH, githubCi(), "ci.yml"],
+    [GITHUB_CI_PATH, githubCiTemplate(), "ci.yml.jinja"],
     [CIRCLECI_OK_PATH, circleciOk(), "ci-ok.yml"],
   ];
   if (process.argv.includes("--check")) {

@@ -1,0 +1,4 @@
+{
+  "name": "web-circleci-only",
+  "pieces": ["base", "circleci", "circleci-only", "preact-app:web", "hono-worker:api"]
+}

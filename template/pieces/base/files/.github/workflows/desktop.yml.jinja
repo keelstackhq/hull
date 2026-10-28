@@ -1,4 +1,4 @@
-{% if "tauri-app" in pieces %}name: desktop
+{% if "circleci-only" in pieces %}{% else %}{% if "tauri-app" in pieces %}name: desktop
 
 on:
   workflow_dispatch:
@@ -28,4 +28,4 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build desktop
         run: pnpm turbo run build:desktop
-{% endif %}
+{% endif %}{% endif %}

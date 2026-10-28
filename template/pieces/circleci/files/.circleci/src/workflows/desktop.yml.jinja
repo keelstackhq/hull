@@ -1,0 +1,9 @@
+{% if "circleci-only" in pieces %}{% if "tauri-app" in pieces %}# Weekly: create the scheduled pipeline in the CircleCI project settings (Triggers, Mondays 05:00 UTC,
+# like the GitHub cron). Also runs for a manual pipeline (API). Never on a PR.
+when:
+  or:
+    - equal: [scheduled_pipeline, << pipeline.trigger_source >>]
+    - equal: [api, << pipeline.trigger_source >>]
+jobs:
+  - desktop
+{% endif %}{% endif %}

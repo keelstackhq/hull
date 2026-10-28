@@ -16,6 +16,7 @@ const UNTRUSTED = [
   "pull_request_review_comment",
   "merge_group",
   "issue_comment",
+  "status",
 ];
 
 function walk(dir) {
@@ -44,6 +45,7 @@ function workflows() {
         for (const pieces of [
           ["base"],
           ["base", "hono-worker", "tauri-app", "secrets", "circleci"],
+          ["base", "hono-worker", "tauri-app", "secrets", "circleci", "circleci-only"],
         ]) {
           const text = renderString(src, contextFor(src, pieces));
           if (text.trim()) out.push({ rel: `${rel} [${pieces.join(",")}]`, text });
@@ -115,6 +117,35 @@ test("workflows triggered by pull_request, pull_request_target, merge_group or i
   };
   const bad = all.flatMap((w) => untrustedViolations(w.rel, YAML.parse(w.text), load));
   assert.deepEqual(bad, []);
+});
+
+test("rendered combos: no pull_request_target, issue_comment or status workflow has environment: or SOPS_AGE_KEY", async () => {
+  const web = ["base", "preact-app:web", "hono-worker:api"];
+  const vars = { scope: "hullci", context_prefix: "hullci" };
+  const combos = [
+    [...web, "secrets"],
+    [...web, "circleci", "circleci-only"],
+    [...web, "secrets", "circleci", "circleci-only"],
+  ];
+  const seen = new Set();
+  for (const pieces of combos) {
+    const { dir } = await renderCombo(pieces, pieces.includes("secrets") ? vars : {});
+    const wfDir = join(dir, ".github/workflows");
+    for (const f of readdirSync(wfDir)) {
+      const text = readFileSync(join(wfDir, f), "utf8");
+      seen.add(f);
+      const wf = YAML.parse(text);
+      if (!triggers(wf).some((t) => ["pull_request_target", "issue_comment", "status"].includes(t)))
+        continue;
+      assert.ok(!/SOPS_AGE_KEY/.test(text), `${pieces.join()} ${f}: SOPS_AGE_KEY`);
+      for (const [id, job] of Object.entries(wf.jobs))
+        assert.equal(job.environment, undefined, `${pieces.join()} ${f} ${id}: environment`);
+      assert.deepEqual(untrustedViolations(f, wf), []);
+    }
+  }
+  // the secret-reading workflows are rendered in these combos and covered by the other checks
+  for (const f of ["circleci-status.yml", "deploy.yml", "preview-deploy.yml"])
+    assert.ok(seen.has(f), f);
 });
 
 test("the untrusted-trigger check catches each kind of leak", () => {
