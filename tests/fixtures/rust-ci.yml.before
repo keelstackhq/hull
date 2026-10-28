@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+    steps:
+      - name: Start timer
+        run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      # The runner's preinstalled node runs both scripts (Node built-ins only); no setup step.
+      - name: Agents index current?
+        run: node scripts/agents-index.mjs --check
+      - name: Docs only?
+        id: affected
+        run: node .github/scripts/docs-only.mjs >> "$GITHUB_OUTPUT"
+      - name: Rust toolchain (from rust-toolchain.toml)
+        if: steps.affected.outputs.skip != 'true'
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        if: steps.affected.outputs.skip != 'true'
+        with:
+          key: ${{ hashFiles('rust-toolchain.toml') }}
+      - uses: taiki-e/install-action@v2
+        if: steps.affected.outputs.skip != 'true'
+        with:
+          tool: cargo-nextest@0.9.148,cargo-deny@0.20.2
+      - name: Format
+        if: steps.affected.outputs.skip != 'true'
+        run: cargo fmt --all --check
+      - name: Clippy
+        if: steps.affected.outputs.skip != 'true'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Dependency policy
+        if: steps.affected.outputs.skip != 'true'
+        run: cargo deny --locked check bans licenses sources
+      - name: Tests
+        if: steps.affected.outputs.skip != 'true'
+        run: cargo nextest run --workspace --locked --profile ci
+      - name: Doc tests
+        if: steps.affected.outputs.skip != 'true'
+        run: cargo test --workspace --doc --locked
+      - name: Job duration
+        if: always()
+        continue-on-error: true
+        run: |
+          secs=$(( $(date +%s) - ${CI_START:-$(date +%s)} ))
+          echo "ci job: ${secs} s (budget: 45 s typical PR, 15 s docs-only)" >> "$GITHUB_STEP_SUMMARY"
+
+  ci-ok:
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require ci success
+        run: |
+          if [ "${{ needs.ci.result }}" != "success" ]; then
+            echo "ci result: ${{ needs.ci.result }}"
+            exit 1
+          fi

@@ -1,0 +1,6 @@
+{
+  "name": "rust-circleci",
+  "template": "template-rust",
+  "pieces": ["base", "circleci", "rust-cli:cli"],
+  "vars": {}
+}

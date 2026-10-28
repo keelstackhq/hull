@@ -22,7 +22,7 @@ const RUST_PIECES = new Set(["rust-tool", "rust-cli"]);
 const VITE_PIECES = new Set(["preact-app", "ui-storybook", "astro-site"]);
 
 /** Steps run in a rendered template-rust combo (spec §15): no pnpm, no turbo. */
-export function rustComboSteps(renderer = "dev") {
+export function rustComboSteps(renderer = "dev", pieces = [], dir = ".") {
   const ci = RUST_CI_STEPS.map((s) => {
     const [cmd, ...args] = s.split(" ");
     return [cmd, args];
@@ -36,7 +36,11 @@ export function rustComboSteps(renderer = "dev") {
           ["cargo", ["generate-lockfile"]],
           ["node", ["scripts/agents-index.mjs"]],
         ];
-  return [...setup, ...ci, ["node", ["scripts/agents-index.mjs", "--check"]]];
+  const steps = [...setup, ...ci, ["node", ["scripts/agents-index.mjs", "--check"]]];
+  // pack .circleci/src with the pinned CLI and check it (S§12 item 3)
+  if (pieces.some((p) => p.split(":")[0] === "circleci"))
+    steps.push(["node", [CHECK_CIRCLECI, dir]]);
+  return steps;
 }
 
 /** Steps run in each rendered combo; `check-single-vite` for combos with Vite pieces. */
@@ -153,7 +157,7 @@ export async function dogfood(opts) {
       }
       if (ok) {
         const steps = isRustTemplate(combo)
-          ? rustComboSteps(renderer)
+          ? rustComboSteps(renderer, combo.pieces, dir)
           : comboSteps(cacheDir, combo.pieces, dir, renderer);
         for (const [cmd, args] of steps) {
           if ((await exec(cmd, args, dir)) !== 0) {

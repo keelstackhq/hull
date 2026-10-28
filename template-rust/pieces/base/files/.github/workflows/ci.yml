@@ -23,44 +23,57 @@ jobs:
     env:
       BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
     steps:
+      # step: timer
       - name: Start timer
         run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
+      # step: checkout
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           filter: blob:none
+      # step: agents-index
       # The runner's preinstalled node runs both scripts (Node built-ins only); no setup step.
       - name: Agents index current?
         run: node scripts/agents-index.mjs --check
+      # step: docs-only
       - name: Docs only?
         id: affected
         run: node .github/scripts/docs-only.mjs >> "$GITHUB_OUTPUT"
+      # step: rust-toolchain
       - name: Rust toolchain (from rust-toolchain.toml)
         if: steps.affected.outputs.skip != 'true'
         run: rustup toolchain install
+      # step: rust-cache
       - uses: Swatinem/rust-cache@v2
         if: steps.affected.outputs.skip != 'true'
         with:
           key: ${{ hashFiles('rust-toolchain.toml') }}
+      # step: rust-tools
       - uses: taiki-e/install-action@v2
         if: steps.affected.outputs.skip != 'true'
         with:
           tool: cargo-nextest@0.9.148,cargo-deny@0.20.2
+      # step: fmt
       - name: Format
         if: steps.affected.outputs.skip != 'true'
         run: cargo fmt --all --check
+      # step: clippy
       - name: Clippy
         if: steps.affected.outputs.skip != 'true'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # step: deny
       - name: Dependency policy
         if: steps.affected.outputs.skip != 'true'
         run: cargo deny --locked check bans licenses sources
+      # step: nextest
       - name: Tests
         if: steps.affected.outputs.skip != 'true'
         run: cargo nextest run --workspace --locked --profile ci
+      # step: doc-tests
       - name: Doc tests
         if: steps.affected.outputs.skip != 'true'
         run: cargo test --workspace --doc --locked
+      # step: duration
       - name: Job duration
         if: always()
         continue-on-error: true

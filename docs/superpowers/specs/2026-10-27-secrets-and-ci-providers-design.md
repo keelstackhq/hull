@@ -403,6 +403,10 @@ carry `# step: <id>` comments. Tests: (1) regenerating equals the checked-in fil
 sequence in both equals `CI_PLAN`; (3) the task list in both equals `CI_TASKS` (existing parity
 test extended); (4) in HU-1b the generated `ci.yml` equals today's `ci.yml` after stripping the
 `# step:` comment lines; HU-3 renames it to `ci.yml.jinja` (guard + raw block).
+template-rust's pair (HU-7) comes from `RUST_CI_PLAN`, whose run steps are `RUST_CI_STEPS`:
+`timer, checkout, agents-index, docs-only, rust-toolchain, rust-cache, rust-tools, fmt, clippy,
+deny, nextest, doc-tests, duration` (no turbo, no hoard; `scm-base.sh` sets `BASE` for
+`docs-only.mjs`).
 
 ### 6.3 CircleCI files and which piece owns them
 
@@ -418,6 +422,9 @@ circleci piece (owns exactly these paths, no `.circleci/**` glob):
 .circleci/src/jobs/desktop.yml.jinja + workflows/desktop.yml.jinja
                                      {% if "tauri-app" in pieces %} inside {% if "circleci-only" in pieces %}
                                      (in this piece because tauri-app's files are under apps/<name>/)
+template-rust circleci piece: config.yml, @config.yml, scripts/scm-base.sh (byte-identical to the
+above), executors/rust.yml (the same cimg/node digest; Rust from a sha-checked rustup-init),
+jobs/ci-ok.yml (generated), workflows/ci.yml
 secrets piece (root files, no target):
 .circleci/src/commands/secrets-exec.yml.jinja   {% if "circleci" in pieces %} (= hoist reference, §4.3)
 .circleci/src/jobs/deploy.yml.jinja, workflows/deploy.yml.jinja   {% if "circleci-only" in pieces %}
@@ -454,7 +461,7 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   command: saves `hoard-v1-main~{{ .Revision }}` and restores the newest `hoard-v1-main~` prefix (P7);
   its restore still runs on main until hoard gains a parameter to skip it (open, §12 item 15). Rust:
   `~/.cargo/registry` and `target/` only (never `~/.cargo/bin`) keyed on the git-ignored file
-  `.rust-cache-key` (`rust-v2-{{ checksum ".rust-cache-key" }}`), written by the rust-affected step: the
+  `.rust-cache-key` (`rust-v2-{{ checksum ".rust-cache-key" }}`), written by the rust-affected step (docs-only in template-rust): the
   literal `skip` when no Rust work, else a hash of `Cargo.lock` + `rust-toolchain.toml` (either may be
   missing). No prefix fallback. A skip run on the default branch saves an empty cache under the
   constant skip key, which cannot collide with a hash key and is immutable, so it is harmless.
@@ -596,6 +603,8 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
 1. The CircleCI GitHub App status context for a job named `ci-ok` is exactly `ci/circleci: ci-ok`,
    and the sender login of those statuses is `circleci-app[bot]` (a constant in the mirror; CAN-1
    checks it and, if it differs, an agent PR fixes the constant in hull and bosun — no owner step).
+   Pinning the sender by numeric `github.event.sender.id` (stable across renames) is an option once
+   CAN-1 records the id.
 2. `checkout: method: blobless` exists and works with `git fetch` of the default branch.
 3. `circleci config pack` output + continuation API works without orbs; `circleci config validate`
    runs offline in hull CI (else hull validates against the CircleCI JSON schema from SchemaStore,

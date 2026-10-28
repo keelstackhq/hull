@@ -1,0 +1,7 @@
+# Unfiltered by branch or path: gh-readonly-queue/* (merge queue) and every PR branch run ci-ok.
+# Scheduled pipelines skip it (no caches saved on main by a schedule); push and API pipelines still run it.
+when:
+  not:
+    equal: [scheduled_pipeline, << pipeline.trigger_source >>]
+jobs:
+  - ci-ok

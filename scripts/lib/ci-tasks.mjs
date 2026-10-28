@@ -354,3 +354,137 @@ export const RUST_CI_STEPS = Object.freeze([
   "cargo nextest run --workspace --locked --profile ci",
   "cargo test --workspace --doc --locked",
 ]);
+
+const NOT_DOCS = "steps.affected.outputs.skip != 'true'";
+const RUST_RUN_NAMES = [
+  ["fmt", "Format"],
+  ["clippy", "Clippy"],
+  ["deny", "Dependency policy"],
+  ["nextest", "Tests"],
+  ["doc-tests", "Doc tests"],
+];
+if (RUST_RUN_NAMES.length !== RUST_CI_STEPS.length)
+  throw new Error("RUST_RUN_NAMES must name every RUST_CI_STEPS entry");
+
+const ccRun = (name, ...lines) => [`  - run:`, `      name: ${name}`, ...lines];
+const rustRun = ([id, name], i) => {
+  const cmd = RUST_CI_STEPS[i];
+  const last = i === RUST_RUN_NAMES.length - 1;
+  return {
+    id,
+    github: yml(`      - name: ${name}`, `        if: ${NOT_DOCS}`, `        run: ${cmd}`),
+    circleci: yml(
+      ...ccRun(name, `      command: ${cmd}`),
+      ...(last
+        ? [
+            "  - run: mkdir -p ~/.cargo/registry target",
+            ...onDefault(
+              "  - save_cache:",
+              '      key: rust-v2-{{ checksum ".rust-cache-key" }}',
+              "      paths: [~/.cargo/registry, target]",
+            ),
+          ]
+        : []),
+    ),
+  };
+};
+
+// No turbo and no hoard here: BASE (what docs-only.mjs diffs against) comes from scm-base.sh.
+const RUST_CHECKOUT = yml(
+  "  - checkout:",
+  "      method: blobless",
+  "  - run:",
+  "      name: Diff base (scm-base.sh)",
+  "      command: |",
+  "        git fetch --no-tags origin main",
+  // Assign first: CircleCI runs bash -eo pipefail, so a failing scm-base.sh stops the job.
+  "        base=$(sh .circleci/scripts/scm-base.sh '<< pipeline.git.base_revision >>')",
+  '        echo "export BASE=$base" >> "$BASH_ENV"',
+);
+
+const RUST_CIRCLECI_TOOLS = CIRCLECI["rust-tools"].replaceAll(`        ${rustOnly}\n`, "");
+
+/**
+ * Steps of the generated `template-rust` CI job, in order (secrets-ci design §6.2, §7). Same
+ * shape as `CI_PLAN`; the run steps' commands are exactly `RUST_CI_STEPS`. GitHub and CircleCI
+ * bodies differ only where the provider forces it (no turbo, no pnpm, docs-only early exit).
+ */
+export const RUST_CI_PLAN = Object.freeze(
+  [
+    { id: "timer", github: GITHUB_STEPS[0].github, circleci: CIRCLECI.timer },
+    { id: "checkout", github: GITHUB_STEPS[1].github, circleci: RUST_CHECKOUT },
+    {
+      id: "agents-index",
+      github: yml(
+        "      # The runner's preinstalled node runs both scripts (Node built-ins only); no setup step.",
+        "      - name: Agents index current?",
+        "        run: node scripts/agents-index.mjs --check",
+      ),
+      circleci: CIRCLECI["agents-index"],
+    },
+    {
+      id: "docs-only",
+      github: yml(
+        "      - name: Docs only?",
+        "        id: affected",
+        '        run: node .github/scripts/docs-only.mjs >> "$GITHUB_OUTPUT"',
+      ),
+      circleci: yml(
+        ...ccRun(
+          "Docs only?",
+          "      command: |",
+          // The cache key file is all the Rust cache steps key on: "skip" when docs-only.
+          "        echo skip > .rust-cache-key",
+          '        t="$(mktemp -d)"',
+          '        node .github/scripts/docs-only.mjs > "$t/out"',
+          '        if grep -qx "skip=true" "$t/out"; then circleci-agent step halt; fi',
+          // Missing files are fine (cat exits 1, so `|| true` keeps bash -eo pipefail alive).
+          '        { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key',
+        ),
+      ),
+    },
+    {
+      id: "rust-toolchain",
+      github: yml(
+        "      - name: Rust toolchain (from rust-toolchain.toml)",
+        `        if: ${NOT_DOCS}`,
+        "        run: rustup toolchain install",
+      ),
+      circleci: CIRCLECI["rust-toolchain"].replace(`        ${rustOnly}\n`, ""),
+    },
+    {
+      id: "rust-cache",
+      github: yml(
+        "      - uses: Swatinem/rust-cache@v2",
+        `        if: ${NOT_DOCS}`,
+        "        with:",
+        "          key: ${{ hashFiles('rust-toolchain.toml') }}",
+      ),
+      circleci: CIRCLECI["rust-cache"],
+    },
+    {
+      id: "rust-tools",
+      github: yml(
+        "      - uses: taiki-e/install-action@v2",
+        `        if: ${NOT_DOCS}`,
+        "        with:",
+        "          tool: cargo-nextest@0.9.148,cargo-deny@0.20.2",
+      ),
+      circleci: RUST_CIRCLECI_TOOLS,
+    },
+    ...RUST_RUN_NAMES.map(rustRun),
+    {
+      id: "duration",
+      github: GITHUB_STEPS.at(-1).github,
+      circleci: yml(
+        ...ccRun(
+          "Job duration",
+          "      when: always",
+          "      command: |",
+          "        secs=$(( $(date +%s) - ${CI_START:-$(date +%s)} ))",
+          '        echo "ci job: ${secs} s (budget: 75 s typical PR, 30 s docs-only)"',
+        ),
+      ),
+    },
+  ].map((s) => Object.freeze(s)),
+);

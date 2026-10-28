@@ -149,3 +149,14 @@ test("template-rust base, manifest and other files select every template-rust co
     "rust-lib",
   ]);
 });
+
+test("real combos: the template-rust circleci piece selects rust-circleci only", () => {
+  const real = loadCombos().combos;
+  assert.deepEqual(affectedCombos(["template-rust/pieces/circleci/files/x"], real), [
+    "rust-circleci",
+  ]);
+  assert.deepEqual(affectedCombos(["template-rust/pieces/rust-cli/files/x"], real), [
+    "rust",
+    "rust-circleci",
+  ]);
+});

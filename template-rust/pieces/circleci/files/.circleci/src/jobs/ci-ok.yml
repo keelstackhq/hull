@@ -1,0 +1,104 @@
+executor: rust
+steps:
+  # step: timer
+  - run: echo "export CI_START=$(date +%s)" >> "$BASH_ENV"
+  # step: checkout
+  - checkout:
+      method: blobless
+  - run:
+      name: Diff base (scm-base.sh)
+      command: |
+        git fetch --no-tags origin main
+        base=$(sh .circleci/scripts/scm-base.sh '<< pipeline.git.base_revision >>')
+        echo "export BASE=$base" >> "$BASH_ENV"
+  # step: agents-index
+  - run:
+      name: Agents index current?
+      command: node scripts/agents-index.mjs --check
+  # step: docs-only
+  - run:
+      name: Docs only?
+      command: |
+        echo skip > .rust-cache-key
+        t="$(mktemp -d)"
+        node .github/scripts/docs-only.mjs > "$t/out"
+        if grep -qx "skip=true" "$t/out"; then circleci-agent step halt; fi
+        { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key
+  # step: rust-toolchain
+  - run:
+      name: Rust toolchain (from rust-toolchain.toml)
+      command: |
+        # rustup 1.29.2, verified 2026-10-28 (static.rust-lang.org rustup-init.sha256)
+        curl -fsSL -o /tmp/rustup-init "https://static.rust-lang.org/rustup/archive/1.29.2/x86_64-unknown-linux-gnu/rustup-init"
+        echo "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4  /tmp/rustup-init" | sha256sum -c - || exit 1
+        chmod +x /tmp/rustup-init
+        /tmp/rustup-init -y --profile minimal --default-toolchain none
+        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+        . "$HOME/.cargo/env"
+        rustup toolchain install
+  # step: rust-cache
+  - when:
+      condition:
+        not:
+          equal: [main, << pipeline.git.branch >>]
+      steps:
+      - restore_cache:
+          keys:
+            - rust-v2-{{ checksum ".rust-cache-key" }}
+  # step: rust-tools
+  - run:
+      name: cargo-nextest and cargo-deny
+      command: |
+        # Tools live in $HOME/.hull-tools, which no cache ever restores or saves, and come first on
+        # PATH: a binary from a cache (CircleCI caches are not branch-scoped) is never trusted.
+        tools="$HOME/.hull-tools"
+        mkdir -p "$tools/bin"
+        echo "export PATH=\"$tools/bin:\$PATH\"" >> "$BASH_ENV"
+        # cargo-nextest 0.9.148 linux-gnu release asset; sha256 computed 2026-10-28 by downloading
+        # https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.148/cargo-nextest-0.9.148-x86_64-unknown-linux-gnu.tar.gz
+        # (no checksum file is published)
+        t="$(mktemp -d)"
+        curl -fsSL -o "$t/nextest.tgz" "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.148/cargo-nextest-0.9.148-x86_64-unknown-linux-gnu.tar.gz"
+        echo "223ba936714cc861a9cdedad5a8eb664dfdd69d6fbdf6cea6aa8184f523290dc  $t/nextest.tgz" | sha256sum -c - || exit 1
+        tar -xzf "$t/nextest.tgz" -C "$t" cargo-nextest
+        install -m 755 "$t/cargo-nextest" "$tools/bin/cargo-nextest"
+        # cargo-deny 0.20.2 musl, sha256 from the release's .sha256 asset, 2026-10-28
+        curl -fsSL -o "$t/deny.tgz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"
+        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  $t/deny.tgz" | sha256sum -c - || exit 1
+        tar -xzf "$t/deny.tgz" -C "$t" --strip-components=1 cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny
+        install -m 755 "$t/cargo-deny" "$tools/bin/cargo-deny"
+  # step: fmt
+  - run:
+      name: Format
+      command: cargo fmt --all --check
+  # step: clippy
+  - run:
+      name: Clippy
+      command: cargo clippy --workspace --all-targets --locked -- -D warnings
+  # step: deny
+  - run:
+      name: Dependency policy
+      command: cargo deny --locked check bans licenses sources
+  # step: nextest
+  - run:
+      name: Tests
+      command: cargo nextest run --workspace --locked --profile ci
+  # step: doc-tests
+  - run:
+      name: Doc tests
+      command: cargo test --workspace --doc --locked
+  - run: mkdir -p ~/.cargo/registry target
+  - when:
+      condition:
+        equal: [main, << pipeline.git.branch >>]
+      steps:
+      - save_cache:
+          key: rust-v2-{{ checksum ".rust-cache-key" }}
+          paths: [~/.cargo/registry, target]
+  # step: duration
+  - run:
+      name: Job duration
+      when: always
+      command: |
+        secs=$(( $(date +%s) - ${CI_START:-$(date +%s)} ))
+        echo "ci job: ${secs} s (budget: 75 s typical PR, 30 s docs-only)"

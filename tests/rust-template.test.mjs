@@ -46,7 +46,7 @@ test("template-rust manifest: format 1, hull-rust, base, min_splice 0.2.0, no va
   assert.equal(t.base, "base");
   assert.equal(t.minSplice, "0.2.0");
   assert.deepEqual(Object.keys(t.vars ?? {}), []);
-  assert.deepEqual([...t.pieces.keys()].sort(), ["base", "rust-cli"]);
+  assert.deepEqual([...t.pieces.keys()].sort(), ["base", "circleci", "rust-cli"]);
 });
 
 test("template-rust invariants: one class per path, subset, no {{ in paths", async () => {

@@ -1,0 +1,7 @@
+version: 2.1
+# cimg/node 24.22.1, same digest as template's executor (multi-arch index verified 2026-10-28, Docker
+# Hub registry). Node is here only for the two repo scripts (agents-index.mjs, docs-only.mjs) that
+# the GitHub job runs on the runner's node; the Rust toolchain comes from rustup per rust-toolchain.toml.
+docker:
+  - image: cimg/node:24.22.1@sha256:af46387c805de6dc3bc101a66de590daf4d01d5565ea66a99cf438fba323a055
+resource_class: medium
