@@ -163,6 +163,16 @@ const onDefault = (...steps) => [
   "      steps:",
   ...steps.map((l) => `    ${l}`),
 ];
+// A same-repo PR runs its own .circleci config and can write cache keys the default branch will
+// use, so the default branch restores no cache and always builds clean; only PRs reuse its caches.
+const offDefault = (...steps) => [
+  "  - when:",
+  "      condition:",
+  "        not:",
+  "          equal: [main, << pipeline.git.branch >>]",
+  "      steps:",
+  ...steps.map((l) => `    ${l}`),
+];
 const rustOnly = '[ "$RUST" = true ] || exit 0';
 const CIRCLECI = {
   timer: yml('  - run: echo "export CI_START=$(date +%s)" >> "$BASH_ENV"'),
@@ -215,10 +225,12 @@ const CIRCLECI = {
     '        echo \'export PATH="$HOME/.local/bin:$PATH"\' >> "$BASH_ENV"',
   ),
   install: yml(
-    "  - restore_cache:",
-    "      keys:",
-    '        - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}',
-    "        - pnpm-v1-",
+    ...offDefault(
+      "  - restore_cache:",
+      "      keys:",
+      '        - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}',
+      "        - pnpm-v1-",
+    ),
     "  - run:",
     "      name: Install",
     "      command: pnpm install --frozen-lockfile --prefer-offline",
@@ -229,6 +241,7 @@ const CIRCLECI = {
     ),
   ),
   "turbo-cache": yml(
+    "  # TODO(hoard-restore): pass `restore: false` on the default branch once hoard has it (spec §12 item 15).",
     "  # hoard 0.4.0, verified 2026-10-28; sha256 is the linux-x64 musl archive",
     "  - hoard:",
     "      step: start",
@@ -272,9 +285,11 @@ const CIRCLECI = {
     "        rustup toolchain install",
   ),
   "rust-cache": yml(
-    "  - restore_cache:",
-    "      keys:",
-    '        - rust-v2-{{ checksum ".rust-cache-key" }}',
+    ...offDefault(
+      "  - restore_cache:",
+      "      keys:",
+      '        - rust-v2-{{ checksum ".rust-cache-key" }}',
+    ),
   ),
   "rust-tools": yml(
     "  - run:",
@@ -286,11 +301,15 @@ const CIRCLECI = {
     '        tools="$HOME/.hull-tools"',
     '        mkdir -p "$tools/bin"',
     '        echo "export PATH=\\"$tools/bin:\\$PATH\\"" >> "$BASH_ENV"',
-    "        # nextest publishes no checksum file we can reach, so it is rebuilt from the pinned source",
-    "        # on every Rust run (crates verified by its Cargo.lock; slow, accepted).",
-    '        cargo install --locked --root "$tools" cargo-nextest@0.9.148',
-    "        # cargo-deny 0.20.2 musl, sha256 from the release's .sha256 asset, 2026-10-28",
+    "        # cargo-nextest 0.9.148 linux-gnu release asset; sha256 computed 2026-10-28 by downloading",
+    "        # https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.148/cargo-nextest-0.9.148-x86_64-unknown-linux-gnu.tar.gz",
+    "        # (no checksum file is published)",
     '        t="$(mktemp -d)"',
+    '        curl -fsSL -o "$t/nextest.tgz" "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.148/cargo-nextest-0.9.148-x86_64-unknown-linux-gnu.tar.gz"',
+    '        echo "223ba936714cc861a9cdedad5a8eb664dfdd69d6fbdf6cea6aa8184f523290dc  $t/nextest.tgz" | sha256sum -c - || exit 1',
+    '        tar -xzf "$t/nextest.tgz" -C "$t" cargo-nextest',
+    '        install -m 755 "$t/cargo-nextest" "$tools/bin/cargo-nextest"',
+    "        # cargo-deny 0.20.2 musl, sha256 from the release's .sha256 asset, 2026-10-28",
     '        curl -fsSL -o "$t/deny.tgz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"',
     '        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  $t/deny.tgz" | sha256sum -c - || exit 1',
     '        tar -xzf "$t/deny.tgz" -C "$t" --strip-components=1 cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny',

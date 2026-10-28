@@ -258,7 +258,7 @@ test("every save_cache is default-branch-only and never saves ~/.cargo/bin", asy
   }
 });
 
-test("cargo-deny is verified on every run and cargo-nextest is never taken from a cache", () => {
+test("cargo-deny is verified on every run, never taken from a cache", () => {
   const step = CI_PLAN.find((s) => s.id === "rust-tools").circleci;
   const command = YAML.parse(step)[0].run.command;
   assert.doesNotMatch(command, /command -v/);
@@ -266,5 +266,47 @@ test("cargo-deny is verified on every run and cargo-nextest is never taken from 
   const check = lines.findIndex((l) => l.includes("sha256sum -c") && l.includes("deny"));
   assert.ok(check > 0);
   assert.match(lines[check], /^echo/, "the check is not nested in an if");
-  assert.match(command, /cargo install --locked --root \S+ cargo-nextest@/);
+});
+
+test("ci-ok restores no cache on the default branch (hoard.yml is vendored and checked separately)", () => {
+  const restores = [];
+  const walk = (steps, skipsOnMain) => {
+    for (const step of steps ?? []) {
+      if (typeof step === "string") continue;
+      if (step.restore_cache) restores.push({ skipsOnMain, keys: step.restore_cache.keys });
+      if (step.when?.steps) {
+        const eq = step.when.condition?.not?.equal;
+        const notMain =
+          Array.isArray(eq) && eq[0] === "main" && eq[1] === "<< pipeline.git.branch >>";
+        walk(step.when.steps, skipsOnMain || notMain);
+      }
+    }
+  };
+  walk(YAML.parse(ciOk).steps, false);
+  assert.ok(restores.length >= 2, "pnpm and rust caches");
+  for (const r of restores)
+    assert.ok(r.skipsOnMain, `restore_cache ${JSON.stringify(r.keys)} runs on the default branch`);
+});
+
+test("cargo-nextest comes from the pinned release tarball, verified unconditionally", () => {
+  const step = CI_PLAN.find((s) => s.id === "rust-tools").circleci;
+  const command = YAML.parse(step)[0].run.command;
+  assert.doesNotMatch(command, /cargo install/);
+  const lines = command.split("\n");
+  const dl = lines.findIndex((l) => /curl .*-o "\$t\/nextest\.tgz"/.test(l));
+  const check = lines.findIndex((l) =>
+    /^echo "[0-9a-f]{64} {2}\$t\/nextest\.tgz" \| sha256sum -c - \|\| exit 1$/.test(l),
+  );
+  const use = lines.findIndex((l) => l.startsWith("tar ") && l.includes("nextest.tgz"));
+  assert.ok(dl >= 0 && dl < check && check < use, "download, then check, then extract");
+  assert.match(lines[dl], /cargo-nextest-0\.9\.148-x86_64-unknown-linux-gnu\.tar\.gz/);
+});
+
+test("the hoard start step carries TODO(hoard-restore) until hoard can skip its restore on main", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const yml = await readFile(
+    new URL("../template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(yml, /# TODO\(hoard-restore\)[^\n]*\n(?:\s*#[^\n]*\n)*\s*- hoard:\n\s*step: start/);
 });
