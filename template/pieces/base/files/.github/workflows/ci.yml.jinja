@@ -100,6 +100,10 @@ jobs:
       - name: Run affected tasks
         if: steps.affected.outputs.skip != 'true'
         run: pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only
+      # step: ci-extra
+      - name: Repo CI extras (scripts/ci-extra.sh)
+        if: steps.affected.outputs.skip != 'true'
+        run: if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi
       # step: duration
       - name: Job duration
         if: always()

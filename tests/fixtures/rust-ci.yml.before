@@ -61,6 +61,9 @@ jobs:
       - name: Doc tests
         if: steps.affected.outputs.skip != 'true'
         run: cargo test --workspace --doc --locked
+      - name: Repo CI extras (scripts/ci-extra.sh)
+        if: steps.affected.outputs.skip != 'true'
+        run: if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi
       - name: Job duration
         if: always()
         continue-on-error: true

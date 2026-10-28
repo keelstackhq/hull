@@ -77,6 +77,7 @@ Files (shared):
 Files (seed):
 
 - `AGENTS.md`
+- `scripts/ci-extra.sh`
 - `README.md`
 - `docs/agents/project.md`
 - `packages/shared/src/**`

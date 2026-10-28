@@ -105,7 +105,7 @@ test("hoard is the turbo remote cache: after install, before turbo run, no actio
 });
 
 test("turbo run uses CI_TASKS and --affected", () => {
-  const last = steps.at(-2);
+  const last = steps.at(-3);
   assert.equal(last.run, `pnpm turbo run ${tasks} --affected --output-logs=errors-only`);
 });
 

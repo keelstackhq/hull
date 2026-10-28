@@ -4,7 +4,7 @@ description = "Pure Rust workspace root: cargo, rustup pin, cargo-deny, nextest,
 [files]
 shared = ["Cargo.toml", "crates/common/Cargo.toml"]
 owned = [".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/docs-only.mjs", ".github/scripts/release-pending.mjs", "scripts/agents-index.mjs", "rust-toolchain.toml", "rustfmt.toml", "deny.toml", ".config/nextest.toml", "renovate.json"]
-seed = ["AGENTS.md", "README.md", "docs/agents/project.md", "hoist.toml", "crates/common/src/**"]
+seed = ["AGENTS.md", "scripts/ci-extra.sh", "README.md", "docs/agents/project.md", "hoist.toml", "crates/common/src/**"]
 
 [merge]
 "Cargo.toml" = "toml"

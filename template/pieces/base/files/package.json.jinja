@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ci": "turbo run lint format:check typecheck test build --affected",
+    "ci": "turbo run lint format:check typecheck test build --affected && (if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi)",
     "check": "turbo run lint format:check typecheck test",
     "build": "turbo run build",
     "test": "turbo run test",

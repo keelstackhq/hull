@@ -55,7 +55,10 @@ test("vite override matches the vite-plus pin", async () => {
 test("ci script uses CI_TASKS with --affected", async () => {
   const { dir } = await renderCombo(["base"]);
   const pkg = JSON.parse(await read(dir, "package.json"));
-  assert.equal(pkg.scripts.ci, `turbo run ${CI_TASKS.join(" ")} --affected`);
+  assert.equal(
+    pkg.scripts.ci,
+    `turbo run ${CI_TASKS.join(" ")} --affected && (if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi)`,
+  );
   assert.equal(pkg.scripts.check, "turbo run lint format:check typecheck test");
   assert.equal(pkg.packageManager, "pnpm@12.11.2");
   assert.equal(pkg.devDependencies.docspack, undefined);
@@ -87,7 +90,10 @@ test("root format:check covers root files via a root turbo task", async () => {
   assert.ok(turbo.tasks["//#format:check"]);
   const pkg = JSON.parse(await read(dir, "package.json"));
   assert.match(pkg.scripts["format:check"], /^vp fmt --check /);
-  assert.equal(pkg.scripts.ci, `turbo run ${CI_TASKS.join(" ")} --affected`);
+  assert.equal(
+    pkg.scripts.ci,
+    `turbo run ${CI_TASKS.join(" ")} --affected && (if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi)`,
+  );
 });
 
 test("turbo.json defines every CI task and no vp run", async () => {

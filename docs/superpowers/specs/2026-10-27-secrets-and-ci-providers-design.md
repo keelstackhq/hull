@@ -395,7 +395,7 @@ Until splice 0.3.0 is released, `circleci-only` is supported at `new` only; HU-9
 list of step ids with per-provider bodies:
 
 `timer, checkout, agents-index, affected, setup-pnpm-node, install, turbo-cache, rust-affected,
-rust-toolchain, rust-cache, rust-tools, run-affected, duration`.
+rust-toolchain, rust-cache, rust-tools, run-affected, ci-extra, duration`.
 
 `scripts/gen-ci.mjs` writes `template/pieces/base/files/.github/workflows/ci.yml.jinja` and
 `template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml` (and the template-rust pair). Both
@@ -405,8 +405,15 @@ test extended); (4) in HU-1b the generated `ci.yml` equals today's `ci.yml` afte
 `# step:` comment lines; HU-3 renames it to `ci.yml.jinja` (guard + raw block).
 template-rust's pair (HU-7) comes from `RUST_CI_PLAN`, whose run steps are `RUST_CI_STEPS`:
 `timer, checkout, agents-index, docs-only, rust-toolchain, rust-cache, rust-tools, fmt, clippy,
-deny, nextest, doc-tests, duration` (no turbo, no hoard; `scm-base.sh` sets `BASE` for
+deny, nextest, doc-tests, ci-extra, duration` (no turbo, no hoard; `scm-base.sh` sets `BASE` for
 `docs-only.mjs`).
+
+`ci-extra` is the repo-specific hook: the seed `scripts/ci-extra.sh` (a no-op `bash` script in both
+templates' `base`), run last as `if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi`
+(file modes are not carried, so it is never executed directly; a repo may delete the file). It sits
+inside the early exit: GitHub uses the same `if:` as the run steps, CircleCI places it after the
+affected / docs-only halt, so a docs-only or unaffected PR never runs it. Dogfood and the base `ci`
+script run it too.
 
 ### 6.3 CircleCI files and which piece owns them
 
