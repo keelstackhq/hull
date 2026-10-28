@@ -71,5 +71,6 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 
 - `docs/agents/project.md`: repo-specific notes; read first.
 - `docs/agents/index.md`: generated map of commands, packages and docs.{% if "docs" in pieces %}
-- `docs/agents/docs.md`: how to look up dependency docs.{% endif %}
+- `docs/agents/docs.md`: how to look up dependency docs.{% endif %}{% if "secrets" in pieces %}
+- `docs/agents/secrets.md`: rules for secrets; never read values.{% endif %}
 - `<dir>/AGENTS.md`: notes for one package.

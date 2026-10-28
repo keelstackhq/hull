@@ -153,3 +153,52 @@ test("unreadable files dir (not ENOENT) is rethrown", async () => {
     (e) => e.code === "ENOTDIR",
   );
 });
+
+/** Fixture copy with extra pieces; `vars` maps piece id -> [vars] toml body. */
+async function withPieces(vars) {
+  const dir = await mkdtemp(join(tmpdir(), "hull-plan-"));
+  await cp(FIXTURE, dir, { recursive: true });
+  for (const [id, body] of Object.entries(vars)) {
+    await cp(join(dir, "pieces/app"), join(dir, "pieces", id), { recursive: true });
+    await writeFile(
+      join(dir, "pieces", id, "piece.toml"),
+      `id = "${id}"\nrequires = ["base"]\ntarget = "apps/${id}"\n\n[vars]\n${body}\n\n[files]\nowned = ["config.json"]\n`,
+    );
+  }
+  return loadTemplate(dir);
+}
+const uv = (t2, pieces, vars) => resolveRequest(t2, { pieces, vars });
+const usage = (re) => (e) => e instanceof UsageError && re.test(e.message);
+const NEEDED = 'token = { prompt = "token", pattern = "^[a-z]+$" }';
+
+test("unqualified piece var maps to its single owner", async () => {
+  const t2 = await withPieces({ one: NEEDED });
+  assert.equal(uv(t2, ["one"], { token: "abc" })[1].vars.token, "abc");
+});
+test("unqualified var matching a template var stays template-level", async () => {
+  const t2 = await withPieces({ one: 'scope = { prompt = "s", default = "own" }' });
+  const i = uv(t2, ["one"], { scope: "tpl" });
+  assert.equal(i[0].vars.scope, "tpl");
+  assert.equal(i[1].vars.scope, "own");
+});
+test("unqualified var declared by two selected pieces applies to both", async () => {
+  const t2 = await withPieces({ one: NEEDED, two: NEEDED });
+  const i = uv(t2, ["one", "two"], { token: "abc" });
+  assert.deepEqual(
+    i.slice(1).map((x) => x.vars.token),
+    ["abc", "abc"],
+  );
+});
+test("unqualified name is not mapped", async () => {
+  const t2 = await withPieces({ one: NEEDED });
+  assert.throws(() => uv(t2, ["one"], { name: "x", token: "abc" }), usage(/unknown var "name"/));
+});
+test("unqualified var of an unselected owner → unknown var", async () => {
+  const t2 = await withPieces({ one: NEEDED });
+  assert.throws(() => uv(t2, ["app"], { token: "abc" }), usage(/unknown var "token"/));
+  assert.throws(() => uv(t2, ["app"], { "one.token": "abc" }), usage(/one\.token.*not selected/));
+});
+test("missing required piece var names the unqualified key", async () => {
+  const t2 = await withPieces({ one: NEEDED });
+  assert.throws(() => uv(t2, ["one"], {}), usage(/^token is required \(piece one\)$/));
+});

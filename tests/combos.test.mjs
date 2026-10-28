@@ -23,6 +23,11 @@ test("loadCombos returns exactly the combos hull CI renders, sorted by name", ()
     { name: "rust", template: "template-rust", pieces: ["base", "rust-cli:cli"], vars: {} },
     { name: "site", pieces: ["base", "astro-site:site", "rust-tool:tool"] },
     { name: "web", pieces: ["base", "preact-app:web", "ui-storybook", "hono-worker:api"] },
+    {
+      name: "web-secrets",
+      pieces: ["base", "preact-app:web", "hono-worker:api", "secrets"],
+      vars: { scope: "hullci", context_prefix: "hullci" },
+    },
   ]);
 });
 
