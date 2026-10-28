@@ -61,6 +61,7 @@ Files (owned):
 - `.github/scripts/affected.mjs`
 - `.github/scripts/rust-affected.mjs`
 - `.github/workflows/release.yml`
+- `.github/workflows/splice.yml`
 - `.github/scripts/release-plan.mjs`
 - `scripts/agents-index.mjs`
 - `Cargo.toml`

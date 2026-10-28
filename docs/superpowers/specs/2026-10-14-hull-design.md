@@ -183,8 +183,13 @@ Root files (class in brackets):
   plus `docspack` when `"docs" in pieces`.
   Also script `agents:index` = `node scripts/agents-index.mjs`; root `format:check` and the
   `//#format:check` inputs cover `scripts` (the owned `scripts/agents-index.mjs`, and `docs-packs.mjs`
-  with `docs`). `piece.toml` lists `scripts/agents-index.mjs` as owned and has a second `[[post]]`,
-  `node scripts/agents-index.mjs`, `when = ["new", "add", "update"]`, after the install post.
+  with `docs`). `piece.toml` lists `scripts/agents-index.mjs` as owned and has the install post on `new`,
+  then `[[post]]` `pnpm install --lockfile-only --ignore-scripts`, `when = ["update"]`, then
+  `node scripts/agents-index.mjs`, `when = ["new", "add", "update"]`. The lockfile post exists because
+  splice runs every post whose `when` contains `update` and a catalog bump arrives through the
+  `pnpm-workspace.yaml` merge without a lockfile change, so the bot's PR would fail
+  `pnpm install --frozen-lockfile`. `splice.yml` sets up pnpm and node (SHA-pinned, before the App
+  token step, so they never see the token) for it.
 - `pnpm-workspace.yaml` [shared, yaml]: `packages: [apps/*, packages/*, crates/*]`; `catalog:`
   with every version in §7 (unused entries are harmless, so the file does not depend on pieces);
   `overrides: { vite: "npm:@voidzero-dev/vite-plus-core@<vite-plus version>" }`;
@@ -219,7 +224,7 @@ Root files (class in brackets):
   `.gitattributes` [owned] `* text=auto eol=lf`.
 - `renovate.json` [owned]: `{"extends": ["github>keelstackhq/hull//renovate/default"]}` (§8.6).
 - `.github/workflows/ci.yml` [owned] (§8.1), `preview.yml` [owned] with `.github/scripts/preview.mjs` [owned] (§8.2),
-  `desktop.yml.jinja` [owned] (§8.3), `release.yml` [owned] with
+  `desktop.yml.jinja` [owned] (§8.3), `splice.yml` [owned] (the update bot; token order App, PAT, `github.token` and session mode as in §15), `release.yml` [owned] with
   `.github/scripts/release-plan.mjs` [owned] (§8.7; plain files, rendered in every repo, idle
   without a rust-cli or ts-lib package). A `.jinja` workflow can emit GitHub's `${{ … }}` only with
   `{% raw %}` (needs `min_splice` 0.2.0); today every workflow is a plain file unless it needs

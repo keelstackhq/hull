@@ -7,6 +7,7 @@ import YAML from "yaml";
 const path = (p) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const SPLICE = ".github/workflows/splice.yml";
 const RUST_SPLICE = `template-rust/pieces/base/files/${SPLICE}`;
+const TS_SPLICE = `template/pieces/base/files/${SPLICE}`;
 const RUST_RELEASE = "template-rust/pieces/base/files/.github/workflows/release.yml";
 const load = (p) => YAML.parse(readFileSync(path(p), "utf8"));
 
@@ -36,11 +37,44 @@ function checkJob(job, idVar, keyName, perms) {
 }
 
 test("splice.yml: hull's and template-rust's are byte-identical", () => {
-  assert.equal(readFileSync(path(SPLICE), "utf8"), readFileSync(path(RUST_SPLICE), "utf8"));
+  const want = readFileSync(path(SPLICE), "utf8");
+  assert.equal(readFileSync(path(RUST_SPLICE), "utf8"), want);
+});
+
+// The two setup steps template/'s copy adds (splice's [[post]] lockfile hook needs pnpm and node);
+// they run before the App step, so they never see the bot token.
+const SETUP_STEPS = `      # The update runs template [[post]] hooks on this runner, e.g. \`pnpm install --lockfile-only\`.
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .node-version
+`;
+const ANCHOR = "      # Optional GitHub App";
+
+test("splice.yml: template/'s copy differs only by the pnpm and node setup steps", () => {
+  const want = readFileSync(path(SPLICE), "utf8");
+  const ts = readFileSync(path(TS_SPLICE), "utf8");
+  assert.ok(want.includes(ANCHOR));
+  assert.equal(ts, want.replace(ANCHOR, SETUP_STEPS + ANCHOR));
+  const steps = load(TS_SPLICE).jobs.update.steps;
+  const app = steps.findIndex((s) => s.id === "app");
+  const setup = steps.filter((s) =>
+    /^(pnpm\/action-setup|actions\/setup-node)@/.test(s.uses ?? ""),
+  );
+  assert.equal(setup.length, 2);
+  for (const s of setup) {
+    assert.ok(steps.indexOf(s) < app, "before the App step");
+    assert.match(s.uses, /@[0-9a-f]{40}$/);
+    assert.ok(!("env" in s) && !("token" in (s.with ?? {})), "no env or token input");
+    assert.ok(!JSON.stringify(s).includes("secrets."), "no secrets");
+  }
+  assert.match(ts, /pnpm\/action-setup@[0-9a-f]{40} # v\d+\.\d+\.\d+\n/);
+  assert.match(ts, /actions\/setup-node@[0-9a-f]{40} # v\d+\.\d+\.\d+\n/);
+  assert.equal(setup[1].with["node-version-file"], ".node-version");
 });
 
 test("splice.yml: App token step pinned and gated, token precedence app > PAT > github.token", () => {
-  for (const f of [SPLICE, RUST_SPLICE]) {
+  for (const f of [SPLICE, RUST_SPLICE, TS_SPLICE]) {
     const job = load(f).jobs.update;
     job.__file = f;
     checkJob(job, "SPLICE_APP_CLIENT_ID", "SPLICE_APP_KEY", [
@@ -58,7 +92,7 @@ test("splice.yml: App token step pinned and gated, token precedence app > PAT > 
 });
 
 test("splice.yml: session mode, job skipped when vars.SPLICE_BOT == 'off'", () => {
-  for (const f of [SPLICE, RUST_SPLICE])
+  for (const f of [SPLICE, RUST_SPLICE, TS_SPLICE])
     assert.equal(load(f).jobs.update.if, "vars.SPLICE_BOT != 'off'");
 });
 
@@ -79,7 +113,7 @@ test("release.yml prepare: App token step pinned and gated, precedence app > PAT
   for (const s of job.steps.filter((x) => /\bnpm install\b/.test(x.run ?? "")))
     assert.match(s.run, /--ignore-scripts/, s.run);
   const raw = readFileSync(path(RUST_RELEASE), "utf8");
-  for (const f of [SPLICE, RUST_SPLICE])
+  for (const f of [SPLICE, RUST_SPLICE, TS_SPLICE])
     assert.match(
       readFileSync(path(f), "utf8"),
       /uses: keelstackhq\/splice\/action@5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0 # v0\.3\.0\n/,

@@ -3,7 +3,7 @@ description = "Workspace root: pnpm, Turborepo, TypeScript, Vite+, CI and AI lay
 
 [files]
 shared = ["package.json", "pnpm-workspace.yaml", "turbo.json", "packages/shared/package.json"]
-owned = [".github/workflows/ci.yml", ".github/workflows/preview.yml", ".github/workflows/preview-deploy.yml", ".github/scripts/preview.mjs", ".github/workflows/desktop.yml", ".github/scripts/affected.mjs", ".github/scripts/rust-affected.mjs", ".github/workflows/release.yml", ".github/scripts/release-plan.mjs", "scripts/agents-index.mjs", "Cargo.toml", "rust-toolchain.toml", "renovate.json"]
+owned = [".github/workflows/ci.yml", ".github/workflows/preview.yml", ".github/workflows/preview-deploy.yml", ".github/scripts/preview.mjs", ".github/workflows/desktop.yml", ".github/scripts/affected.mjs", ".github/scripts/rust-affected.mjs", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/release-plan.mjs", "scripts/agents-index.mjs", "Cargo.toml", "rust-toolchain.toml", "renovate.json"]
 seed = ["AGENTS.md", "scripts/ci-extra.sh", "README.md", "docs/agents/project.md", "packages/shared/src/**"]
 
 [merge]
@@ -15,6 +15,12 @@ seed = ["AGENTS.md", "scripts/ci-extra.sh", "README.md", "docs/agents/project.md
 [[post]]
 run = "pnpm install --no-frozen-lockfile"
 when = ["new"]
+
+# A catalog bump arrives via the pnpm-workspace.yaml merge; refresh pnpm-lock.yaml so the update
+# PR passes `pnpm install --frozen-lockfile`. Lockfile only, no install scripts.
+[[post]]
+run = "pnpm install --lockfile-only --ignore-scripts"
+when = ["update"]
 
 [[post]]
 run = "node scripts/agents-index.mjs"
