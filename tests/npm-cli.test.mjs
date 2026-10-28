@@ -50,7 +50,7 @@ test("classes", async () => {
 test("package.json: no publish-time metadata, four scripts, bin and crate wiring", async () => {
   const { dir } = await renderCombo(["base", "rust-cli:mytool", "npm-cli:mynpm"], {
     scope: "acme",
-    "npm-cli.crate": "mytool",
+    crate: "mytool",
   });
   const pkg = JSON.parse(await read(dir, "packages/mynpm/package.json"));
   assert.equal(pkg.name, "@acme/mynpm");
@@ -94,7 +94,7 @@ test("tsconfig checks the JavaScript sources with Node types (typecheck is tsc)"
 
 test("AGENTS.md and README.md say a rust-cli instance is needed", async () => {
   const { dir } = await renderCombo(["base", "rust-cli:mytool", "npm-cli:cli"], {
-    "npm-cli.crate": "mytool",
+    crate: "mytool",
   });
   const re = /needs a rust-cli instance named `mytool`/;
   assert.match(await read(dir, "packages/cli/AGENTS.md"), re);

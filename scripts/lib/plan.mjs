@@ -26,6 +26,8 @@ function checkPattern(spec, name, value) {
   }
 }
 
+const missing = (k) => `missing value for var \`${k}\`; pass --data ${k}=…`;
+
 /** `implicitBase`: listing the base piece is a usage error, as in splice 0.2.0 `new`. */
 export function resolveRequest(t, req, { implicitBase = false } = {}) {
   const parsed = req.pieces.map((item) => {
@@ -60,53 +62,35 @@ export function resolveRequest(t, req, { implicitBase = false } = {}) {
     if (list.length > 0 && !piece.multiple) {
       throw new UsageError(`piece "${id}" can only be added once`);
     }
-    const userName = explicit ?? req.vars[`${id}.name`];
+    const userName = explicit ?? (piece.multiple && piece.vars.name ? req.vars.name : undefined);
     const name = piece.multiple ? (userName ?? piece.vars.name?.default ?? id) : id;
     if (segmentProblem(name)) {
       const msg = `invalid instance name ${JSON.stringify(name)} for piece "${id}"`;
       throw new (userName === undefined && piece.multiple ? TemplateError : UsageError)(msg);
     }
     if (list.some((x) => x.name === name)) {
-      throw new UsageError(`piece "${id}" already has an instance named "${name}"`);
+      throw new UsageError(`piece \`${id}\` has two instances named \`${name}\``);
     }
     const inst = { piece, name };
     list.push(inst);
     order.push(inst);
   }
 
-  // Like splice, a bare `--data key=x` resolves against the template vars, then the vars of the
-  // SELECTED pieces; every selected piece declaring it gets the value. `name` stays qualified.
-  const owners = new Map();
-  for (const id of seen.keys()) {
-    for (const k of Object.keys(t.pieces.get(id).vars)) {
-      owners.set(k, [...(owners.get(k) ?? []), id]);
-    }
-  }
-  const vars = {};
-  for (const [k, v] of Object.entries(req.vars)) {
-    const o = k in t.vars || k === "name" ? undefined : owners.get(k);
-    for (const key of o ? o.map((id) => `${id}.${k}`) : [k]) {
-      if (key in vars) throw new UsageError(`var "${key}" given twice`);
-      vars[key] = v;
-    }
-  }
-  req = { ...req, vars };
-
+  // Contract rule 9.28: keys are bare var names. `new` accepts the template vars and the vars of
+  // the selected pieces; a piece var applies to every selected piece that declares it.
   const known = new Set(Object.keys(t.vars));
-  for (const piece of t.pieces.values()) {
-    for (const k of Object.keys(piece.vars)) known.add(`${piece.id}.${k}`);
-  }
+  for (const id of seen.keys()) for (const k of Object.keys(t.pieces.get(id).vars)) known.add(k);
   for (const k of Object.keys(req.vars)) {
-    if (!known.has(k)) throw new UsageError(`unknown var "${k}"`);
-    if (k.includes(".") && !seen.has(k.slice(0, k.indexOf(".")))) {
-      throw new UsageError(`var "${k}" targets a piece that is not selected`);
+    if (k.includes(".")) {
+      throw new UsageError(`var "${k}": --data keys are bare var names, not <piece>.<var>`);
     }
+    if (!known.has(k)) throw new UsageError(`unknown var "${k}"`);
   }
 
   const base = {};
   for (const [k, spec] of Object.entries(t.vars)) {
     const v = req.vars[k] ?? spec.default;
-    if (v === undefined) throw new UsageError(`var "${k}" is required`);
+    if (v === undefined) throw new UsageError(missing(k));
     checkPattern(spec, k, v);
     base[k] = v;
   }
@@ -115,11 +99,9 @@ export function resolveRequest(t, req, { implicitBase = false } = {}) {
     const vars = { ...base };
     if (inst.piece.multiple) vars.name = inst.name;
     for (const [k, spec] of Object.entries(inst.piece.vars)) {
-      let v = k === "name" ? inst.name : (req.vars[`${inst.piece.id}.${k}`] ?? spec.default);
-      if (v === undefined) {
-        throw new UsageError(`${k} is required (piece ${inst.piece.id})`);
-      }
-      checkPattern(spec, `${inst.piece.id}.${k}`, v);
+      let v = k === "name" ? inst.name : (req.vars[k] ?? spec.default);
+      if (v === undefined) throw new UsageError(missing(k));
+      checkPattern(spec, k, v);
       vars[k] = v;
     }
     inst.vars = vars;

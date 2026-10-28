@@ -776,7 +776,7 @@ Exists until splice v0.1 renders hull; afterwards it stays as a conformance orac
 
 ```
 node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]... \
-  --data <key>=<value>... [--data <piece-id>.<key>=<value>...] [--template-version <v>] [--json]
+  --data <key>=<value>... [--template-version <v>] [--json]
 ```
 
 - Implements contract §1–§4 and §8 (JSON shape, exit codes), and writes files for `new` only:
@@ -785,9 +785,13 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
 - `base` is always applied first and exactly once. The CLI refuses `--piece base` (exit 2, splice
   0.2.0's messages); `renderNew` (dogfood, tests) accepts it in a piece list and ignores it.
 - `--out` must not exist or be empty (exit 2).
-- Exit 2: unknown piece, missing `requires`, a non-multiple piece twice, duplicate instance name,
-  a var failing its `pattern`, unknown var. Exit 3: invalid `splice.toml`/`piece.toml`, unknown
-  `format`, subset violation, undefined variable, two pieces writing the same path.
+- `--data` keys follow contract rule 9.28: bare var names (template vars and the vars of the
+  selected pieces; a piece var applies to every selected instance that declares it).
+- Exit 2: unknown piece, missing `requires`, a non-multiple piece twice, duplicate instance name
+  (also two un-named instances of one piece given the same `--data name`), a var failing its
+  `pattern`, unknown var, a dotted `<piece>.<var>` key. Exit 3: invalid `splice.toml`/`piece.toml`,
+  unknown `format`, a piece var named like a template var, subset violation, undefined variable,
+  two pieces writing the same path.
 - Context: template vars, then the instance's piece vars; `pieces` (ids in application order,
   unique); `piece` `{id, name}` (name = `vars.name` or the id); `template`
   `{name, version}` (`--template-version`, default `0.0.0-dev`).

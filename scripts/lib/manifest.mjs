@@ -264,6 +264,15 @@ export async function loadTemplate(dir) {
         throw new TemplateError(`piece ${p.id}: requires "${r}" which is not a piece`);
     }
   }
+  for (const p of pieces.values()) {
+    for (const k of Object.keys(p.vars)) {
+      if (k in vars) {
+        throw new TemplateError(
+          `piece \`${p.id}\` variable \`${k}\` shadows the template variable of the same name`,
+        );
+      }
+    }
+  }
   return {
     dir,
     name: raw.name,

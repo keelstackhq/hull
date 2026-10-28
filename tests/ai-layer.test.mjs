@@ -449,7 +449,7 @@ test("all pieces together: AGENTS.md + CLAUDE.md <= 80 lines, index <= 8192 byte
       "rust-cli:cli",
       "npm-cli:npm",
     ],
-    { ...comboVars, "npm-cli.crate": "cli" },
+    { ...comboVars, crate: "cli" },
   );
   const { agents, claude } = await agentsText(dir);
   assert.ok(

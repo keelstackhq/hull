@@ -41,8 +41,22 @@ test("two instances of a multiple piece", () =>
   ));
 test("template var overrides default", () =>
   assert.equal(req(["app"], { scope: "x" })[1].vars.scope, "x"));
-test("piece var via <id>.<key>", () =>
-  assert.equal(req(["app"], { "app.name": "site" })[1].name, "site"));
+test("--data name=… names an un-named multiple instance", () =>
+  assert.equal(req(["app"], { name: "site" })[1].name, "site"));
+test("--piece id:name wins over --data name", () =>
+  assert.deepEqual(
+    req(["app:a", "app"], { name: "x" }).map((i) => i.name),
+    ["base", "a", "x"],
+  ));
+test("--data name=x on two un-named instances of one piece collides", () =>
+  assert.throws(
+    () => req(["app", "app"], { name: "x" }),
+    (e) => e instanceof UsageError && /piece `app` has two instances named `x`/.test(e.message),
+  ));
+test("dotted <piece>.<var> keys → UsageError", () => {
+  assert.throws(() => req(["app"], { "app.name": "site" }), UsageError);
+  assert.throws(() => req(["app"], { "base.scope": "x" }), UsageError);
+});
 test("unknown piece → UsageError", () =>
   assert.throws(
     () => req(["ghost"]),
@@ -175,11 +189,13 @@ test("unqualified piece var maps to its single owner", async () => {
   const t2 = await withPieces({ one: NEEDED });
   assert.equal(uv(t2, ["one"], { token: "abc" })[1].vars.token, "abc");
 });
-test("unqualified var matching a template var stays template-level", async () => {
-  const t2 = await withPieces({ one: 'scope = { prompt = "s", default = "own" }' });
-  const i = uv(t2, ["one"], { scope: "tpl" });
-  assert.equal(i[0].vars.scope, "tpl");
-  assert.equal(i[1].vars.scope, "own");
+test("a piece var named like a template var → TemplateError at load", async () => {
+  await assert.rejects(
+    withPieces({ one: 'scope = { prompt = "s", default = "own" }' }),
+    (e) =>
+      e instanceof TemplateError &&
+      /piece `one` variable `scope` shadows the template variable of the same name/.test(e.message),
+  );
 });
 test("unqualified var declared by two selected pieces applies to both", async () => {
   const t2 = await withPieces({ one: NEEDED, two: NEEDED });
@@ -189,16 +205,19 @@ test("unqualified var declared by two selected pieces applies to both", async ()
     ["abc", "abc"],
   );
 });
-test("unqualified name is not mapped", async () => {
+test("--data name=… names every un-named instance that declares it", async () => {
   const t2 = await withPieces({ one: NEEDED });
-  assert.throws(() => uv(t2, ["one"], { name: "x", token: "abc" }), usage(/unknown var "name"/));
+  assert.equal(uv(t2, ["app", "one"], { name: "x", token: "abc" })[1].name, "x");
 });
 test("unqualified var of an unselected owner → unknown var", async () => {
   const t2 = await withPieces({ one: NEEDED });
   assert.throws(() => uv(t2, ["app"], { token: "abc" }), usage(/unknown var "token"/));
-  assert.throws(() => uv(t2, ["app"], { "one.token": "abc" }), usage(/one\.token.*not selected/));
+  assert.throws(() => uv(t2, ["app"], { "one.token": "abc" }), UsageError);
 });
 test("missing required piece var names the unqualified key", async () => {
   const t2 = await withPieces({ one: NEEDED });
-  assert.throws(() => uv(t2, ["one"], {}), usage(/^token is required \(piece one\)$/));
+  assert.throws(
+    () => uv(t2, ["one"], {}),
+    usage(/^missing value for var `token`; pass --data token=…$/),
+  );
 });
