@@ -17,6 +17,7 @@ const HULL = fileURLToPath(new URL("..", import.meta.url));
 export const ciCommand = () => ["pnpm", "turbo", "run", ...CI_TASKS];
 
 const CHECK_SINGLE_VITE = fileURLToPath(new URL("./check-single-vite.mjs", import.meta.url));
+const CHECK_CIRCLECI = fileURLToPath(new URL("./circleci-check.mjs", import.meta.url));
 const RUST_PIECES = new Set(["rust-tool", "rust-cli"]);
 const VITE_PIECES = new Set(["preact-app", "ui-storybook", "astro-site"]);
 
@@ -60,6 +61,10 @@ export function comboSteps(cacheDir, pieces = [], dir = ".", renderer = "dev") {
         ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
     steps.push(["node", [CHECK_SINGLE_VITE, dir]]);
+  }
+  // pack .circleci/src with the pinned CLI and check it (S§12 item 3)
+  if (pieces.some((p) => p.split(":")[0] === "circleci")) {
+    steps.push(["node", [CHECK_CIRCLECI, dir]]);
   }
   return steps;
 }

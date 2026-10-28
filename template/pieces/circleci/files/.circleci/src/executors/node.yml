@@ -1,0 +1,5 @@
+# cimg/node 24.22.1, digest of the multi-arch index verified 2026-10-28 (Docker Hub registry).
+# Node comes with the image (affected.mjs and agents-index run before any install); .node-version is 24.
+docker:
+  - image: cimg/node:24.22.1@sha256:af46387c805de6dc3bc101a66de590daf4d01d5565ea66a99cf438fba323a055
+resource_class: medium

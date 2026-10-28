@@ -410,7 +410,7 @@ test extended); (4) in HU-1b the generated `ci.yml` equals today's `ci.yml` afte
 circleci piece (owns exactly these paths, no `.circleci/**` glob):
 .circleci/config.yml                 setup: true; packs .circleci/src, continues
 .circleci/src/@config.yml            version: 2.1
-.circleci/src/executors/node.yml     cimg/base pinned by digest, resource_class medium
+.circleci/src/executors/node.yml     cimg/node (Node is needed before install; the setup job uses cimg/base) pinned by digest, resource_class medium
 .circleci/src/commands/hoard.yml     start/stop hoard fs + restore/save cache (= hoard reference)
 .circleci/src/jobs/ci-ok.yml         generated (§6.2)
 .circleci/src/workflows/ci.yml       ci-ok on every branch incl. gh-readonly-queue/*
@@ -444,9 +444,9 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   failure stops the job.
   `TURBO_SCM_HEAD` = `CIRCLE_SHA1`.
 - **Caching:** pnpm store via `restore_cache`/`save_cache` keyed on `pnpm-lock.yaml`; turbo via
-  hoard `fs` in `~/.cache/hoard`, cache key `hoard-v1-{{ .Branch }}-{{ .Revision }}` restoring
-  `hoard-v1-{{ .Branch }}-` then `hoard-v1-main-` (P7). Rust: `~/.cargo` and `target/` keyed on
-  `Cargo.lock` + `rust-toolchain.toml`.
+  hoard `fs` in `~/.cache/hoard`, vendored hoard v0.4.0 command: saves
+  `hoard-v1-main~{{ .Revision }}` (default branch only) and restores the newest `hoard-v1-main~` prefix (P7). Rust: `~/.cargo` and `target/` keyed on
+  the git-ignored file `.rust-cache-key` (`rust-v2-{{ checksum ".rust-cache-key" }}`), written by the rust-affected step: the literal `skip` when no Rust work, else a hash of `Cargo.lock` + `rust-toolchain.toml` (either may be missing). No prefix fallback. `save_cache` cannot be conditioned on a file, so skip runs save an empty cache under the constant skip key; it cannot collide with a hash key and is immutable, so it is harmless.
 - **Budgets:** GitHub budget unchanged (45 s typical PR, 15 s docs-only). CircleCI: setup + one job,
   docker executor, ≤ 75 s typical PR, ≤ 30 s docs-only (setup adds a container start). D-011
   extends D-007 to CircleCI: one workflow, setup + one job on the PR path, no macOS on the PR path,

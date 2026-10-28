@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { GITHUB_CI_PATH, githubCi } from "../scripts/gen-ci.mjs";
+import { GITHUB_CI_PATH, circleciOk, githubCi } from "../scripts/gen-ci.mjs";
 import { CI_PLAN } from "../scripts/lib/ci-tasks.mjs";
 
 const genCi = fileURLToPath(new URL("../scripts/gen-ci.mjs", import.meta.url));
@@ -63,4 +63,22 @@ test("gen-ci --check run through a symlinked checkout still reports drift", asyn
   });
   assert.equal(r.status, 1, r.stderr);
   assert.match(r.stderr, /out of date/);
+});
+
+test("gen-ci --check also reports a drifted .circleci ci-ok.yml", async (t) => {
+  const tmp = await mkdtemp(join(tmpdir(), "hull-gen-ci-ok-"));
+  t.after(() => rm(tmp, { recursive: true, force: true }));
+  await cp(fileURLToPath(new URL("../scripts/", import.meta.url)), join(tmp, "scripts"), {
+    recursive: true,
+  });
+  const ok = join(tmp, "template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml");
+  const gh = join(tmp, "template/pieces/base/files/.github/workflows/ci.yml");
+  for (const f of [ok, gh]) await mkdir(dirname(f), { recursive: true });
+  await writeFile(gh, githubCi());
+  await writeFile(ok, `${circleciOk()}# drift\n`);
+  const r = spawnSync(process.execPath, [join(tmp, "scripts/gen-ci.mjs"), "--check"], {
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /ci-ok\.yml is out of date/);
 });

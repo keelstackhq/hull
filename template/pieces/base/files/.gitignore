@@ -12,3 +12,4 @@ storybook-static/
 .dev.vars
 *.log
 .DS_Store
+.rust-cache-key

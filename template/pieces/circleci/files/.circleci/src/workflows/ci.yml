@@ -1,0 +1,3 @@
+# Unfiltered by branch or path: gh-readonly-queue/* (merge queue) and every PR branch run ci-ok.
+jobs:
+  - ci-ok
