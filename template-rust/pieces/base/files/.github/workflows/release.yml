@@ -136,7 +136,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
-      - run: npm install -g "@keelstackhq/hoist@$HOIST_VERSION"
+      - run: npm install -g --ignore-scripts "@keelstackhq/hoist@$HOIST_VERSION"
       - uses: actions/download-artifact@v8
         with:
           pattern: dist-*
@@ -167,7 +167,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
       # The checkout keeps this token in .git/config (hoist pushes the release branch with it), so
-      # every later step can read it: install nothing here beyond the pinned hoist.
+      # every later step can read it: only the pinned hoist is installed, with --ignore-scripts.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -177,7 +177,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
-      - run: npm install -g "@keelstackhq/hoist@$HOIST_VERSION"
+      - run: npm install -g --ignore-scripts "@keelstackhq/hoist@$HOIST_VERSION"
       - run: hoist release prepare
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || secrets.HOIST_RELEASE_TOKEN || github.token }}

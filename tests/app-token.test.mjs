@@ -75,4 +75,15 @@ test("release.yml prepare: App token step pinned and gated, precedence app > PAT
   assert.equal(checkout.with.token, want);
   const hoist = job.steps.find((s) => s.run === "hoist release prepare");
   assert.equal(hoist.env.GH_TOKEN, want);
+  // the checkout leaves the token in .git/config: no install step may run lifecycle scripts
+  for (const s of job.steps.filter((x) => /\bnpm install\b/.test(x.run ?? "")))
+    assert.match(s.run, /--ignore-scripts/, s.run);
+  const raw = readFileSync(path(RUST_RELEASE), "utf8");
+  for (const f of [SPLICE, RUST_SPLICE])
+    assert.match(
+      readFileSync(path(f), "utf8"),
+      /uses: keelstackhq\/splice\/action@5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0 # v0\.3\.0\n/,
+      f,
+    );
+  assert.ok(raw.includes("--ignore-scripts"));
 });

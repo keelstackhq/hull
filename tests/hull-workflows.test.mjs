@@ -68,7 +68,8 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   const [checkout, , bot] = wf.jobs.update.steps;
   assert.match(checkout.uses, /^actions\/checkout@/);
   assert.equal(checkout.with["persist-credentials"], false);
-  assert.equal(bot.uses, "keelstackhq/splice/action@v1");
+  // it receives a token with workflows: write, so it is pinned by commit SHA
+  assert.equal(bot.uses, "keelstackhq/splice/action@5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0");
   assert.equal(bot.with.scope, "all");
   assert.equal(
     bot.with.token,

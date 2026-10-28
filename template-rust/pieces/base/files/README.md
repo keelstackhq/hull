@@ -44,11 +44,11 @@ A PR opened with `github.token` gets no CI (events by `GITHUB_TOKEN` trigger no 
 push changes to `.github/workflows/*` (needs the `workflows` permission), and so cannot merge when
 a ruleset requires `ci-ok`. Pick one:
 
-1. GitHub App (no personal token): install an App with Contents and Pull requests write (plus
-   Workflows write if it must update workflow files). In environment `splice-bot`, set the
-   variable `SPLICE_APP_CLIENT_ID` (the App's Client ID) and the secret `SPLICE_APP_KEY` (its
-   private key). For the release PR, set `HOIST_RELEASE_APP_CLIENT_ID` and `HOIST_RELEASE_APP_KEY`
-   in environment `release-pr`.
+1. GitHub App (no personal token): install an App with Contents and Pull requests write, and for
+   the update bot Workflows write (required: `splice.yml` requests it, and the token step fails
+   without it). In environment `splice-bot`, set the variable `SPLICE_APP_CLIENT_ID` (the App's
+   Client ID) and the secret `SPLICE_APP_KEY` (its private key). For the release PR, set
+   `HOIST_RELEASE_APP_CLIENT_ID` and `HOIST_RELEASE_APP_KEY` in environment `release-pr`.
 2. PAT: `SPLICE_BOT_TOKEN` / `HOIST_RELEASE_TOKEN` as environment secrets (Contents and Pull
    requests write; plus Workflows write for `SPLICE_BOT_TOKEN`).
 3. Session mode (update bot only): set the repository variable `SPLICE_BOT=off`. The job is
