@@ -335,3 +335,22 @@ test("README names the rigging and decisions channel adds (D-004); no bosun path
     }
   }
 });
+
+test("base post hooks: Cargo.lock is refreshed minimally on update, never re-resolved", () => {
+  const posts = t.pieces.get("base").post;
+  const upd = posts.filter((p) => p.when.includes("update") && p.run.includes("cargo"));
+  assert.deepEqual(
+    upd.map((p) => p.run),
+    ["cargo update --workspace"],
+  );
+  assert.deepEqual(upd[0].when, ["update"]);
+  for (const piece of t.pieces.values()) {
+    for (const p of piece.post ?? []) {
+      if (p.when.includes("update")) assert.doesNotMatch(p.run, /generate-lockfile/);
+    }
+  }
+  const order = posts.map((p) => p.run);
+  assert.ok(
+    order.indexOf("cargo update --workspace") < order.indexOf("node scripts/agents-index.mjs"),
+  );
+});

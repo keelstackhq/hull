@@ -189,7 +189,10 @@ Root files (class in brackets):
   splice runs every post whose `when` contains `update` and a catalog bump arrives through the
   `pnpm-workspace.yaml` merge without a lockfile change, so the bot's PR would fail
   `pnpm install --frozen-lockfile`. `splice.yml` sets up pnpm and node (SHA-pinned, before the App
-  token step, so they never see the token) for it.
+  token step, so they never see the token) for it. Known gap (2026-10-28): splice v0.3.0 runs post
+  hooks with the action's `GH_TOKEN` in their environment, so the lockfile post (and a repo's
+  `.pnpmfile.cjs`) can read the bot token; splice is removing token variables from post hooks, and
+  `splice.yml` moves to that release's SHA once it is out.
 - `pnpm-workspace.yaml` [shared, yaml]: `packages: [apps/*, packages/*, crates/*]`; `catalog:`
   with every version in §7 (unused entries are harmless, so the file does not depend on pieces);
   `overrides: { vite: "npm:@voidzero-dev/vite-plus-core@<vite-plus version>" }`;
@@ -1082,7 +1085,14 @@ it), no template `[vars]`. hull's `v<semver>` tags version all three templates.
   that matches no crate (`cargo metadata` and `generate-lockfile` exit 101 with no `apps/` crate,
   checked with cargo 1.99.1 on 2026-10-28), so a comment above it tells consumers to add such globs
   once a crate exists; the toml merge keeps that edit, but it conflicts if the template later
-  changes the array (arrays are whole values, contract §5). Owned files: `rust-toolchain.toml` (`1.99.1`, `clippy`,
+  changes the array (arrays are whole values, contract §5). `[[post]]`: `cargo generate-lockfile`
+  on `new`; on `update` `cargo update --workspace` refreshes `Cargo.lock` for dependency changes a
+  merge made to `Cargo.toml` (CI uses `--locked`) while leaving unrelated locked crates alone, which
+  `generate-lockfile` would re-resolve (cargo 1.97.1, 2026-10-28). In the update bot, rustup
+  (preinstalled on the runner) installs the pinned toolchain from `rust-toolchain.toml` on first use,
+  so `splice.yml` needs no toolchain step. splice skips post hooks when a merge conflicts, so a
+  conflict PR is refreshed by whoever resolves it. The `GH_TOKEN` gap of §6.1 applies here too
+  (`cargo update` runs with the bot token in its environment) until splice's fix is pinned. Owned files: `rust-toolchain.toml` (`1.99.1`, `clippy`,
   `rustfmt`, profile minimal), `rustfmt.toml` (`style_edition = "2024"`), `deny.toml` (the §6.10
   policy for the whole workspace), `.config/nextest.toml` (profile `ci`: no fail-fast),
   `.gitignore`, `.gitattributes`, `renovate.json` (the same preset, §8.6), the workflows below,
