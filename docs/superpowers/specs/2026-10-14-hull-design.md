@@ -1122,7 +1122,8 @@ the bosun target matrix (`cargo build --release --locked --target <t>`; each bin
 only in the release jobs that run hoist. The update bot `splice.yml` (owned) is the one splice's
 README gives. Token order for the bot and for `prepare`: a GitHub App token
 (`actions/create-github-app-token`, SHA-pinned, scoped to the repo; `vars.SPLICE_APP_CLIENT_ID` /
-`vars.HOIST_RELEASE_APP_CLIENT_ID` hold the App's Client ID, the key is an environment secret), else
+`vars.HOIST_RELEASE_APP_CLIENT_ID` hold the App's Client ID, a repository variable read by both `prepare` and `publish`; the key is
+a secret of each environment that uses it: `release-pr`, `release`), else
 the PAT secret, else `github.token`, whose PRs get no CI. `vars.SPLICE_BOT == 'off'` skips the bot
 job (session mode: an agent session runs `splice update --all` and opens the PR). 
 `publish` takes the same optional App (Contents write only) for `GH_TOKEN`, else `github.token`,

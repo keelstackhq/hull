@@ -184,10 +184,31 @@ content_of() {
   jq -r '.content // "" | gsub("\n"; "") | @base64d' <<<"$out"
 }
 
+# crate_names REPO: every [package] name of every Cargo.toml in the repo (one tree call, one read
+# per manifest); a virtual root manifest has none. Non-zero on a truncated tree or any read error.
+crate_names() {
+  local t paths path body rc
+  t=$(gh_get "repos/$1/git/trees/HEAD?recursive=1") || return 1
+  jq -e '.truncated == false and (.tree | type == "array")' <<<"$t" >/dev/null 2>&1 || {
+    echo "bootstrap-secrets: $1: file tree truncated or unreadable; cannot list crate names" >&2
+    return 1
+  }
+  paths=$(jq -r '.tree[] | select(.type == "blob" and (.path | test("(^|/)Cargo\\.toml$"))) | .path' <<<"$t")
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    rc=0
+    body=$(content_of "$1" "$path") || rc=$?
+    [ "$rc" -eq 0 ] || return 1
+    sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$body" \
+      | awk '/^\[/ { p = ($0 ~ /^\[package\]$/); next } p && /^name[[:space:]]*=/ { print; exit }'
+  done <<<"$paths"
+}
+
 # hoist_tag_mismatch REPO: prints ok | mismatch | unknown. Call after tag_ruleset said ok (it leaves
 # $TMPD/tag-app when an App is on the bypass list and $TMPD/tag-all when the ruleset includes ~ALL).
 # Only release.yml running `hoist release publish` matters. Its tags are blocked when the ruleset
-# covers ~ALL or hoist.toml's [release] tag_format contains -v (default {name}@{version}: no).
+# covers ~ALL, hoist.toml's [release] tag_format contains -v, or (format uses {name}, default
+# {name}@{version}) a crate name contains -v.
 # Blocked tags need an allowed App on the bypass list AND the repo variable
 # HOIST_RELEASE_APP_CLIENT_ID, else publish falls back to github.token and is rejected.
 hoist_tag_mismatch() {
@@ -200,12 +221,33 @@ hoist_tag_mismatch() {
   rc=0
   toml=$(content_of "$1" hoist.toml) || rc=$?
   if [ "$rc" -eq 0 ]; then
-    fmt=$(sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$toml" \
-      | awk '/^\[/ && !/^\[[^]]*=/ { r = ($0 ~ /^\[[[:space:]]*release[[:space:]]*\]$/); next } r && /^tag_format[[:space:]]*=/ { print; exit }')
+    # FMT <line> for [release] tag_format, release = { tag_format = .. } or release.tag_format = ..;
+    # UNK for any other form of `release` (fail closed)
+    fmt=$(sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$toml" | awk '
+      BEGIN { top = 1; r = 0 }
+      /^\[\[[[:space:]]*release/ { print "UNK"; next }
+      /^\[/ && !/^\[[^]]*=/ { top = 0; r = ($0 ~ /^\[[[:space:]]*release[[:space:]]*\]$/); next }
+      top && /^release[[:space:]]*=/ {
+        if ($0 !~ /^release[[:space:]]*=[[:space:]]*\{/) print "UNK"
+        else if ($0 ~ /tag_format/) print "FMT " $0
+        next }
+      top && /^release[[:space:]]*\.[[:space:]]*tag_format[[:space:]]*=/ { print "FMT " $0; next }
+      r && /^tag_format[[:space:]]*=/ { print "FMT " $0 }')
+    if grep -q '^UNK' <<<"$fmt"; then
+      echo "bootstrap-secrets: $1: hoist.toml: unrecognised form of release; cannot read tag_format" >&2
+      echo unknown; return 0
+    fi
+    fmt=$(grep -m1 '^FMT ' <<<"$fmt" || true)
   elif [ "$rc" -ne 4 ]; then
     echo unknown; return 0
   fi
   case "$fmt" in *-v*) blocked=1 ;; esac
+  # a format without {name} makes crate names irrelevant; otherwise a name with -v matches *-v*
+  if [ "$blocked" = 0 ] && { [ -z "$fmt" ] || [[ "$fmt" == *'{name}'* ]]; }; then
+    local names
+    names=$(crate_names "$1") || { echo unknown; return 0; }
+    case "$names" in *-v*) blocked=1 ;; esac
+  fi
   [ "$blocked" = 1 ] || { echo ok; return 0; }
   if [ -e "$TMPD/tag-app" ] && [ ! -e "$TMPD/tag-all-noapp" ]; then
     rc=0

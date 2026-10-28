@@ -849,7 +849,7 @@ const tagRuleset = (over = {}) => ({
   ...over,
 });
 
-const RAW = /^(actions|rulesets)\//;
+const RAW = /^(actions|rulesets|git)\//;
 // --check-rulesets needs only gh and jq: a stub gh, no sops/age.
 function checkRulesets(list, detail, extra = [], files = {}) {
   const tmp = mkdtempSync(join(tmpdir(), "rules-"));
@@ -1013,7 +1013,7 @@ test("--check-rulesets reports a mismatch: hoist pushes *-v* tags, no App can by
 });
 
 test("--check-rulesets: no release.yml, no hoist publish or the default tag_format is ok", () => {
-  const tf = (t) => ({ ".github/workflows/release.yml": PUBLISH_WF, "hoist.toml": t });
+  const tf = (t) => wfFiles(t);
   for (const files of [
     {},
     {
@@ -1029,8 +1029,16 @@ test("--check-rulesets: no release.yml, no hoist publish or the default tag_form
   }
 });
 
-const wfFiles = (toml) => ({
+const TREE = "git/trees/HEAD?recursive=1";
+const tree = (...paths) => ({
+  tree: paths.map((path) => ({ path, type: "blob" })),
+  truncated: false,
+});
+const wfFiles = (toml, paths = ["Cargo.toml", "crates/foo/Cargo.toml"]) => ({
   ".github/workflows/release.yml": PUBLISH_WF,
+  [TREE]: tree(...paths),
+  "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n',
+  "crates/foo/Cargo.toml": '[package]\nname = "foo" # plain\nversion = "1.0.0"\n',
   ...(toml === undefined ? {} : { "hoist.toml": toml }),
 });
 const ALL = { conditions: { ref_name: { include: ["~ALL"], exclude: [] } } };
@@ -1139,5 +1147,56 @@ test("--check-rulesets: a contents read that is not base64 is unknown", () => {
     const r = checkRulesets(LIST, tagRuleset(), [], files);
     assert.notEqual(r.status, 0);
     assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  }
+});
+
+test("--check-rulesets: a crate name containing -v blocks the default tag format", () => {
+  const files = { ...wfFiles(), "crates/foo/Cargo.toml": '[package]\nname = "foo-vm"\n' };
+  const r = checkRulesets(LIST, tagRuleset(), [], files);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+  // a format without {name} makes names irrelevant; a -v in a comment is not a name
+  const lit = { ...files, "hoist.toml": '[release]\ntag_format = "v{version}"\n' };
+  assert.equal(checkRulesets(LIST, tagRuleset(), [], lit).status, 0);
+  const cmt = { ...wfFiles(), "crates/foo/Cargo.toml": '[package]\nname = "foo" # foo-v\n' };
+  assert.equal(checkRulesets(LIST, tagRuleset(), [], cmt).status, 0);
+  // fine once an allowed App and the variable exist
+  const ok = checkRulesets(LIST, tagRuleset(withApp), ["--allow-app", "4242"], {
+    ...files,
+    [VAR]: '{"value":"x"}',
+  });
+  assert.equal(ok.status, 0, ok.stderr);
+});
+
+test("--check-rulesets: a truncated tree or a failed Cargo.toml read is unknown", () => {
+  const trunc = { ...wfFiles(), [TREE]: { ...tree("Cargo.toml"), truncated: true } };
+  let r = checkRulesets(LIST, tagRuleset(), [], trunc);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  r = checkRulesets(LIST, tagRuleset(), [], {
+    ...wfFiles(),
+    "crates/foo/Cargo.toml": new Error("gh: Server Error (HTTP 500)\n"),
+  });
+  assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  r = checkRulesets(LIST, tagRuleset(), [], {
+    ...wfFiles(),
+    [TREE]: new Error("gh: Server Error (HTTP 500)\n"),
+  });
+  assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+});
+
+test("--check-rulesets: inline and dotted release tag_format; other forms fail closed", () => {
+  const dash = '"{name}-v{version}"';
+  for (const [toml, want] of [
+    [`release = { tag_format = ${dash} }\n[other]\nx = 1\n`, "mismatch"],
+    [`release.tag_format = ${dash}\n`, "mismatch"],
+    [`release = { changelog = true }\n`, "ok"],
+    [`release.changelog = true\n`, "ok"],
+    [`release = "oops"\n`, "unknown"],
+    [`[[release]]\ntag_format = ${dash}\n`, "unknown"],
+  ]) {
+    const r = checkRulesets(LIST, tagRuleset(), [], wfFiles(toml));
+    assert.match(r.stdout, new RegExp(`tag ruleset acme/site: ${want}`), toml);
+    assert.equal(r.status === 0, want === "ok", toml);
   }
 });
