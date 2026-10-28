@@ -16,7 +16,10 @@
 # Usage:
 #   bootstrap-secrets.sh --self-test
 #   bootstrap-secrets.sh --check-rulesets [--allow-app APP-ID]... OWNER/REPO...
-#       read-only; exit 1 unless every repo has the release-tag ruleset (run it as the owner)
+#       read-only; exit 1 unless every repo has the release-tag ruleset (run it as the owner);
+#       also "mismatch" when release.yml runs `hoist release publish`, hoist.toml's tag_format
+#       contains -v (or the ruleset covers ~ALL) and no GitHub App is on the ruleset's bypass list
+#       or the repo variable HOIST_RELEASE_APP_CLIENT_ID is missing
 #   bootstrap-secrets.sh --secrets-dir DIR --owner-pub AGE1 [--owner-pub AGE1]...
 #       --consumer OWNER/REPO:ENV:github
 #       --consumer OWNER/REPO:ENV:circleci:CIRCLECI-PROJECT-ID ...
@@ -128,7 +131,7 @@ setup_github() {
 # bypass_actors is visible only to admins: without it the result is "unknown" (fail closed), so the
 # owner's own run is the binding check. Private repos need GitHub Pro/Team for rulesets.
 tag_ruleset() {
-  local list ids id r unknown=""
+  local list ids id r unknown="" found=""
   if ! list=$(gh_get "repos/$1/rulesets?includes_parents=true&per_page=100"); then echo unknown; return 0; fi
   if ! jq -e 'type == "array"' <<<"$list" >/dev/null 2>&1; then
     echo "bootstrap-secrets: rulesets of $1: unexpected response" >&2
@@ -153,12 +156,109 @@ tag_ruleset() {
         or .actor_type == "OrganizationAdmin"
         or (.actor_type == "Integration" and ((.actor_id | tostring) as $i | $allowed | index($i) != null))))
     ' <<<"$r" >/dev/null 2>&1; then
-      echo ok
-      return 0
+      found=1
+      # a pull_request-mode App cannot push tags: only "always" counts
+      jq -e '.bypass_actors | any(.actor_type == "Integration" and .bypass_mode == "always")' <<<"$r" >/dev/null 2>&1 \
+        && : >"$TMPD/tag-app"
+    else
+      echo "bootstrap-secrets: ruleset $id of $1 does not qualify (pattern, excludes, rules or bypass list)" >&2
     fi
-    echo "bootstrap-secrets: ruleset $id of $1 does not qualify (pattern, excludes, rules or bypass list)" >&2
+    # every ~ALL ruleset restricts every tag, qualifying or not; one without the App blocks publish
+    if jq -e '(.conditions.ref_name.include // []) | any(. == "~ALL")' <<<"$r" >/dev/null 2>&1; then
+      : >"$TMPD/tag-all"
+      jq -e '.bypass_actors | any(.actor_type == "Integration" and .bypass_mode == "always")' <<<"$r" >/dev/null 2>&1 \
+        || : >"$TMPD/tag-all-noapp"
+    fi
   done
+  if [ -n "$found" ]; then echo ok; return 0; fi
   if [ -n "$unknown" ]; then echo unknown; else echo missing; fi
+}
+
+# content_of REPO PATH: prints the decoded file; 4 when absent (empty answers count as absent).
+content_of() {
+  local out rc=0
+  out=$(gh_get "repos/$1/contents/$2") || rc=$?
+  [ "$rc" -eq 0 ] || return "$rc"
+  [ -n "$out" ] || return 4
+  jq -e '.encoding == "base64"' <<<"$out" >/dev/null 2>&1 || return 5
+  jq -r '.content // "" | gsub("\n"; "") | @base64d' <<<"$out"
+}
+
+# crate_names REPO: every [package] name of every Cargo.toml in the repo (one tree call, one read
+# per manifest); a virtual root manifest has none. Non-zero on a truncated tree or any read error.
+crate_names() {
+  local t paths path body rc
+  t=$(gh_get "repos/$1/git/trees/HEAD?recursive=1") || return 1
+  jq -e '.truncated == false and (.tree | type == "array")' <<<"$t" >/dev/null 2>&1 || {
+    echo "bootstrap-secrets: $1: file tree truncated or unreadable; cannot list crate names" >&2
+    return 1
+  }
+  paths=$(jq -r '.tree[] | select(.type == "blob" and (.path | test("(^|/)Cargo\\.toml$"))) | .path' <<<"$t")
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    rc=0
+    body=$(content_of "$1" "$path") || rc=$?
+    [ "$rc" -eq 0 ] || return 1
+    sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$body" \
+      | awk '/^\[/ { p = ($0 ~ /^\[package\]$/); next } p && /^name[[:space:]]*=/ { print; exit }'
+  done <<<"$paths"
+}
+
+# hoist_tag_mismatch REPO: prints ok | mismatch | unknown. Call after tag_ruleset said ok (it leaves
+# $TMPD/tag-app when an App is on the bypass list and $TMPD/tag-all when the ruleset includes ~ALL).
+# Only release.yml running `hoist release publish` matters. Its tags are blocked when the ruleset
+# covers ~ALL, hoist.toml's [release] tag_format contains -v, or (format uses {name}, default
+# {name}@{version}) a crate name contains -v.
+# Blocked tags need an allowed App on the bypass list AND the repo variable
+# HOIST_RELEASE_APP_CLIENT_ID, else publish falls back to github.token and is rejected.
+hoist_tag_mismatch() {
+  local wf toml fmt="" rc=0 blocked=0
+  wf=$(content_of "$1" .github/workflows/release.yml) || rc=$?
+  [ "$rc" -ne 4 ] || { echo ok; return 0; }
+  [ "$rc" -eq 0 ] || { echo unknown; return 0; }
+  grep -q 'hoist release publish' <<<"$wf" || { echo ok; return 0; }
+  [ ! -e "$TMPD/tag-all" ] || blocked=1
+  rc=0
+  toml=$(content_of "$1" hoist.toml) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    # FMT <line> for [release] tag_format, release = { tag_format = .. } or release.tag_format = ..;
+    # UNK for any other form of `release` (fail closed)
+    fmt=$(sed -E 's/[[:space:]]+#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$toml" | awk '
+      BEGIN { top = 1; r = 0 }
+      /^\[\[[[:space:]]*release/ { print "UNK"; next }
+      /^\[/ && !/^\[[^]]*=/ { top = 0; r = ($0 ~ /^\[[[:space:]]*release[[:space:]]*\]$/); next }
+      top && /^release[[:space:]]*=/ {
+        if ($0 !~ /^release[[:space:]]*=[[:space:]]*\{/) print "UNK"
+        else if ($0 ~ /tag_format/) print "FMT " $0
+        next }
+      top && /^release[[:space:]]*\.[[:space:]]*tag_format[[:space:]]*=/ { print "FMT " $0; next }
+      r && /^tag_format[[:space:]]*=/ { print "FMT " $0 }')
+    if grep -q '^UNK' <<<"$fmt"; then
+      echo "bootstrap-secrets: $1: hoist.toml: unrecognised form of release; cannot read tag_format" >&2
+      echo unknown; return 0
+    fi
+    fmt=$(grep -m1 '^FMT ' <<<"$fmt" || true)
+  elif [ "$rc" -ne 4 ]; then
+    echo unknown; return 0
+  fi
+  case "$fmt" in *-v*) blocked=1 ;; esac
+  # a format without {name} makes crate names irrelevant; otherwise a name with -v matches *-v*
+  if [ "$blocked" = 0 ] && { [ -z "$fmt" ] || [[ "$fmt" == *'{name}'* ]]; }; then
+    local names
+    names=$(crate_names "$1") || { echo unknown; return 0; }
+    case "$names" in *-v*) blocked=1 ;; esac
+  fi
+  [ "$blocked" = 1 ] || { echo ok; return 0; }
+  if [ -e "$TMPD/tag-app" ] && [ ! -e "$TMPD/tag-all-noapp" ]; then
+    rc=0
+    wf=$(gh_get "repos/$1/actions/variables/HOIST_RELEASE_APP_CLIENT_ID") || rc=$?
+    [ "$rc" -eq 4 ] || [ "$rc" -eq 0 ] || { echo unknown; return 0; }
+    if [ "$rc" -eq 0 ] && jq -e '.value != null and .value != ""' <<<"$wf" >/dev/null 2>&1; then echo ok; return 0; fi
+    echo "bootstrap-secrets: $1: repo variable HOIST_RELEASE_APP_CLIENT_ID is missing; publish would push tags with github.token, which the tag ruleset rejects" >&2
+  else
+    echo "bootstrap-secrets: $1: release.yml pushes tags with hoist that the tag ruleset covers; add its GitHub App to the ruleset bypass list and pass --allow-app <id>" >&2
+  fi
+  echo mismatch
 }
 
 # --- CircleCI -------------------------------------------------------------------------------
@@ -259,7 +359,9 @@ main() {
         TMPD=$(mktemp -d); trap 'rm -rf "$TMPD"' EXIT
         local bad=0 st
         for repo in "$@"; do
+          rm -f "$TMPD/tag-app" "$TMPD/tag-all" "$TMPD/tag-all-noapp"
           st=$(tag_ruleset "$repo")
+          [ "$st" != ok ] || st=$(hoist_tag_mismatch "$repo")
           echo "tag ruleset $repo: $st"
           [ "$st" = ok ] || bad=1
         done

@@ -14,12 +14,12 @@
   },
   "rust": {
     "ci.yml": "53d3dcd363a163db85ae4620e252fe777aef7639f6e1d070566600777477de8f",
-    "release.yml": "d3b21b5bc1046dcec0b495d77721f21338c6bbb8c44a5a8d29e271d7bed95039",
+    "release.yml": "e86e9a1c3641e7c16e4cd03b9873b62a508f05e52a9c6b94eee3ca7ec609782a",
     "splice.yml": "6645271e3fe94066bd5567f24d2f4b626ce83bb60195ef93ad6172200b860270"
   },
   "rust-circleci": {
     "ci.yml": "53d3dcd363a163db85ae4620e252fe777aef7639f6e1d070566600777477de8f",
-    "release.yml": "d3b21b5bc1046dcec0b495d77721f21338c6bbb8c44a5a8d29e271d7bed95039",
+    "release.yml": "e86e9a1c3641e7c16e4cd03b9873b62a508f05e52a9c6b94eee3ca7ec609782a",
     "splice.yml": "6645271e3fe94066bd5567f24d2f4b626ce83bb60195ef93ad6172200b860270"
   }
 }
