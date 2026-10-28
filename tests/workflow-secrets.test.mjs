@@ -34,7 +34,7 @@ function contextFor(source, pieces) {
 /** Every workflow of template/ and template-rust/; .jinja ones rendered with and without secrets. */
 function workflows() {
   const out = [];
-  for (const dir of ["template", "template-rust"]) {
+  for (const dir of ["template", "template-rust", "rigging"]) {
     for (const f of walk(join(ROOT, dir))) {
       if (!/\.github\/workflows\/[^/]+\.ya?ml(\.jinja)?$/.test(f)) continue;
       const src = readFileSync(f, "utf8");
@@ -203,4 +203,78 @@ test("every hoist secrets action or secrets-run.yml reference is a 40-hex SHA wi
       refs += [...text.matchAll(HOIST_REF)].length;
     }
   assert.ok(refs >= 1, "preview-deploy.yml.jinja references the action");
+});
+
+const EXPR = /\$\{\{([\s\S]*?)\}\}/g;
+const SECRETS_REF = /(?<![\w.-])secrets(?![\w-])/i;
+
+/** True when `node` reads a secret other than GITHUB_TOKEN: inside `${{ }}` (or an `if:`), or `secrets:` inherit/map. */
+function usesSecret(node, key = "") {
+  if (typeof node === "string") {
+    const spans = key === "if" ? [node] : [...node.matchAll(EXPR)].map((m) => m[1]);
+    return spans.some((e) => SECRETS_REF.test(e.replace(/secrets\.GITHUB_TOKEN/gi, "")));
+  }
+  if (Array.isArray(node)) return node.some((x) => usesSecret(x, key));
+  if (node && typeof node === "object")
+    return Object.entries(node).some(
+      ([k, v]) =>
+        (k === "secrets" && (v === "inherit" || (v && typeof v === "object"))) || usesSecret(v, k),
+    );
+  return false;
+}
+
+/**
+ * Jobs that reference a secret other than secrets.GITHUB_TOKEN but declare no `environment:`.
+ * A secret in workflow-level `env:` applies to every job.
+ */
+function envlessSecretJobs(rel, wf) {
+  const wfWide = usesSecret(wf.env);
+  const bad = [];
+  for (const [id, job] of Object.entries(wf.jobs ?? {}))
+    if ((wfWide || usesSecret(job)) && !job.environment)
+      bad.push(`${rel} job ${id}: secrets without environment`);
+  return bad;
+}
+
+test("every job that reads a secret other than GITHUB_TOKEN declares an environment", () => {
+  const all = workflows();
+  assert.ok(all.length >= 7, `only ${all.length} workflows found`);
+  assert.deepEqual(
+    all.flatMap((w) => envlessSecretJobs(w.rel, YAML.parse(w.text))),
+    [],
+  );
+});
+
+test("hull's own workflows: every job that reads a secret other than GITHUB_TOKEN declares an environment", () => {
+  const dir = join(ROOT, ".github/workflows");
+  const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f));
+  assert.ok(files.includes("splice.yml"));
+  const bad = files.flatMap((f) =>
+    envlessSecretJobs(f, YAML.parse(readFileSync(join(dir, f), "utf8"))),
+  );
+  assert.deepEqual(bad, []);
+});
+
+test("the environment check catches each form of secret use", () => {
+  const job = (x) => ({ jobs: { j: { steps: [], ...x } } });
+  for (const x of [
+    { env: { T: "${{ secrets.NPM_TOKEN || github.token }}" } },
+    { env: { T: "${{ secrets['NPM_TOKEN'] }}" } },
+    { env: { T: "${{ toJSON(secrets) }}" } },
+    { secrets: "inherit" },
+  ])
+    assert.equal(envlessSecretJobs("x", job(x)).length, 1, JSON.stringify(x));
+  for (const x of [
+    { env: { T: "${{ SECRETS.NPM_TOKEN }}" } },
+    { secrets: { X: "${{ github.token }}" } },
+    { uses: "./.github/workflows/x.yml", secrets: { X: "y" } },
+  ])
+    assert.equal(envlessSecretJobs("x", job(x)).length, 1, JSON.stringify(x));
+  assert.deepEqual(envlessSecretJobs("x", job({ env: { T: "${{ secrets.GITHUB_TOKEN }}" } })), []);
+  assert.deepEqual(envlessSecretJobs("x", job({ env: { T: "${{ Secrets.github_token }}" } })), []);
+  assert.deepEqual(envlessSecretJobs("x", job({ steps: [{ run: 'echo "no secrets"' }] })), []);
+  assert.deepEqual(envlessSecretJobs("x", job({ steps: [{ name: "rotate secrets" }] })), []);
+  const wide = { env: { T: "${{ secrets.X }}" }, jobs: { a: {}, b: { environment: "e" } } };
+  assert.equal(envlessSecretJobs("x", wide).length, 1);
+  assert.deepEqual(envlessSecretJobs("x", job({ environment: "e", secrets: "inherit" })), []);
 });

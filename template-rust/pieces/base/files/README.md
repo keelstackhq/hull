@@ -29,3 +29,11 @@ gh run view <id> --json jobs   # completedAt - startedAt of job "ci"
 
 `release.yml` runs hoist on every push to `main`. It does nothing until the repository variable
 `HOIST_RELEASE` is `enabled`. One-time human steps are in `docs/agents/project.md` (Blocked).
+
+## Secrets
+
+Create the `splice-bot` and `release-pr` environments first (Deployment branches = Selected →
+`main`); a first run would auto-create unprotected ones. Then store `SPLICE_BOT_TOKEN`
+(`splice.yml`) and `HOIST_RELEASE_TOKEN` (`release.yml`, job `prepare`) only as secrets of those
+environments. Never store them as repository secrets: any pull request that edits a workflow
+could read those. Without them the workflows fall back to `github.token`.

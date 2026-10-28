@@ -12,6 +12,11 @@ Keep `unreleased` while changes accumulate.
 **Upgrade: move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the `preview` environment
 (Deployment branches → `main`), then delete the repository-level `CLOUDFLARE_*` secrets.**
 
+- Jobs that read a secret declare an `environment:` (Deployment branches → `main`): `splice.yml`
+  uses `splice-bot`; template-rust `release.yml` job `prepare` uses `release-pr`.
+  **Upgrade: first create the `splice-bot` (and, for Rust repos, `release-pr`) environment with
+  Deployment branches = Selected → `main` (a first run would auto-create an unprotected one), then
+  move `SPLICE_BOT_TOKEN` / `HOIST_RELEASE_TOKEN` there and delete the repository-level secrets.**
 - PR previews run in two phases: `preview.yml` builds with no secrets and uploads `preview-<pr>`;
   `preview-deploy.yml` (environment `preview`, default-branch code only) deploys `<app>-preview`.
 - `min_splice` rises to 0.2.0 (raw blocks in `preview-deploy.yml.jinja`).
