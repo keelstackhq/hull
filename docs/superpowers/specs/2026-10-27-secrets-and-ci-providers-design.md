@@ -436,8 +436,11 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   `git fetch origin <default>` so turbo can diff. Unverified (§12).
 - **Affected early exit:** the same `affected` step (same turbo binary download, same
   `.github/scripts/affected.mjs`; the script path stays for both providers). `TURBO_SCM_BASE` from
-  `scm-base.sh`: merge-queue branch `gh-readonly-queue/<base>/pr-<n>-<sha>` → `<sha>`; default branch
-  → `<< pipeline.git.base_revision >>`; else `git merge-base HEAD origin/<default>`.
+  `scm-base.sh`: merge-queue branch `gh-readonly-queue/<base>/pr-<n>-<sha>` → `<sha>` (40 lowercase
+  hex, else exit 1); default branch → `<< pipeline.git.base_revision >>`, or the parent commit when it
+  is empty (first pipeline, API or scheduled runs); else `git merge-base HEAD origin/<default>`. The
+  branch name is never printed or passed to git; the caller assigns the output first (`b=$(…)`) so a
+  failure stops the job.
   `TURBO_SCM_HEAD` = `CIRCLE_SHA1`.
 - **Caching:** pnpm store via `restore_cache`/`save_cache` keyed on `pnpm-lock.yaml`; turbo via
   hoard `fs` in `~/.cache/hoard`, cache key `hoard-v1-{{ .Branch }}-{{ .Revision }}` restoring
