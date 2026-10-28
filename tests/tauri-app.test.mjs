@@ -46,7 +46,7 @@ test("classes", async () => {
 test("tauri.conf.json wires the frontend instance (spec 6.7)", async () => {
   const { dir } = await renderCombo(["base", "preact-app:admin", "tauri-app:desktop"], {
     scope: "acme",
-    "tauri-app.frontend": "admin",
+    frontend: "admin",
   });
   const conf = JSON.parse(await read(dir, "apps/desktop/src-tauri/tauri.conf.json"));
   assert.equal(conf.build.beforeDevCommand, "pnpm --filter @acme/admin dev");

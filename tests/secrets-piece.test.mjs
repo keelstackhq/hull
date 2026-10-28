@@ -123,11 +123,14 @@ test("docs/agents/secrets.md is short and AGENTS.md / CLAUDE.md keep their budge
 });
 
 test("context_prefix has no default: rendering without it fails", async () => {
-  await assert.rejects(renderCombo(PIECES), /context_prefix is required \(piece secrets\)/);
+  await assert.rejects(
+    renderCombo(PIECES),
+    /missing value for var `context_prefix`; pass --data context_prefix=…/,
+  );
   await assert.rejects(renderCombo(PIECES, { context_prefix: "Bad_Prefix" }));
 });
 
-test("a piece var may be given unqualified when one piece declares it (splice spelling)", async () => {
+test("a piece var is given as a bare name; the dotted form is rejected (rule 9.28)", async () => {
   const { dir } = await renderCombo(PIECES, { context_prefix: "hullci" });
   assert.ok(read(dir, "secrets.toml"));
   await assert.rejects(

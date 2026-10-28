@@ -92,7 +92,7 @@ test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", asyn
 test("repository is omitted by default and rendered when given", async () => {
   const bare = JSON.parse(await read((await renderCombo(PIECES)).dir, "packages/lib/package.json"));
   assert.equal(bare.repository, undefined);
-  const { dir } = await renderCombo(PIECES, { "ts-lib.repository": "https://github.com/acme/lib" });
+  const { dir } = await renderCombo(PIECES, { repository: "https://github.com/acme/lib" });
   const pkg = JSON.parse(await read(dir, "packages/lib/package.json"));
   assert.deepEqual(pkg.repository, { type: "git", url: "git+https://github.com/acme/lib.git" });
 });
@@ -124,7 +124,7 @@ test("repository var pattern: https://github.com/<owner>/<repo> only; no quotes,
     "https://github.com/acme/lib x",
   ])
     assert.equal(re.test(bad), false, bad);
-  await assert.rejects(renderCombo(PIECES, { "ts-lib.repository": 'https://github.com/a/b"c' }));
+  await assert.rejects(renderCombo(PIECES, { repository: 'https://github.com/a/b"c' }));
 });
 
 test("AGENTS.md names the trusted-publisher and first-publish steps, ≤ 20 lines", async () => {
