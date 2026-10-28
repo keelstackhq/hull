@@ -150,6 +150,7 @@ jobs:
     needs: [detect, publish]
     if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect.outputs.enabled == 'true' && (needs.detect.outputs.pending == 'false' || needs.publish.result == 'success') }}
     runs-on: ubuntu-latest
+    environment: release-pr
     permissions:
       contents: write
       pull-requests: write
