@@ -46,10 +46,10 @@ const { docsOnly, pendingMod, indexMod } = {
   indexMod: await import(join(BASE, "scripts/agents-index.mjs")),
 };
 
-test("template-rust manifest: format 1, hull-rust, base, min_splice 0.2.0, no vars", () => {
+test("template-rust manifest: format 1, hull-rust, base, min_splice 0.3.0, no vars", () => {
   assert.equal(t.name, "hull-rust");
   assert.equal(t.base, "base");
-  assert.equal(t.minSplice, "0.2.0");
+  assert.equal(t.minSplice, "0.3.0");
   assert.deepEqual(Object.keys(t.vars ?? {}), []);
   assert.deepEqual([...t.pieces.keys()].sort(), ["base", "circleci", "circleci-only", "rust-cli"]);
 });

@@ -57,8 +57,8 @@ already have release flows.
 - Approve the `release` environment for the hoist and hoard releases (GitHub mobile → Actions → Review
   deployments), phone.
 - Optional, off the critical path: tag splice `v0.3.0` (github.com → splice → Releases → Draft new
-  release), phone. Only HU-9's `min_splice` bump and switching existing repos to `circleci-only` wait
-  for it; nothing else blocks on it.
+  release), phone. Done: splice 0.3.0 is on npm (2026-10-27), hull's `min_splice` is 0.3.0 and
+  existing repos can switch to `circleci-only`.
 
 ## 1. Goals and non-goals
 
@@ -383,9 +383,9 @@ with `{% if "circleci-only" in pieces %}{% else %}{% raw %}…{% endraw %}{% end
 render is not written (contract §4). The `{% raw %}` needs `min_splice` 0.2.0 (hull's manifest
 moves from 0.1.0; splice 0.2.1 is current). Switching an existing repo to `circleci-only` later needs
 splice to delete an owned file whose re-render is empty: new contract rule 9.27 (§10), splice 0.3.0.
-Until splice 0.3.0 is released, `circleci-only` is supported at `new` only; HU-9 raises hull's
-`min_splice` to 0.3.0 once it is, and the docs then describe `splice add circleci` /
-`splice add circleci-only` as the way to switch.
+splice 0.3.0 was released on 2026-10-27, so hull's `min_splice` is 0.3.0 and an existing repo
+switches with `splice add circleci` then `splice add circleci-only` (splice ≥ 0.3.0; the latter
+deletes the GitHub `ci.yml`; `tests/splice-add-circleci.test.mjs`).
 
 `template-rust` gets the same two pieces with `RUST_CI_STEPS` (HU-7).
 

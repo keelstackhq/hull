@@ -25,7 +25,7 @@ visual tests on the PR path, React (Preact only), Cloudflare Pages, our own remo
 
 - Template source: `gh:keelstackhq/hull//template`. A template version is a git tag `v<semver>` on hull.
   Since v0.3.0 the tag is created by hull's `release.yml` (§10.5), never by hand.
-- `template/splice.toml`: `format = 1`, `name = "hull"`, `min_splice = "0.1.0"`, `base = "base"`.
+- `template/splice.toml`: `format = 1`, `name = "hull"`, `min_splice = "0.3.0"`, `base = "base"`.
 - First release `v0.1.0` after milestone 3. Breaking template changes bump the minor until 1.0 and
   ship a migration (`template/migrations/<semver>.toml`) when files move or disappear.
 - License MIT.
@@ -1071,8 +1071,8 @@ Contract format 1 stays as it is (D-003, D-005).
 So a `rust-base` piece in `template/` cannot remove `package.json`, `pnpm-workspace.yaml` or
 `turbo.json`. Contract §1 already lets a template live in a subdirectory, and `rigging/` (§14) is
 precedent for a second template in this repo. `template-rust/splice.toml`: `format = 1`,
-`name = "hull-rust"`, `base = "base"`, `min_splice = "0.2.0"` (the update bot and channels need
-it), no template `[vars]`. hull's `v<semver>` tags version all three templates.
+`name = "hull-rust"`, `base = "base"`, `min_splice = "0.3.0"` (raw blocks; rule 9.27 for
+circleci-only), no template `[vars]`. hull's `v<semver>` tags version all three templates.
 
 **Shape** (`template-rust/pieces/`):
 

@@ -40,7 +40,7 @@ jobs:
       - name: Install splice
         # same version as SPLICE_VERSION in scripts/lib/splice.mjs (tests/hull-workflows.test.mjs)
         run: |
-          npm install -g --no-fund --no-audit @keelstackhq/splice@0.2.0
+          npm install -g --no-fund --no-audit @keelstackhq/splice@0.3.0
           echo "SPLICE_BIN=$(command -v splice)" >> "$GITHUB_ENV"
       - name: Install sops and age-keygen (tests/bootstrap-secrets.test.mjs)
         # sops: SHA-256 from sops-v3.13.3.checksums.txt; age: SHA-256 of the v1.3.2 release

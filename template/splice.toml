@@ -1,6 +1,6 @@
 format = 1
 name = "hull"
-min_splice = "0.2.0"
+min_splice = "0.3.0"
 base = "base"
 
 [vars]

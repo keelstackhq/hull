@@ -34,7 +34,7 @@ for (const piece of t.pieces.values()) {
 
 test("template loads", () => {
   assert.equal(t.name, "hull");
-  assert.equal(t.minSplice, "0.2.0");
+  assert.equal(t.minSplice, "0.3.0");
   assert.equal(t.base, "base");
   assert.ok(t.pieces.has("base"));
 });
