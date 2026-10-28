@@ -4,7 +4,10 @@ Generated from {{ template.name }} {{ template.version }}.
 
 ## Measure CI time
 
-Budget for job `ci`: 45 s on a typical PR, 15 s docs-only. Measure the last 20 runs:
+{% if "circleci-only" in pieces %}Budget for the CircleCI job `ci-ok`: 75 s on a typical PR, 30 s docs-only (the setup job adds a
+container start). CI runs on CircleCI only: read the duration of the `ci-ok` job in the CircleCI
+pipeline of recent PRs (the `ci-ok` status on GitHub mirrors it). Ignore cancelled and skipped runs.
+{% else %}Budget for job `ci`: 45 s on a typical PR, 15 s docs-only. Measure the last 20 runs:
 
 ```bash
 gh run list -w ci.yml -L 20 --json databaseId
@@ -12,7 +15,7 @@ gh run view <id> --json jobs   # completedAt - startedAt of job "ci"
 ```
 
 Ignore cancelled and skipped runs. The job summary of each run also shows its duration.
-
+{% endif %}
 ## PR previews
 
 `preview.yml` builds apps on every PR with no secrets; `preview-deploy.yml` (environment `preview`)
