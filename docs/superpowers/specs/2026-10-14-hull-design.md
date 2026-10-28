@@ -1073,7 +1073,11 @@ it), no template `[vars]`. hull's `v<semver>` tags version all three templates.
   `rust-version = "1.99.1"`), `[workspace.lints]` (`unsafe_code = "forbid"`, clippy `all` warn),
   `[profile.release] lto = "thin"`. Cargo errors on a virtual workspace without members, so `base`
   ships the seed crate `crates/common` (`publish = false`, a lib with one unit test and one doc
-  test), like `packages/shared` in §6.1. Owned files: `rust-toolchain.toml` (`1.99.1`, `clippy`,
+  test), like `packages/shared` in §6.1. `members` has no `"apps/*"`: cargo rejects a member glob
+  that matches no crate (`cargo metadata` and `generate-lockfile` exit 101 with no `apps/` crate,
+  checked with cargo 1.99.1 on 2026-10-28), so a comment above it tells consumers to add such globs
+  once a crate exists; the toml merge keeps that edit, but it conflicts if the template later
+  changes the array (arrays are whole values, contract §5). Owned files: `rust-toolchain.toml` (`1.99.1`, `clippy`,
   `rustfmt`, profile minimal), `rustfmt.toml` (`style_edition = "2024"`), `deny.toml` (the §6.10
   policy for the whole workspace), `.config/nextest.toml` (profile `ci`: no fail-fast),
   `.gitignore`, `.gitattributes`, `renovate.json` (the same preset, §8.6), the workflows below,
