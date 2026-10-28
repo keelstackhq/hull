@@ -650,6 +650,10 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    true) guarding that `restore_cache`, which `ci-ok` would pass as false on the default branch.
    Accepted until then because no repo uses the `circleci` piece yet and jobs with secrets never use
    hoard; the step carries `TODO(hoard-restore)` (a test keeps it until the follow-up lands).
+16. The `pipeline.trigger_source` values `scheduled_pipeline` and `api` on GitHub App projects are
+   unverified (CAN-1 checks them). The CircleCI `ci` workflow skips `scheduled_pipeline` (so the
+   weekly desktop pipeline does not run `ci-ok` or save caches on main); the desktop workflow runs
+   for `scheduled_pipeline` or `api`. Push, PR and merge-queue pipelines still run `ci-ok`.
 
 ## 13. Owner-only steps
 

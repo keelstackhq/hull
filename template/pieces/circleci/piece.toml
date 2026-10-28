@@ -9,6 +9,8 @@ owned = [
   ".circleci/src/executors/node.yml",
   ".circleci/src/commands/hoard.yml",
   ".circleci/src/jobs/ci-ok.yml",
+  ".circleci/src/jobs/desktop.yml",
+  ".circleci/src/workflows/desktop.yml",
   ".circleci/src/workflows/ci.yml",
   ".circleci/scripts/scm-base.sh",
 ]

@@ -1,0 +1,35 @@
+{% if "circleci-only" in pieces %}{% if "tauri-app" in pieces %}# Weekly desktop build (mirror of .github/workflows/desktop.yml, which is not rendered in circleci-only
+# mode). No secrets and no cache: tools are pinned and hash-checked on every run.
+executor: node
+steps:
+  - checkout
+  - run:
+      name: Install Tauri system packages
+      command: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+  - run:
+      name: pnpm (corepack, version from packageManager)
+      command: |
+        mkdir -p "$HOME/.local/bin"
+        corepack enable --install-directory "$HOME/.local/bin"
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+  - run:
+      name: Rust toolchain (from rust-toolchain.toml)
+      command: |
+        # rustup 1.29.2, verified 2026-10-28 (static.rust-lang.org rustup-init.sha256)
+        curl -fsSL -o /tmp/rustup-init "https://static.rust-lang.org/rustup/archive/1.29.2/x86_64-unknown-linux-gnu/rustup-init"
+        echo "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4  /tmp/rustup-init" | sha256sum -c - || exit 1
+        chmod +x /tmp/rustup-init
+        /tmp/rustup-init -y --profile minimal --default-toolchain none
+        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+        . "$HOME/.cargo/env"
+        rustup toolchain install
+  - run:
+      name: Install
+      command: pnpm install --frozen-lockfile
+  - run:
+      name: Build desktop
+      no_output_timeout: 30m
+      command: pnpm turbo run build:desktop
+{% endif %}{% endif %}

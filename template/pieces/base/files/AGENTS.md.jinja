@@ -55,7 +55,7 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 - `apps/*` (hono-worker): Hono workers with JSON request logs; see `apps/<name>/AGENTS.md`.{% endif %}{% if "rust-tool" in pieces %}
 - `crates/*` (rust-tool): Rust crates in a Cargo workspace; scripts use `-p <crate>`, never `--workspace`; see `crates/<name>/AGENTS.md`.{% endif %}{% if "rust-cli" in pieces %}
 - `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit codes and cargo-deny; scripts use `-p <crate>`; see `crates/<name>/AGENTS.md`.{% endif %}{% if "tauri-app" in pieces %}
-- `apps/*` (tauri-app): Tauri v2 desktop shell; Rust builds only in `desktop.yml`; see `apps/<name>/AGENTS.md`.{% endif %}{% if "ts-lib" in pieces %}
+- `apps/*` (tauri-app): Tauri v2 desktop shell; Rust builds only in `desktop.yml`; see `apps/<name>/AGENTS.md`.{% if "circleci-only" in pieces %} The CircleCI `desktop` workflow needs a CircleCI scheduled trigger (Project Settings, Triggers, weekly, branch main).{% endif %}{% endif %}{% if "ts-lib" in pieces %}
 - `packages/*` (ts-lib): publishable ESM libraries, `build` runs publint and attw; see `packages/<name>/AGENTS.md`.{% endif %}{% if "npm-cli" in pieces %}
 - `packages/*` (npm-cli): npm launcher for a rust-cli binary, platform packages are staged at release time; see `packages/<name>/AGENTS.md`.{% endif %}{# same-branches #}{% if "preact-app" in pieces %}
 {% elif "ui-storybook" in pieces %}

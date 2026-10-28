@@ -23,7 +23,17 @@ test("rust-cli, npm-cli and ts-lib changes select the cli and lib combos", () =>
   assert.deepEqual(affectedCombos(["template/pieces/ts-lib/files/x"], real), ["lib"]);
   assert.deepEqual(
     affectedCombos(["template/pieces/base/files/.github/workflows/release.yml"], real),
-    ["base", "cli", "docs", "lib", "site", "web", "web-circleci", "web-secrets"],
+    [
+      "base",
+      "cli",
+      "docs",
+      "lib",
+      "site",
+      "web",
+      "web-circleci",
+      "web-circleci-only",
+      "web-secrets",
+    ],
   );
 });
 
@@ -87,6 +97,7 @@ test("real combos: hono-worker selects web, astro-site selects site", () => {
   assert.deepEqual(affectedCombos(["template/pieces/hono-worker/files/x"], real), [
     "web",
     "web-circleci",
+    "web-circleci-only",
     "web-secrets",
   ]);
   assert.deepEqual(affectedCombos(["template/pieces/astro-site/files/x"], real), ["site"]);
@@ -94,6 +105,7 @@ test("real combos: hono-worker selects web, astro-site selects site", () => {
   assert.deepEqual(affectedCombos(["template/pieces/preact-app/files/x"], real), [
     "web",
     "web-circleci",
+    "web-circleci-only",
     "web-secrets",
   ]);
   assert.deepEqual(affectedCombos(["template/pieces/ui-storybook/files/x"], real), ["web"]);

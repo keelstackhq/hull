@@ -107,8 +107,34 @@ Files (owned):
 - `.circleci/src/executors/node.yml`
 - `.circleci/src/commands/hoard.yml`
 - `.circleci/src/jobs/ci-ok.yml`
+- `.circleci/src/jobs/desktop.yml`
+- `.circleci/src/workflows/desktop.yml`
 - `.circleci/src/workflows/ci.yml`
 - `.circleci/scripts/scm-base.sh`
+
+Files (shared):
+
+- none
+
+Files (seed):
+
+- none
+
+## circleci-only
+
+CircleCI as the only CI provider: ci, desktop and deploy workflows leave GitHub, a status mirror turns ci/circleci: ci-ok into the required ci-ok
+
+- Multiple instances: no
+- Target: repo root
+- Requires: `circleci`
+
+Variables:
+
+- none
+
+Files (owned):
+
+- `.github/workflows/circleci-status.yml`
 
 Files (shared):
 

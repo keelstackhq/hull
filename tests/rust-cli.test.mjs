@@ -324,7 +324,7 @@ test("renovate preset groups clap and tracing and tracks the cargo-deny pin", as
   assert.equal(mgr.customType, "regex");
   assert.equal(mgr.datasourceTemplate, "crate");
   assert.deepEqual(mgr.managerFilePatterns, ["/^\\.github/workflows/.*\\.ya?ml$/"]);
-  const ci = await readFile(join(BASE, ".github/workflows/ci.yml"), "utf8");
+  const ci = await readFile(join(BASE, ".github/workflows/ci.yml.jinja"), "utf8");
   const m = new RegExp(mgr.matchStrings[0]).exec(ci);
   assert.equal(m?.groups?.currentValue, "0.20.2");
 });

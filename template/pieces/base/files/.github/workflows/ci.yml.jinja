@@ -1,4 +1,4 @@
-name: ci
+{% if "circleci-only" in pieces %}{% else %}{% raw %}name: ci
 
 on:
   pull_request:
@@ -119,3 +119,4 @@ jobs:
             echo "ci result: ${{ needs.ci.result }}"
             exit 1
           fi
+{% endraw %}{% endif %}

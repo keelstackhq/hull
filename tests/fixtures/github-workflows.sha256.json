@@ -1,0 +1,15 @@
+{
+  "web": {
+    "ci.yml": "2220eb83f31de93a2ad8d2b8fd6cc2eb2176fce75e4e51404cfb98fb37bd77f8",
+    "preview-deploy.yml": "115f775371fead8503699f8302a9589b87fe6731423051e91b436984fcd2225a",
+    "preview.yml": "d31787a4b1532bc561c67e4e7ee791e9a705a18230ecc4a8eb6a47a4e90fc0a1",
+    "release.yml": "9c9162357fe2e8540169386992055628e4ec247bec0c3c1d38935b30bfea280c"
+  },
+  "desktop": {
+    "ci.yml": "2220eb83f31de93a2ad8d2b8fd6cc2eb2176fce75e4e51404cfb98fb37bd77f8",
+    "desktop.yml": "04aacca2266a940e6ce1a1b26386ac7af117a70e592fbf07cbe3c5a7f6ccd0a0",
+    "preview-deploy.yml": "115f775371fead8503699f8302a9589b87fe6731423051e91b436984fcd2225a",
+    "preview.yml": "d31787a4b1532bc561c67e4e7ee791e9a705a18230ecc4a8eb6a47a4e90fc0a1",
+    "release.yml": "9c9162357fe2e8540169386992055628e4ec247bec0c3c1d38935b30bfea280c"
+  }
+}

@@ -25,6 +25,10 @@ test("loadCombos returns exactly the combos hull CI renders, sorted by name", ()
     { name: "web", pieces: ["base", "preact-app:web", "ui-storybook", "hono-worker:api"] },
     { name: "web-circleci", pieces: ["base", "circleci", "preact-app:web", "hono-worker:api"] },
     {
+      name: "web-circleci-only",
+      pieces: ["base", "circleci", "circleci-only", "preact-app:web", "hono-worker:api"],
+    },
+    {
       name: "web-secrets",
       pieces: ["base", "preact-app:web", "hono-worker:api", "secrets"],
       vars: { scope: "hullci", context_prefix: "hullci" },

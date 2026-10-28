@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { GITHUB_CI_PATH, circleciOk, githubCi } from "../scripts/gen-ci.mjs";
+import { GITHUB_CI_PATH, circleciOk, githubCi, githubCiTemplate } from "../scripts/gen-ci.mjs";
+import { renderString } from "../scripts/lib/render-file.mjs";
 import { CI_PLAN } from "../scripts/lib/ci-tasks.mjs";
 
 const genCi = fileURLToPath(new URL("../scripts/gen-ci.mjs", import.meta.url));
@@ -20,7 +21,17 @@ test("gen-ci --check passes on the checked-in ci.yml", () => {
 test("generated ci.yml without '# step:' lines is byte-identical to the previous file", async () => {
   const before = await readFile(fixture, "utf8");
   assert.equal(githubCi().replace(stepLine, ""), before);
-  assert.equal((await readFile(GITHUB_CI_PATH, "utf8")).replace(stepLine, ""), before);
+  const source = await readFile(GITHUB_CI_PATH, "utf8");
+  assert.equal(renderString(source, { pieces: ["base"] }).replace(stepLine, ""), before);
+});
+
+test("ci.yml.jinja is guarded: empty with circleci-only, no trailing newline in the source", async () => {
+  const source = await readFile(GITHUB_CI_PATH, "utf8");
+  assert.equal(source, githubCiTemplate());
+  assert.ok(source.startsWith('{% if "circleci-only" in pieces %}{% else %}{% raw %}name: ci\n'));
+  assert.ok(source.endsWith("{% endraw %}{% endif %}"));
+  assert.equal(renderString(source, { pieces: ["base", "circleci", "circleci-only"] }), "");
+  assert.equal(renderString(source, { pieces: ["base"] }), githubCi());
 });
 
 test("step ids in ci.yml equal CI_PLAN ids in order", async () => {
@@ -54,9 +65,9 @@ test("gen-ci --check run through a symlinked checkout still reports drift", asyn
   await cp(fileURLToPath(new URL("../scripts/", import.meta.url)), join(real, "scripts"), {
     recursive: true,
   });
-  const yml = join(real, "template/pieces/base/files/.github/workflows/ci.yml");
+  const yml = join(real, "template/pieces/base/files/.github/workflows/ci.yml.jinja");
   await mkdir(dirname(yml), { recursive: true });
-  await writeFile(yml, `${githubCi()}# drift\n`);
+  await writeFile(yml, `${githubCiTemplate()}# drift\n`);
   await symlink(real, join(tmp, "link"), "dir");
   const r = spawnSync(process.execPath, [join(tmp, "link/scripts/gen-ci.mjs"), "--check"], {
     encoding: "utf8",
@@ -72,9 +83,9 @@ test("gen-ci --check also reports a drifted .circleci ci-ok.yml", async (t) => {
     recursive: true,
   });
   const ok = join(tmp, "template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml");
-  const gh = join(tmp, "template/pieces/base/files/.github/workflows/ci.yml");
+  const gh = join(tmp, "template/pieces/base/files/.github/workflows/ci.yml.jinja");
   for (const f of [ok, gh]) await mkdir(dirname(f), { recursive: true });
-  await writeFile(gh, githubCi());
+  await writeFile(gh, githubCiTemplate());
   await writeFile(ok, `${circleciOk()}# drift\n`);
   const r = spawnSync(process.execPath, [join(tmp, "scripts/gen-ci.mjs"), "--check"], {
     encoding: "utf8",
