@@ -9,32 +9,30 @@ stack, tool versions and config, and keeps them current. Your app code stays you
 
 ## Quick start
 
-`@keelstackhq/splice` is not released yet, so today you render with hull's dev renderer
-(needs Node 24 and pnpm 12; run `pnpm install` once in a hull checkout):
+Render with splice (needs Node 24 and pnpm 12; `base` is always included):
 
 ```bash
-node scripts/render.mjs new --template template --out ../my-repo \
+pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template my-repo \
   --piece preact-app:web --piece hono-worker:api --data scope=acme
-cd ../my-repo && git init && pnpm install && node scripts/agents-index.mjs && pnpm run ci
+cd my-repo && pnpm install && pnpm run ci
 ```
 
-`base` is always rendered; like splice, the dev renderer refuses `--piece base` (exit 2).
-The dev renderer runs no `[[post]]` hooks, so run `node scripts/agents-index.mjs` yourself after
-rendering to create the docs index (splice will run it).
+hull v0.4.0 and later need splice 0.3.0 or later for every command. Later, `splice add <piece>`
+adds a piece, `splice update` moves to a newer hull (owned files replaced, shared files merged,
+your source never touched) and `splice check` runs in CI. An existing repo switches to
+CircleCI-only with `splice add circleci` then `splice add circleci-only`, which removes `ci.yml`.
 
-The renderer only supports `new`; there is no `add` or `update` until splice ships. To render
-piece combinations and run their CI command the way hull's CI does:
+hull's own dev renderer (`node scripts/render.mjs new ...`, `new` only, no `[[post]]` hooks; it
+refuses `--piece base` like splice) exists for hull development. To render piece combinations and
+run their CI command the way hull's CI does:
 
 ```bash
 node scripts/dogfood.mjs --combo base
 node scripts/dogfood.mjs --combo web --combo site
 ```
 
-With splice (0.2.0 or later) the equivalent is
-`pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template my-repo --piece preact-app:web ...`
-(`base` is always included), later `splice add`, `splice update` (owned files replaced, shared
-files merged, your source never touched) and `splice check` in CI. hull's own CI renders its
-combos with splice; `node scripts/dogfood.mjs --renderer dev` uses the dev renderer instead.
+hull's CI renders its combos with splice; `node scripts/dogfood.mjs --renderer dev` uses the dev
+renderer instead.
 
 ## Pure Rust repos
 

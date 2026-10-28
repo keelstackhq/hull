@@ -19,7 +19,10 @@ Keep `unreleased` while changes accumulate.
   move `SPLICE_BOT_TOKEN` / `HOIST_RELEASE_TOKEN` there and delete the repository-level secrets.**
 - PR previews run in two phases: `preview.yml` builds with no secrets and uploads `preview-<pr>`;
   `preview-deploy.yml` (environment `preview`, default-branch code only) deploys `<app>-preview`.
-- `min_splice` rises to 0.2.0 (raw blocks in `preview-deploy.yml.jinja`).
+- **Upgrade: `min_splice` rises to 0.3.0 (raw blocks; contract rule 9.27, an empty re-render removes
+  owned files). Upgrade splice (CLI, `pnpm dlx` pin, the update-bot action) before updating. An
+  existing repo switches to CircleCI-only with `splice add circleci` then `splice add circleci-only`
+  (removes `ci.yml`).**
 
 ## v0.3.1 — 2026-10-27
 

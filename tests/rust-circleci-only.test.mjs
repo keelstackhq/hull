@@ -41,9 +41,9 @@ test("the rust-circleci-only combo is registered", () => {
   });
 });
 
-test("template-rust min_splice allows raw blocks (0.2.0)", async () => {
+test("template-rust min_splice is 0.3.0 (raw blocks, rule 9.27)", async () => {
   const t = parseToml(await readFile(join(RUST, "splice.toml"), "utf8"));
-  assert.equal(t.min_splice, "0.2.0");
+  assert.equal(t.min_splice, "0.3.0");
 });
 
 test("circleci-only piece requires circleci and owns only the mirror", async () => {
