@@ -11,5 +11,15 @@
     "preview-deploy.yml": "115f775371fead8503699f8302a9589b87fe6731423051e91b436984fcd2225a",
     "preview.yml": "d31787a4b1532bc561c67e4e7ee791e9a705a18230ecc4a8eb6a47a4e90fc0a1",
     "release.yml": "9c9162357fe2e8540169386992055628e4ec247bec0c3c1d38935b30bfea280c"
+  },
+  "rust": {
+    "ci.yml": "1ffff90aac8c8639e2ef1ca70de25edd039db0fe3b5a349c4c6b927b2e89917d",
+    "release.yml": "3a8e6f00be99647f2d89667f68eedae2709d2d3d6b0672a9067bca0d3e834c26",
+    "splice.yml": "5920d5482fe6a75dc58d2ef2a770c97798414dd8266a7ea6a4ff228cd7e5d9c1"
+  },
+  "rust-circleci": {
+    "ci.yml": "1ffff90aac8c8639e2ef1ca70de25edd039db0fe3b5a349c4c6b927b2e89917d",
+    "release.yml": "3a8e6f00be99647f2d89667f68eedae2709d2d3d6b0672a9067bca0d3e834c26",
+    "splice.yml": "5920d5482fe6a75dc58d2ef2a770c97798414dd8266a7ea6a4ff228cd7e5d9c1"
   }
 }

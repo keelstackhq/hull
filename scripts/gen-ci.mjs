@@ -16,7 +16,7 @@ export const CIRCLECI_OK_PATH = fileURLToPath(
 );
 
 export const RUST_GITHUB_CI_PATH = fileURLToPath(
-  new URL("../template-rust/pieces/base/files/.github/workflows/ci.yml", import.meta.url),
+  new URL("../template-rust/pieces/base/files/.github/workflows/ci.yml.jinja", import.meta.url),
 );
 
 export const RUST_CIRCLECI_OK_PATH = fileURLToPath(
@@ -116,6 +116,11 @@ export function rustGithubCi(plan = RUST_CI_PLAN) {
   return `${rustHeader}${steps}${footer}`;
 }
 
+/** The checked-in template-rust source: `rustGithubCi` behind the same `circleci-only` guard. */
+export function rustGithubCiTemplate(plan = RUST_CI_PLAN) {
+  return `{% if "circleci-only" in pieces %}{% else %}{% raw %}${rustGithubCi(plan)}{% endraw %}{% endif %}`;
+}
+
 /** The `template-rust` CircleCI `ci-ok` job for `RUST_CI_PLAN`. */
 export function rustCircleciOk(plan = RUST_CI_PLAN) {
   const steps = plan.map((s) => `  # step: ${s.id}\n${s.circleci}`).join("");
@@ -126,7 +131,7 @@ async function main() {
   const files = [
     [GITHUB_CI_PATH, githubCiTemplate(), "ci.yml.jinja"],
     [CIRCLECI_OK_PATH, circleciOk(), "ci-ok.yml"],
-    [RUST_GITHUB_CI_PATH, rustGithubCi(), "template-rust ci.yml"],
+    [RUST_GITHUB_CI_PATH, rustGithubCiTemplate(), "template-rust ci.yml.jinja"],
     [RUST_CIRCLECI_OK_PATH, rustCircleciOk(), "template-rust ci-ok.yml"],
   ];
   if (process.argv.includes("--check")) {
