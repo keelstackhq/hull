@@ -52,7 +52,7 @@ Keep `unreleased` while changes accumulate.
   `deploy:preview` scripts and turbo task are gone, and `deploy` no longer gets `PR_NUMBER`.
 - New piece `secrets` (opt-in, requires base; required var `context_prefix`): seed `secrets.toml`,
   owned `deploy.yml` (push to `main`, environment `prod`, hoist secrets; not written with
-  `circleci-only`) and `docs/agents/secrets.md`. It needs hoist released (see Blocked).
+  `circleci-only`) and `docs/agents/secrets.md`. Uses hoist secrets v0.3.0.
 - New pieces `circleci` ("both" mode: a CircleCI `ci-ok` next to the unchanged GitHub `ci.yml`) and
   `circleci-only` (no `ci.yml`, `desktop.yml` or `deploy.yml`; `circleci-status.yml` mirrors the
   CircleCI `ci-ok` / `bosun-ok` as GitHub statuses), for `template/` and template-rust. Base
