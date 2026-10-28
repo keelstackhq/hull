@@ -87,3 +87,17 @@ test("release.yml prepare: App token step pinned and gated, precedence app > PAT
     );
   assert.ok(raw.includes("--ignore-scripts"));
 });
+
+test("release.yml publish: App token step pinned and gated, tags pushed with it, id-token kept", () => {
+  const job = load(RUST_RELEASE).jobs.publish;
+  job.__file = RUST_RELEASE;
+  // hoist creates the tags and the GitHub Release: Contents write only
+  checkJob(job, "HOIST_RELEASE_APP_CLIENT_ID", "HOIST_RELEASE_APP_KEY", ["contents"]);
+  assert.equal(job.environment, "release");
+  assert.equal(job.permissions["id-token"], "write");
+  const checkout = job.steps.find((s) => s.uses?.startsWith("actions/checkout"));
+  assert.equal(checkout.with["persist-credentials"], false);
+  assert.equal(checkout.with.token, undefined);
+  const hoist = job.steps.find((s) => s.run === "hoist release publish --assets dist");
+  assert.equal(hoist.env.GH_TOKEN, "${{ steps.app.outputs.token || github.token }}");
+});

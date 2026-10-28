@@ -849,8 +849,9 @@ const tagRuleset = (over = {}) => ({
   ...over,
 });
 
+const RAW = /^(actions|rulesets)\//;
 // --check-rulesets needs only gh and jq: a stub gh, no sops/age.
-function checkRulesets(list, detail, extra = []) {
+function checkRulesets(list, detail, extra = [], files = {}) {
   const tmp = mkdtempSync(join(tmpdir(), "rules-"));
   try {
     const bin = join(tmp, "bin");
@@ -867,6 +868,25 @@ function checkRulesets(list, detail, extra = []) {
         typeof list === "string" ? list : JSON.stringify(list),
       );
     if (detail) writeFileSync(join(stub, "resp", keyOf(TAG_DETAIL)), JSON.stringify(detail));
+    for (const [name, text] of Object.entries(files)) {
+      const key = keyOf(`api repos/acme/site/${RAW.test(name) ? "" : "contents/"}${name}`);
+      if (text instanceof Error) writeFileSync(join(stub, "resp", `${key}.err`), text.message);
+      else if (RAW.test(name) || typeof text === "object")
+        writeFileSync(
+          join(stub, "resp", key),
+          typeof text === "string" ? text : JSON.stringify(text),
+        );
+      else {
+        // the real API wraps base64 every 60 characters
+        const b64 = Buffer.from(text)
+          .toString("base64")
+          .replace(/(.{60})/g, "$1\n");
+        writeFileSync(
+          join(stub, "resp", key),
+          JSON.stringify({ content: b64, encoding: "base64" }),
+        );
+      }
+    }
     return spawnSync("bash", [SCRIPT, "--check-rulesets", ...extra, "acme/site"], {
       env: { ...process.env, STUB: stub, PATH: `${bin}:${process.env.PATH}` },
       encoding: "utf8",
@@ -962,5 +982,162 @@ test("the bootstrap paste block reports each consumer repo's tag ruleset quietly
     assert.doesNotMatch(r.stderr, /HTTP 500/);
   } finally {
     rmSync(t.tmp, { recursive: true, force: true });
+  }
+});
+
+const PUBLISH_WF =
+  "jobs:\n  publish:\n    steps:\n      - run: hoist release publish --assets dist\n";
+const VAR = "actions/variables/HOIST_RELEASE_APP_CLIENT_ID";
+const APP = { actor_type: "Integration", actor_id: 4242, bypass_mode: "always" };
+
+test("--check-rulesets reports a mismatch: hoist pushes *-v* tags, no App can bypass", () => {
+  const files = {
+    ".github/workflows/release.yml": PUBLISH_WF,
+    "hoist.toml": '[release]\ntag_format = "{name}-v{version}"\n',
+  };
+  const r = checkRulesets(LIST, tagRuleset(), [], files);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+  assert.match(r.stderr, /release\.yml pushes tags with hoist.*--allow-app/);
+  const ok = checkRulesets(
+    LIST,
+    tagRuleset({ bypass_actors: [ADMIN, APP] }),
+    ["--allow-app", "4242"],
+    {
+      ...files,
+      [VAR]: '{"name":"HOIST_RELEASE_APP_CLIENT_ID","value":"Iv1.abc"}',
+    },
+  );
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /tag ruleset acme\/site: ok/);
+});
+
+test("--check-rulesets: no release.yml, no hoist publish or the default tag_format is ok", () => {
+  const tf = (t) => ({ ".github/workflows/release.yml": PUBLISH_WF, "hoist.toml": t });
+  for (const files of [
+    {},
+    {
+      ".github/workflows/release.yml": "jobs: {}\n",
+      "hoist.toml": '[release]\ntag_format = "{name}-v{version}"\n',
+    },
+    tf("[release]\nchangelog = true\n"),
+    tf('[other]\ntag_format = "{name}-v{version}"\n[release]\n'),
+  ]) {
+    const r = checkRulesets(LIST, tagRuleset(), [], files);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /tag ruleset acme\/site: ok/);
+  }
+});
+
+const wfFiles = (toml) => ({
+  ".github/workflows/release.yml": PUBLISH_WF,
+  ...(toml === undefined ? {} : { "hoist.toml": toml }),
+});
+const ALL = { conditions: { ref_name: { include: ["~ALL"], exclude: [] } } };
+const withApp = { bypass_actors: [ADMIN, APP] };
+
+test("--check-rulesets: an allowed App without the repo variable is a mismatch", () => {
+  const files = wfFiles('[release]\ntag_format = "{name}-v{version}"\n');
+  const args = ["--allow-app", "4242"];
+  const r = checkRulesets(LIST, tagRuleset(withApp), args, files);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+  assert.match(r.stderr, /HOIST_RELEASE_APP_CLIENT_ID is missing/);
+  const err = checkRulesets(LIST, tagRuleset(withApp), args, {
+    ...files,
+    [VAR]: new Error("gh: Server Error (HTTP 500)\n"),
+  });
+  assert.notEqual(err.status, 0);
+  assert.match(err.stdout, /tag ruleset acme\/site: unknown/);
+});
+
+test("--check-rulesets: a non-404 error reading release.yml or hoist.toml is unknown", () => {
+  const e = new Error("gh: Server Error (HTTP 500)\n");
+  for (const files of [{ ".github/workflows/release.yml": e }, { ...wfFiles(), "hoist.toml": e }]) {
+    const r = checkRulesets(LIST, tagRuleset(), [], files);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
+  }
+});
+
+test("--check-rulesets: no hoist.toml means the default format; ~ALL still blocks it", () => {
+  let r = checkRulesets(LIST, tagRuleset(ALL), [], wfFiles());
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+  r = checkRulesets(LIST, tagRuleset(), [], wfFiles());
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /tag ruleset acme\/site: ok/);
+  // ~ALL with the default format is fine once an allowed App and the variable exist
+  r = checkRulesets(LIST, tagRuleset({ ...ALL, ...withApp }), ["--allow-app", "4242"], {
+    ...wfFiles(),
+    [VAR]: '{"value":"Iv1.abc"}',
+  });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test("--check-rulesets reads tag_format past comments and spaced table headers", () => {
+  const dash = '"{name}-v{version}"';
+  for (const [toml, bad] of [
+    [`[ release ]\ntag_format = ${dash}\n`, true],
+    [`[release] # note\n  tag_format = ${dash}  # trailing\n`, true],
+    [`[release]\ntag_format = "{name}@{version}" # was ${dash} -v\n`, false],
+    [`[release]\n# tag_format = ${dash}\n`, false],
+  ]) {
+    const r = checkRulesets(LIST, tagRuleset(), [], wfFiles(toml));
+    assert.equal(r.status === 0, !bad, toml + r.stderr);
+    assert.match(r.stdout, new RegExp(`tag ruleset acme/site: ${bad ? "mismatch" : "ok"}`));
+  }
+});
+
+test("--check-rulesets: only an always-mode App bypass counts", () => {
+  const files = {
+    ...wfFiles('[release]\ntag_format = "{name}-v{version}"\n'),
+    [VAR]: '{"value":"x"}',
+  };
+  const pr = { ...APP, bypass_mode: "pull_request" };
+  const r = checkRulesets(
+    LIST,
+    tagRuleset({ bypass_actors: [ADMIN, pr] }),
+    ["--allow-app", "4242"],
+    files,
+  );
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+});
+
+test("--check-rulesets: a second ~ALL ruleset without the App still blocks", () => {
+  const list = [...LIST, { id: 8, target: "tag", enforcement: "active" }];
+  const files = {
+    ...wfFiles(),
+    [VAR]: '{"value":"x"}',
+    "rulesets/8?includes_parents=true": JSON.stringify(tagRuleset({ id: 8, ...ALL })),
+  };
+  const mk = (extra) =>
+    checkRulesets(list, tagRuleset({ ...withApp, ...extra }), ["--allow-app", "4242"], files);
+  // ruleset 7 qualifies with the App on *-v*; ruleset 8 covers ~ALL without it
+  const r = mk({});
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+});
+
+test("--check-rulesets: an empty repo variable value is a mismatch", () => {
+  const files = {
+    ...wfFiles('[release]\ntag_format = "{name}-v{version}"\n'),
+    [VAR]: '{"value":""}',
+  };
+  const r = checkRulesets(LIST, tagRuleset(withApp), ["--allow-app", "4242"], files);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /tag ruleset acme\/site: mismatch/);
+});
+
+test("--check-rulesets: a contents read that is not base64 is unknown", () => {
+  const big = { content: "", encoding: "none" };
+  for (const files of [
+    { ".github/workflows/release.yml": big },
+    { ...wfFiles(), "hoist.toml": big },
+  ]) {
+    const r = checkRulesets(LIST, tagRuleset(), [], files);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /tag ruleset acme\/site: unknown/);
   }
 });

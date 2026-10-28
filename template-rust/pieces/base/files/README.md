@@ -57,3 +57,10 @@ a ruleset requires `ci-ok`. Pick one:
    files needs a credential with the workflow scope.
 
 Order: App, then PAT, then `github.token`.
+
+`publish` pushes the release tags and creates the GitHub Release. With a tag ruleset covering them
+(`*-v*`, which matches `{name}-v{version}` tags and any crate name containing `-v`), put the App
+(`HOIST_RELEASE_APP_CLIENT_ID` and `HOIST_RELEASE_APP_KEY`, the key also in environment `release`)
+on the ruleset's bypass list, else the push is rejected: `github.token` cannot bypass a ruleset.
+The token is present in the `publish` step, where `cargo publish` runs your crates' build scripts, so
+the App gets Contents write only and goes only on the tag ruleset's bypass list.

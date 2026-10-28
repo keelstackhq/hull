@@ -1124,7 +1124,11 @@ README gives. Token order for the bot and for `prepare`: a GitHub App token
 (`actions/create-github-app-token`, SHA-pinned, scoped to the repo; `vars.SPLICE_APP_CLIENT_ID` /
 `vars.HOIST_RELEASE_APP_CLIENT_ID` hold the App's Client ID, the key is an environment secret), else
 the PAT secret, else `github.token`, whose PRs get no CI. `vars.SPLICE_BOT == 'off'` skips the bot
-job (session mode: an agent session runs `splice update --all` and opens the PR).
+job (session mode: an agent session runs `splice update --all` and opens the PR). 
+`publish` takes the same optional App (Contents write only) for `GH_TOKEN`, else `github.token`,
+because hoist pushes the release tags and a `*-v*` tag ruleset rejects `github.token`. The token
+exists in a step where `cargo publish` runs crates' build scripts, hence contents-only, and the App
+belongs only on the tag ruleset's bypass list.
 The generated README names the two channel adds after `splice new`:
 `rigging --piece claude` and `decisions//channel --track main --piece import-project` (D-004;
 its section lands in the seed `docs/agents/project.md`, which `CLAUDE.md` imports). Checked
