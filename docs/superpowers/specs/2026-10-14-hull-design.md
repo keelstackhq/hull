@@ -651,7 +651,7 @@ upstream.
   4. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
   5. `pnpm install --frozen-lockfile --prefer-offline`.
-  6. Turbo cache: `uses: keelstackhq/hoard@v0` (since 2026-10-22, hoard 0.1.0): a Turborepo
+  6. Turbo cache: `uses: keelstackhq/hoard` (v0.4.0, SHA-pinned; since 2026-10-22, hoard 0.1.0): a Turborepo
      remote cache in the GitHub Actions cache; it exports `TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`
      for the `turbo run` step. No `actions/cache` step.
   6. Rust (present in the plain `ci.yml`, guarded at runtime by
@@ -736,6 +736,9 @@ tracks `cargo-deny@x.y.z` in `.github/workflows/*.yml` (datasource `crate`); the
 manager bumps `rust-toolchain.toml`, so the toolchain needs no regex; automerge for minor/patch and digests with `platformAutomerge`; weekly
 `lockFileMaintenance`. Open question: once `splice update` runs as a bot, template-managed catalog
 entries move to `ignoreDeps` so Renovate and the template do not both bump them.
+
+Every `uses:` in hull's workflows and in the templates is pinned by full commit SHA with a `# vX.Y.Z`
+comment (`tests/action-pins.test.mjs`); `docs/actions.md` (`pnpm docs:actions`) lists them for org allowlists. Renovate keeps the SHAs current in generated repos (via `renovate/default.json`); hull itself has no Renovate config, so its pins (incl. `.yml.jinja` and `ci-tasks.mjs`; run `pnpm gen:ci` after editing the latter) are bumped by hand.
 
 ### 8.7 `release.yml` (tag-driven)
 
@@ -913,7 +916,7 @@ heading fails the run. `scripts/release-tag.mjs` decides (`changelogRelease`, `r
   unchanged, the user's dependency kept, the owned file replaced, `splice check` exit 0 at the end.
   Both skip with a message when `SPLICE_BIN` is unset.
 - **hoard 0.1.0** (done 2026-10-22; the Action's moving tag is `v0`, not `v1`): the
-  `actions/cache` turbo step became `uses: keelstackhq/hoard@v0` in the generated `ci.yml` and in
+  `actions/cache` turbo step became `uses: keelstackhq/hoard` (SHA-pinned v0.4.0) in the generated `ci.yml` and in
   hull's CI.
 
 ## 12. Testing

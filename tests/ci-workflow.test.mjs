@@ -95,8 +95,8 @@ test("install is frozen and prefer-offline; setup-node caches pnpm", () => {
 });
 
 test("hoard is the turbo remote cache: after install, before turbo run, no actions/cache", () => {
-  const i = steps.findIndex((s) => s.uses === "keelstackhq/hoard@v0");
-  assert.ok(i >= 0, "uses keelstackhq/hoard@v0");
+  const i = steps.findIndex((s) => s.uses?.startsWith("keelstackhq/hoard@"));
+  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.4.0, SHA-pinned)");
   assert.match(steps[i].if, /steps\.affected\.outputs\.skip != 'true'/);
   const install = steps.findIndex((s) => s.run?.startsWith("pnpm install"));
   const turbo = steps.findIndex((s) => s.run?.startsWith("pnpm turbo run"));
@@ -301,14 +301,14 @@ test("Job duration step: always, non-fatal, budget in summary, no ${{ }}", () =>
 });
 
 test("index check runs after checkout, before the early-exit step, with no if", () => {
-  const label = (s) => s.name ?? s.uses;
+  const label = (s) => s.name ?? s.uses?.split("@")[0];
   const names = steps.map(label);
-  const order = ["actions/checkout@v5", "Agents index current?", "Anything affected?"];
+  const order = ["actions/checkout", "Agents index current?", "Anything affected?"];
   assert.deepEqual(
     names.filter((n) => order.includes(n)),
     order,
   );
-  assert.ok(names.indexOf("Agents index current?") < names.indexOf("actions/setup-node@v5"));
+  assert.ok(names.indexOf("Agents index current?") < names.indexOf("actions/setup-node"));
   const s = steps.find((x) => x.name === "Agents index current?");
   assert.equal(s.run, "node scripts/agents-index.mjs --check");
   assert.equal("if" in s, false);

@@ -27,7 +27,7 @@ jobs:
       - name: Start timer
         run: echo "CI_START=$(date +%s)" >> "$GITHUB_ENV"
       # step: checkout
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           filter: blob:none
@@ -44,12 +44,12 @@ jobs:
         if: steps.affected.outputs.skip != 'true'
         run: rustup toolchain install
       # step: rust-cache
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         if: steps.affected.outputs.skip != 'true'
         with:
           key: ${{ hashFiles('rust-toolchain.toml') }}
       # step: rust-tools
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         if: steps.affected.outputs.skip != 'true'
         with:
           tool: cargo-nextest@0.9.148,cargo-deny@0.20.2

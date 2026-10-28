@@ -24,7 +24,7 @@ const GITHUB_STEPS = [
   {
     id: "checkout",
     github: yml(
-      "      - uses: actions/checkout@v5",
+      "      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0",
       "        with:",
       "          fetch-depth: 0",
       "          filter: blob:none",
@@ -62,9 +62,9 @@ const GITHUB_STEPS = [
   {
     id: "setup-pnpm-node",
     github: yml(
-      "      - uses: pnpm/action-setup@v4",
+      "      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0",
       `        if: ${notSkipped}`,
-      "      - uses: actions/setup-node@v5",
+      "      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0",
       `        if: ${notSkipped}`,
       "        with:",
       "          node-version-file: .node-version",
@@ -83,7 +83,7 @@ const GITHUB_STEPS = [
     id: "turbo-cache",
     github: yml(
       "      # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM",
-      "      - uses: keelstackhq/hoard@v0",
+      "      - uses: keelstackhq/hoard@06291684834e8d8a82b8d3f5e7c9f5677497f4e2 # v0.4.0",
       `        if: ${notSkipped}`,
     ),
   },
@@ -118,7 +118,7 @@ const GITHUB_STEPS = [
   {
     id: "rust-cache",
     github: yml(
-      "      - uses: Swatinem/rust-cache@v2",
+      "      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3",
       `        if: ${ifRust}`,
       "        with:",
       "          key: ${{ hashFiles('rust-toolchain.toml') }}",
@@ -127,7 +127,7 @@ const GITHUB_STEPS = [
   {
     id: "rust-tools",
     github: yml(
-      "      - uses: taiki-e/install-action@v2",
+      "      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32",
       `        if: ${ifRust}`,
       "        with:",
       "          tool: cargo-nextest@0.9.148,cargo-deny@0.20.2",
@@ -466,7 +466,7 @@ export const RUST_CI_PLAN = Object.freeze(
     {
       id: "rust-cache",
       github: yml(
-        "      - uses: Swatinem/rust-cache@v2",
+        "      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3",
         `        if: ${NOT_DOCS}`,
         "        with:",
         "          key: ${{ hashFiles('rust-toolchain.toml') }}",
@@ -476,7 +476,7 @@ export const RUST_CI_PLAN = Object.freeze(
     {
       id: "rust-tools",
       github: yml(
-        "      - uses: taiki-e/install-action@v2",
+        "      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32",
         `        if: ${NOT_DOCS}`,
         "        with:",
         "          tool: cargo-nextest@0.9.148,cargo-deny@0.20.2",

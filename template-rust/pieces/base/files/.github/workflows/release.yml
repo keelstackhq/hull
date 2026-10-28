@@ -34,7 +34,7 @@ jobs:
       pending: ${{ steps.detect.outputs.pending }}
       enabled: ${{ steps.gate.outputs.enabled }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -56,12 +56,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (needs.detect.outputs.pending == 'true' && needs.detect.outputs.enabled == 'true')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Rust toolchain (from rust-toolchain.toml)
         run: rustup toolchain install
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-deny@0.20.2
       - run: cargo deny --locked check advisories
@@ -87,7 +87,7 @@ jobs:
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - if: matrix.musl
@@ -97,7 +97,7 @@ jobs:
         run: |
           rustup toolchain install
           rustup target add "${{ matrix.target }}"
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: ${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml') }}
       - run: cargo build --release --locked --workspace --bins --target ${{ matrix.target }}
@@ -106,7 +106,7 @@ jobs:
           CC_aarch64_unknown_linux_musl: musl-gcc
       - name: Stage dist/<bin>-<target>
         run: node .github/scripts/release-pending.mjs stage ${{ matrix.target }}
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-${{ matrix.target }}
           path: dist/*
@@ -124,20 +124,20 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
       # `cargo publish` (run by hoist) builds each crate.
       - name: Rust toolchain (from rust-toolchain.toml)
         run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       # npm >= 11.5.1 and Node >= 22.14.0 for trusted publishing; hoist itself comes from npm.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
       - run: npm install -g --ignore-scripts "@keelstackhq/hoist@$HOIST_VERSION"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*
           path: dist
@@ -180,13 +180,13 @@ jobs:
           permission-pull-requests: write
       # The checkout keeps this token in .git/config (hoist pushes the release branch with it), so
       # every later step can read it: only the pinned hoist is installed, with --ignore-scripts.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           token: ${{ steps.app.outputs.token || secrets.HOIST_RELEASE_TOKEN || github.token }}
       - name: Rust toolchain (from rust-toolchain.toml)
         run: rustup toolchain install
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
       - run: npm install -g --ignore-scripts "@keelstackhq/hoist@$HOIST_VERSION"
