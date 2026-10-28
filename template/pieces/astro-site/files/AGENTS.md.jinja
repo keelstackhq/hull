@@ -10,7 +10,6 @@ here (it breaks under the `@astrojs/preact` compat setup).
 - oxfmt `.astro` support is experimental and off, so `format:check` excludes `.astro` files.
 - `typecheck` is `tsc --noEmit` (TS/TSX only); `astro check` needs the TypeScript JS API.
 - Tests: `vp test run`; component tests opt in to happy-dom with `// @vitest-environment happy-dom`.
-- Preview deploy: `pnpm deploy:preview` with `PR_NUMBER` set.
-- PR previews need the Worker to exist: deploy it once with
-  `pnpm turbo run deploy --filter=@{{ scope }}/{{ name }}` (`wrangler login` first); until then
-  `preview.yml` skips it with a notice.
+- Previews deploy to `<app>-preview` as alias `pr-<n>`. Never create `<app>-preview` by hand.
+- Secrets set on the -preview Worker are readable by every PR.
+- `kv`/`d1`/`r2`/`queue`/`service` ids in `env.preview` must be preview-only resources; previews share that data.

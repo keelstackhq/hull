@@ -59,10 +59,7 @@ test("scripts, name and catalog deps", async () => {
   assert.equal(pkg.scripts.dev, "wrangler dev");
   assert.equal(pkg.scripts.deploy, "wrangler deploy");
   assert.equal(pkg.scripts.test, "vp test run");
-  assert.equal(
-    pkg.scripts["deploy:preview"],
-    "wrangler versions upload --preview-alias pr-$PR_NUMBER",
-  );
+  assert.equal(pkg.scripts["deploy:preview"], undefined);
   for (const v of Object.values({ ...pkg.dependencies, ...pkg.devDependencies }))
     assert.equal(v, "catalog:");
   assert.ok(pkg.dependencies.hono);

@@ -3,8 +3,7 @@
 // checkout, environment preview) rejects anything but plain output, then uploads a version of the
 // `<name>-preview` Worker (`wrangler versions upload --no-bundle --preview-alias pr-<n>`) from a
 // minimal generated config: no production bindings, routes or domains, only `env.preview` bindings.
-// No PR code runs and nothing is built. With no subcommand: the legacy single-job turbo path, until
-// preview.yml moves to the two phases. Node built-ins only.
+// No PR code runs and nothing is built. Node built-ins only.
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
@@ -21,15 +20,6 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-
-export const TURBO_ARGS = [
-  "turbo",
-  "run",
-  "deploy:preview",
-  "--affected",
-  "--continue",
-  "--log-prefix=task",
-];
 
 const NOT_CREATED =
   /\[ERROR\]\s+You cannot upload a new version of a Worker that does not yet exist/;
@@ -156,7 +146,12 @@ function previewNameClash(root) {
     }
   });
   const previews = new Set(cfgs.map((c) => `${c.name}-preview`));
-  const names = cfgs.flatMap((c) => [c.name, ...Object.values(c.env ?? {}).map((e) => e?.name)]);
+  // An env without a name deploys as `<name>-<env>`; `env.preview` is only the binding source.
+  const envNames = (c) =>
+    Object.entries(c.env ?? {}).map(
+      ([k, e]) => e?.name ?? (k === "preview" ? "" : `${c.name}-${k}`),
+    );
+  const names = cfgs.flatMap((c) => [c.name, ...envNames(c)]);
   return names.find((n) => previews.has(n));
 }
 
@@ -216,12 +211,31 @@ export async function deploy({ artifact: given, root, pr, run }) {
       continue;
     }
     const pv = cfg.env?.preview;
+    const list = (v) => (v === undefined ? [] : Array.isArray(v) ? v : null);
+    const [services, dos, producers, consumers] = [
+      pv?.services,
+      pv?.durable_objects?.bindings,
+      pv?.queues?.producers,
+      pv?.queues?.consumers,
+    ].map(list);
+    if ([services, dos, producers, consumers].includes(null)) {
+      errors.push(`${dir}: env.preview services, durable_objects.bindings, queues.* must be lists`);
+      continue;
+    }
     const refs = [
-      ...(pv?.services ?? []).map((x) => x?.service),
-      ...(pv?.durable_objects?.bindings ?? []).map((x) => x?.script_name).filter(Boolean),
+      ...services.map((x) => x?.service),
+      ...dos.map((x) => x?.script_name).filter(Boolean),
     ];
     if (!refs.every((x) => String(x).endsWith("-preview"))) {
       errors.push(`${dir}: env.preview binds a Worker that is not a -preview Worker`);
+      continue;
+    }
+    const queues = [
+      ...[...producers, ...consumers].map((x) => x?.queue),
+      ...consumers.map((x) => x?.dead_letter_queue).filter((x) => x !== undefined),
+    ];
+    if (!queues.every((x) => typeof x === "string" && x.endsWith("-preview"))) {
+      errors.push(`${dir}: env.preview uses a queue that is not a -preview queue`);
       continue;
     }
     let entry;
@@ -245,10 +259,11 @@ export async function deploy({ artifact: given, root, pr, run }) {
       // First preview of this app: create the `<name>-preview` Worker once from a stub (never PR
       // code as its live version), then upload the PR code as a preview version.
       const stub = put("stub.js", 'export default { fetch: () => new Response("") };\n');
-      const sconf = put(
-        "stub.json",
-        JSON.stringify(previewConfig({ ...cfg, assets: null, env: null }, { entry: stub })),
-      );
+      // No module scan: base_dir would be the whole temp dir.
+      const sc = previewConfig({ ...cfg, assets: null, env: null }, { entry: stub });
+      delete sc.find_additional_modules;
+      delete sc.base_dir;
+      const sconf = put("stub.json", JSON.stringify(sc));
       r = await wr("deploy", sconf);
       if (r.code === 0) r = await upload();
     }
@@ -270,7 +285,7 @@ export async function fenced(fn, env = process.env, write = (t) => process.stdou
   try {
     return await fn();
   } finally {
-    write(`::${token}::\n`);
+    write(`\n::${token}::\n`);
   }
 }
 
@@ -294,48 +309,6 @@ export function runWrangler(args, root, { bin = ["pnpm", "exec"], write } = {}) 
   });
 }
 
-/**
- * @param {string} log turbo output (ANSI allowed)
- * @param {number} exitCode turbo exit code
- */
-export function report(log, exitCode) {
-  const text = log.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
-  const urls = [...new Set(text.match(/https:\/\/[^\s)]*\.workers\.dev[^\s)]*/g) ?? [])].sort();
-  const notCreated = [
-    ...new Set(
-      text
-        .split("\n")
-        .filter((l) => NOT_CREATED.test(l))
-        .map((l) => /^(\S+):deploy:preview: /.exec(l)?.[1])
-        .filter((p) => p !== undefined),
-    ),
-  ].sort();
-  const failedLine = /^Failed:\s+(.+)$/m.exec(text);
-  const failed = failedLine ? failedLine[1].split(",").map((s) => s.trim()) : [];
-  const ok =
-    exitCode === 0 ||
-    (failed.length > 0 &&
-      failed.every((t) => t.endsWith("#deploy:preview") && notCreated.includes(t.slice(0, -15))));
-
-  let summary = "## Preview deployments\n\n";
-  summary += urls.length ? urls.map((u) => `- ${u}`).join("\n") + "\n" : "No preview URLs.\n";
-  /** @type {string[]} */
-  const notices = [];
-  if (notCreated.length) {
-    summary +=
-      "\n### Skipped: Worker does not exist yet\n\n" +
-      "Previews are versions of an existing Worker. Deploy each app below once, from a machine " +
-      "logged in to Cloudflare (`wrangler login`); later PRs get previews.\n\n";
-    for (const p of notCreated) {
-      summary += `- \`${p}\`: \`pnpm turbo run deploy --filter=${p}\`\n`;
-      notices.push(
-        `::notice title=Preview skipped::${p}: its Worker does not exist yet. Run \`pnpm turbo run deploy --filter=${p}\` once.`,
-      );
-    }
-  }
-  return { ok, urls, notCreated, failed, notices, summary };
-}
-
 /** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
 const isMain = () => {
   const entry = process.argv[1];
@@ -346,38 +319,21 @@ const isMain = () => {
     return false;
   }
 };
-if (isMain() && process.argv.length === 2) {
-  const child = spawn("pnpm", TURBO_ARGS, { stdio: ["ignore", "pipe", "pipe"] });
-  // One log for both streams: a garbled line can only turn a skip into a failure (fail closed).
-  let log = "";
-  for (const [from, to] of [
-    [child.stdout, process.stdout],
-    [child.stderr, process.stderr],
-  ]) {
-    from.on("data", (/** @type {Buffer} */ b) => {
-      log += b.toString();
-      to.write(b);
-    });
-  }
-  child.on("error", (e) => {
-    console.error(`preview: ${e.message}`);
-    process.exit(1);
-  });
-  child.on("close", (code) => {
-    const r = report(log, code ?? 1);
-    for (const n of r.notices) console.log(n);
-    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, r.summary);
-    process.exit(r.ok ? 0 : 1);
-  });
-}
-
-if (isMain() && process.argv.length > 2) {
-  const [cmd, artifact = ".preview"] = process.argv.slice(2);
+if (isMain()) {
+  const [cmd, given] = process.argv.slice(2);
+  const artifact = given ?? process.env.PREVIEW_ARTIFACT ?? ".preview";
   const pr = process.env.PR_NUMBER;
   if (cmd === "build") {
     const apps = buildArtifact({ root: process.cwd(), out: ".preview", pr });
     console.log(`preview: packed ${apps.length} app(s): ${apps.join(", ")}`);
   } else if (cmd === "deploy") {
+    for (const k of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) {
+      if (process.env[k]) continue;
+      console.error(
+        `preview: ${k} is empty. Store CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID only as secrets of the \`preview\` environment (Deployment branches: Selected, main), never as repository secrets.`,
+      );
+      process.exit(1);
+    }
     const root = process.cwd();
     const r = await deploy({
       artifact,
@@ -389,7 +345,9 @@ if (isMain() && process.argv.length > 2) {
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, r.summary);
     process.exit(r.ok ? 0 : 1);
   } else {
-    console.error("usage: preview.mjs [build | deploy [artifact-dir]]");
+    console.error(
+      "usage: preview.mjs build | deploy [artifact-dir] (default: $PREVIEW_ARTIFACT or .preview)",
+    );
     process.exit(2);
   }
 }

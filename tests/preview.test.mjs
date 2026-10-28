@@ -3,7 +3,8 @@ import { readFile, readdir, access } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { test } from "node:test";
 import YAML from "yaml";
-import { renderCombo } from "./helpers.mjs";
+import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
+import { renderString } from "../scripts/lib/render-file.mjs";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
@@ -17,7 +18,6 @@ import {
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import {
-  TURBO_ARGS,
   buildArtifact,
   checkArtifact,
   deploy,
@@ -25,17 +25,17 @@ import {
   parseJsonc,
   previewConfig,
   runWrangler,
-  report,
 } from "../template/pieces/base/files/.github/scripts/preview.mjs";
 
 const SCRIPT = fileURLToPath(
   new URL("../template/pieces/base/files/.github/scripts/preview.mjs", import.meta.url),
 );
 const PATH = ".github/workflows/preview.yml";
+const DEPLOY = ".github/workflows/preview-deploy.yml";
 
-async function load(pieces) {
+async function load(pieces, path = PATH) {
   const { dir, result } = await renderCombo(pieces);
-  const raw = await readFile(join(dir, PATH), "utf8");
+  const raw = await readFile(join(dir, path), "utf8");
   return { dir, result, raw, wf: YAML.parse(raw) };
 }
 
@@ -57,6 +57,13 @@ test("triggers, concurrency, permissions", () => {
   assert.deepEqual(base.wf.permissions, { contents: "read" });
 });
 
+test("preview.yml builds only: no secrets, no environment, no Cloudflare variable", () => {
+  assert.doesNotMatch(base.raw, /secrets\./);
+  assert.doesNotMatch(base.raw, /^\s*environment:/m);
+  assert.doesNotMatch(base.raw, /CLOUDFLARE/);
+  assert.equal(job.environment, undefined);
+});
+
 test("checkout has full history; detect step is right after it", () => {
   const co = steps[0];
   assert.match(co.uses, /^actions\/checkout@/);
@@ -73,120 +80,207 @@ test("every step after detect is guarded by the deploy output", () => {
   }
 });
 
-test("job env carries Cloudflare secrets, PR number and turbo scm range", () => {
-  assert.equal(job.env.CLOUDFLARE_API_TOKEN, "${{ secrets.CLOUDFLARE_API_TOKEN }}");
-  assert.equal(job.env.CLOUDFLARE_ACCOUNT_ID, "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}");
+test("job env carries the PR number and the turbo scm range only", () => {
+  assert.deepEqual(Object.keys(job.env).sort(), ["PR_NUMBER", "TURBO_SCM_BASE", "TURBO_SCM_HEAD"]);
   assert.equal(job.env.PR_NUMBER, "${{ github.event.pull_request.number }}");
   assert.match(job.env.TURBO_SCM_BASE, /pull_request\.base\.sha/);
   assert.match(job.env.TURBO_SCM_HEAD, /github\.sha/);
 });
 
-test("deploy step runs preview.mjs, skipped without the token", () => {
-  const d = steps.find((s) => /preview\.mjs/.test(s.run ?? ""));
-  assert.equal(d.run.trim(), "node .github/scripts/preview.mjs");
-  assert.equal(d.shell, "bash");
-  assert.match(d.if, /env\.CLOUDFLARE_API_TOKEN != ''/);
-  assert.match(d.if, /outputs\.deploy == 'true'/);
+test("preview.yml builds, packs with preview.mjs build and uploads preview-<pr> for 3 days", () => {
+  const i = (f) => steps.findIndex(f);
+  const build = i((s) => s.run === "pnpm turbo run build --affected");
+  const pack = i((s) => s.run === "node .github/scripts/preview.mjs build");
+  const up = i((s) => s.uses?.startsWith("actions/upload-artifact@"));
+  assert.ok(build > detectIdx && pack > build && up > pack);
+  assert.equal(steps[up].with.name, "preview-${{ github.event.pull_request.number }}");
+  assert.equal(steps[up].with.path, ".preview");
+  assert.equal(steps[up].with["retention-days"], 3);
 });
 
-test("preview.mjs is owned by base and runs only deploy:preview (never production deploy)", () => {
+test("preview.mjs is owned by base; without a subcommand it prints usage and exits 2", () => {
   const c = base.result.changes.find((x) => x.path === ".github/scripts/preview.mjs");
   assert.equal(c.class, "owned");
-  assert.deepEqual(TURBO_ARGS, [
-    "turbo",
-    "run",
-    "deploy:preview",
-    "--affected",
-    "--continue",
-    "--log-prefix=task",
-  ]);
+  const r = spawnSync("node", [SCRIPT], { encoding: "utf8" });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /usage: preview\.mjs build \| deploy/);
 });
 
-// Shapes of real turbo 2.11 output with --log-prefix=task in GitHub Actions (checked 2026-10-22).
-const WEB_OK = [
-  "::group::@acme/web:deploy:preview",
-  "@acme/web:deploy:preview: Version Preview Alias URL: \x1b[36mhttps://pr-3-web.acme.workers.dev\x1b[0m",
-  "::endgroup::",
-].join("\n");
-const API_MISSING = [
-  "\x1b[;31m@acme/api:deploy:preview\x1b[;0m",
-  "@acme/api:deploy:preview: \x1b[31m✘ [ERROR]\x1b[0m You cannot upload a new version of a Worker that does not yet exist. Please run the `deploy` command first.",
-  "@acme/api:deploy:preview: [ELIFECYCLE] Command failed with exit code 1.",
-].join("\n");
-const tail = (failed) =>
-  ` Tasks:    1 successful, 2 total\nFailed:    ${failed}\n ERROR  run failed: command  exited (1)\n`;
+// --- preview-deploy.yml: the half that holds secrets, run from the default branch
 
-test("report: success lists the preview URLs without ANSI codes", () => {
-  const r = report(`${WEB_OK}\n Tasks:    1 successful, 1 total\n`, 0);
-  assert.equal(r.ok, true);
-  assert.deepEqual(r.urls, ["https://pr-3-web.acme.workers.dev"]);
-  assert.deepEqual(r.notCreated, []);
-  assert.match(r.summary, /^## Preview deployments\n/);
-  assert.match(r.summary, /https:\/\/pr-3-web\.acme\.workers\.dev/);
+const SECRETS_SRC = readFileSync(
+  join(REAL_TEMPLATE, "pieces/base/files", `${DEPLOY}.jinja`),
+  "utf8",
+);
+const withSecrets = YAML.parse(renderString(SECRETS_SRC, { pieces: ["base", "secrets"] }));
+const dep = await load(["base", "hono-worker:api"], DEPLOY);
+const dj = dep.wf.jobs.deploy;
+const stepsOf = (wf) => wf.jobs.deploy.steps;
+const usesStep = (wf, re) => stepsOf(wf).find((s) => re.test(s.uses ?? ""));
+
+test("preview-deploy.yml is owned and rendered without the .jinja suffix", () => {
+  assert.equal(dep.result.changes.find((x) => x.path === DEPLOY)?.class, "owned");
+  assert.ok(!dep.result.changes.some((x) => x.path.endsWith(".jinja")));
 });
 
-test("report: a Worker that was never deployed is skipped with a notice, not a failure", () => {
-  const r = report(`${WEB_OK}\n${API_MISSING}\n${tail("@acme/api#deploy:preview")}`, 1);
-  assert.equal(r.ok, true);
-  assert.deepEqual(r.notCreated, ["@acme/api"]);
-  assert.deepEqual(r.urls, ["https://pr-3-web.acme.workers.dev"]);
-  assert.match(r.summary, /does not exist yet/);
-  assert.match(r.summary, /pnpm turbo run deploy --filter=@acme\/api/);
-  assert.equal(r.notices.length, 1);
-  assert.match(r.notices[0], /^::notice title=Preview skipped::@acme\/api/);
+test("preview-deploy: workflow_run of preview, completed only; minimal permissions", () => {
+  assert.deepEqual(dep.wf.on, { workflow_run: { workflows: ["preview"], types: ["completed"] } });
+  assert.deepEqual(dep.wf.permissions, {
+    contents: "read",
+    actions: "read",
+    "pull-requests": "read",
+  });
 });
 
-test("report: any other failure still fails the job", () => {
-  const build = report(`${API_MISSING}\n${tail("@acme/web#build, @acme/api#deploy:preview")}`, 1);
-  assert.equal(build.ok, false);
-  const auth = report(
-    `@acme/web:deploy:preview: ✘ [ERROR] Authentication error [code: 10000]\n${tail("@acme/web#deploy:preview")}`,
-    1,
+test("preview-deploy: runs only after a successful same-repo pull_request build", () => {
+  for (const part of [
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.event == 'pull_request'",
+    "github.event.workflow_run.head_repository.full_name == github.repository",
+  ])
+    assert.ok(dj.if.includes(part), part);
+  assert.doesNotMatch(dj.if, / \|\| /);
+  assert.equal(dj.environment, "preview");
+});
+
+test("preview-deploy: a gate job without environment or secrets decides whether anything deploys", async () => {
+  const gate = dep.wf.jobs.gate;
+  assert.equal(gate.environment, undefined);
+  assert.doesNotMatch(JSON.stringify(gate), /secrets|CLOUDFLARE/);
+  assert.ok(gate.if.includes("workflow_run.head_repository.full_name == github.repository"));
+  assert.ok(gate.steps.some((s) => /apps\/\*\/wrangler\.jsonc/.test(s.run ?? "")));
+  const co = gate.steps.find((s) => s.uses?.startsWith("actions/checkout@"));
+  assert.deepEqual(co.with, { "persist-credentials": false });
+  assert.match(gate.outputs.deploy, /steps\.detect\.outputs\.deploy/);
+  assert.equal(dj.needs, "gate");
+  assert.match(dj.if, /needs\.gate\.outputs\.deploy == 'true'/);
+  // A base-only repo has the same file: its deploy job is gated on the detect output too.
+  const only = await load(["base"], DEPLOY);
+  assert.equal(only.wf.jobs.deploy.needs, "gate");
+  assert.match(only.wf.jobs.deploy.if, /needs\.gate\.outputs\.deploy == 'true'/);
+});
+
+test("preview-deploy: one deploy per head branch, newer cancels older", () => {
+  assert.equal(
+    dep.wf.concurrency.group,
+    "preview-deploy-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}",
   );
-  assert.equal(auth.ok, false);
-  assert.deepEqual(auth.notCreated, []);
-  const both = report(
-    `${API_MISSING}\n@acme/web:deploy:preview: ✘ [ERROR] boom\n${tail("@acme/api#deploy:preview, @acme/web#deploy:preview")}`,
-    1,
-  );
-  assert.equal(both.ok, false);
+  assert.equal(dep.wf.concurrency["cancel-in-progress"], true);
 });
 
-test("report: a non-zero exit without a Failed line fails", () => {
-  assert.equal(report(" ERROR  run failed: no lockfile\n", 1).ok, false);
-  assert.equal(report(API_MISSING, 1).ok, false);
+for (const [label, wf] of [
+  ["without secrets", dep.wf],
+  ["with secrets", withSecrets],
+]) {
+  test(`preview-deploy (${label}): checks out the default branch only and installs from its lockfile`, () => {
+    const s = stepsOf(wf);
+    const co = s.find((x) => x.uses?.startsWith("actions/checkout@"));
+    assert.deepEqual(Object.keys(co.with ?? {}), ["persist-credentials"]);
+    assert.equal(co.with["persist-credentials"], false);
+    assert.equal(s.filter((x) => /checkout/.test(x.uses ?? "")).length, 1);
+    assert.ok(s.some((x) => x.run === "pnpm install --frozen-lockfile --prefer-offline"));
+    assert.ok(s.indexOf(co) < s.findIndex((x) => x.run?.startsWith("pnpm install")));
+  });
+
+  test(`preview-deploy (${label}): downloads only preview-<pr> by run id into RUNNER_TEMP`, () => {
+    const d = usesStep(wf, /^actions\/download-artifact@/).with;
+    assert.equal(d.name, "preview-${{ steps.pr.outputs.number }}");
+    assert.equal(d["run-id"], "${{ github.event.workflow_run.id }}");
+    assert.equal(d.path, "${{ runner.temp }}/preview");
+    assert.equal(d.pattern, undefined);
+    assert.equal(d["github-token"], "${{ github.token }}");
+  });
+
+  test(`preview-deploy (${label}): the PR number is event or API data passed through env, never into run:`, () => {
+    const pr = stepsOf(wf).find((x) => x.id === "pr");
+    assert.equal(pr.env.EVENT_PRS, "${{ toJSON(github.event.workflow_run.pull_requests) }}");
+    assert.match(pr.run, /select\(\.head\.sha == \$sha\)/);
+    assert.doesNotMatch(pr.run, /pull_requests\[0\]/);
+    assert.equal(pr.env.GH_TOKEN, "${{ github.token }}");
+    assert.match(pr.run, /gh api "repos\/\$REPO\/commits\/\$HEAD_SHA\/pulls"/);
+    assert.match(pr.run, /\*\[!0-9\]\*/);
+    for (const s of stepsOf(wf)) assert.doesNotMatch(s.run ?? "", /\$\{\{/, s.name ?? s.run);
+  });
+
+  test(`preview-deploy (${label}): deploy comes after the download; nothing builds or runs PR code`, () => {
+    const s = stepsOf(wf);
+    const at = (f) => s.findIndex(f);
+    const dl = at((x) => /download-artifact/.test(x.uses ?? ""));
+    const dp = at((x) => /preview\.mjs deploy/.test(x.run ?? "") || x.with?.run);
+    assert.ok(dl > 0 && dp > dl);
+    assert.equal(dp, s.length - 1);
+    assert.ok(!s.some((x) => /turbo|build|vp /.test(x.run ?? "")));
+    assert.ok(!s.some((x) => x.with?.ref || x.with?.repository));
+  });
+}
+
+test("preview-deploy without secrets: Cloudflare secrets from environment preview, PR number via env", () => {
+  const d = stepsOf(dep.wf).at(-1);
+  assert.equal(d.env.CLOUDFLARE_API_TOKEN, "${{ secrets.CLOUDFLARE_API_TOKEN }}");
+  assert.equal(d.env.CLOUDFLARE_ACCOUNT_ID, "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}");
+  assert.equal(d.env.PR_NUMBER, "${{ steps.pr.outputs.number }}");
+  assert.equal(d.env.PREVIEW_ARTIFACT, "${{ runner.temp }}/preview");
+  assert.equal(d.run, "node .github/scripts/preview.mjs deploy");
+  assert.doesNotMatch(dep.raw, /keelstackhq\/hoist/);
 });
 
-test("deployable pieces document the one-time first deploy", async () => {
+test("preview-deploy with secrets: hoist secrets action, SHA-pinned, env preview, explicit keys", () => {
+  const d = stepsOf(withSecrets).at(-1);
+  assert.match(d.uses, /^keelstackhq\/hoist\/secrets@0{40}$/);
+  assert.equal(d.with.env, "preview");
+  assert.equal(d.with.keys, "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID");
+  assert.equal(d.with.run, "node .github/scripts/preview.mjs deploy");
+  assert.equal(d.with["app-id"], "${{ vars.SECRETS_READ_APP_ID }}");
+  assert.equal(d.with["app-key"], "${{ secrets.SECRETS_READ_APP_KEY }}");
+  assert.equal(d.with["age-key"], "${{ secrets.SOPS_AGE_KEY }}");
+  assert.equal(d.env.PR_NUMBER, "${{ steps.pr.outputs.number }}");
+  assert.equal(withSecrets.jobs.deploy.environment, "preview");
+  assert.doesNotMatch(JSON.stringify(withSecrets), /secrets\.CLOUDFLARE/);
+  const src = SECRETS_SRC.split("\n").find((l) => l.includes("hoist/secrets@"));
+  assert.match(src, /@0{40} # TODO\(hoist-release\)$/);
+});
+
+test("deployable pieces document previews, not a one-time first deploy", async () => {
   for (const piece of ["preact-app:web", "astro-site:site", "hono-worker:api"]) {
     const name = piece.split(":")[1];
     const { dir } = await renderCombo(["base", piece]);
     const doc = await readFile(join(dir, `apps/${name}/AGENTS.md`), "utf8");
-    assert.match(doc, /pnpm turbo run deploy --filter=@\w+\/\w+/, piece);
+    assert.ok(doc.includes(`\`${name}-preview\``) || /`<app>-preview`/.test(doc), piece);
+    assert.match(doc, /alias `pr-<n>`/, piece);
+    assert.match(doc, /never create `[^`]*-preview` by hand/i, piece);
+    assert.match(doc, /secrets set on the -preview Worker are readable by every PR/i, piece);
+    assert.match(doc, /env\.preview[^\n]*preview-only[^\n]*share/is, piece);
+    assert.doesNotMatch(doc, /one-time|deploy it once|does not exist yet|deploy:preview/i, piece);
+    const pkg = JSON.parse(await readFile(join(dir, `apps/${name}/package.json`), "utf8"));
+    assert.equal(pkg.scripts["deploy:preview"], undefined, piece);
   }
-});
-
-test("install matches ci.yml rules", () => {
-  assert.ok(steps.some((s) => s.uses?.startsWith("pnpm/action-setup@v4")));
-  assert.ok(steps.some((s) => s.uses?.startsWith("actions/setup-node@v5")));
-  assert.ok(steps.some((s) => s.run === "pnpm install --frozen-lockfile --prefer-offline"));
-});
-
-test("turbo passes deploy env through for deploy tasks", async () => {
   const turbo = JSON.parse(await readFile(join(base.dir, "turbo.json"), "utf8"));
-  for (const t of ["deploy:preview", "deploy"]) {
-    assert.deepEqual(turbo.tasks[t].passThroughEnv, [
-      "PR_NUMBER",
-      "CLOUDFLARE_API_TOKEN",
-      "CLOUDFLARE_ACCOUNT_ID",
-    ]);
+  assert.equal(turbo.tasks["deploy:preview"], undefined);
+});
+
+test("turbo passes deploy env through for the deploy task", async () => {
+  const turbo = JSON.parse(await readFile(join(base.dir, "turbo.json"), "utf8"));
+  assert.deepEqual(turbo.tasks.deploy.passThroughEnv, [
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID",
+  ]);
+  assert.deepEqual(turbo.tasks.deploy.dependsOn, ["build"]);
+});
+
+test("each deployable app's build writes the Worker bundle apart from the static assets", async () => {
+  for (const piece of ["preact-app:web", "astro-site:site", "hono-worker:api"]) {
+    const name = piece.split(":")[1];
+    const { dir } = await renderCombo(["base", piece]);
+    const cfg = parseJsonc(await readFile(join(dir, `apps/${name}/wrangler.jsonc`), "utf8"));
+    const pkg = JSON.parse(await readFile(join(dir, `apps/${name}/package.json`), "utf8"));
+    if (cfg.main) {
+      assert.equal(pkg.scripts.build, "wrangler deploy --dry-run --outdir dist", piece);
+      assert.equal(cfg.assets, undefined, piece);
+    } else {
+      assert.equal(cfg.assets.directory, "./dist", piece);
+      assert.ok(!/outdir/.test(pkg.scripts.build), piece);
+    }
   }
-});
-
-test("deploy tasks depend on build (a CI checkout has no dist/)", async () => {
-  const turbo = JSON.parse(await readFile(join(base.dir, "turbo.json"), "utf8"));
-  for (const t of ["deploy:preview", "deploy"])
-    assert.deepEqual(turbo.tasks[t].dependsOn, ["build"]);
 });
 
 // Expand `apps/*/wrangler.jsonc` against a rendered dir.
@@ -366,6 +460,8 @@ test("deploy: a missing Worker is created once from a stub entry, then the PR co
   assert.equal(w.cfgs[1].assets, undefined);
   assert.doesNotMatch(w.cfgs[1].main, /preview-art-/);
   assert.match(readFileSync(w.cfgs[1].main, "utf8"), /new Response/);
+  assert.equal(w.cfgs[1].find_additional_modules, undefined);
+  assert.equal(w.cfgs[1].base_dir, undefined);
   assert.match(w.cfgs[2].assets.directory, /preview-art-.*apps\/api\/assets$/);
   const bad = stub(MISSING, OK, { code: 1, out: "boom" });
   assert.equal((await go(bad)).ok, false);
@@ -443,7 +539,7 @@ test("fenced wraps wrangler output in stop-commands only on GitHub Actions", asy
   );
   const token = /^::stop-commands::([0-9a-f]{32})\n$/.exec(out[0])?.[1];
   assert.ok(token);
-  assert.deepEqual(out.slice(1), [`::${token}::\n`]);
+  assert.deepEqual(out.slice(1), [`\n::${token}::\n`]);
   const none = [];
   await fenced(
     async () => 1,
@@ -530,4 +626,103 @@ test("deploy: the missing-Worker error must be wrangler's error line, not any ou
   });
   assert.equal((await go(w)).ok, false);
   assert.equal(w.calls.length, 1);
+});
+
+const TOKENS = { CLOUDFLARE_API_TOKEN: "t", CLOUDFLARE_ACCOUNT_ID: "a" };
+const withEnv = (pv) => `{ "name": "w", "main": "src/index.ts", "env": { "preview": ${pv} } }`;
+
+test("deploy: env.preview.services that is not an array fails that app with its own error", async () => {
+  for (const pv of [
+    '{ "services": { "binding": "S", "service": "x-preview" } }',
+    '{ "services": "x" }',
+  ]) {
+    const w = stub(OK);
+    const r = await go(w, { root: checkout(withEnv(pv)) });
+    assert.equal(r.ok, false);
+    assert.match(r.errors[0], /^api: .*services/);
+    assert.equal(w.calls.length, 0);
+  }
+});
+
+test("deploy: the implicit <name>-<env> Worker name of an env without a name also clashes", async () => {
+  const clash = async (other) => {
+    const root = checkout();
+    mkdirSync(join(root, "apps/other"));
+    writeFileSync(join(root, "apps/other/wrangler.jsonc"), other);
+    const w = stub(OK);
+    return { r: await go(w, { root }), calls: w.calls.length };
+  };
+  const bad = await clash('{ "name": "acme", "env": { "api-preview": { "vars": {} } } }');
+  assert.equal(bad.r.ok, false);
+  assert.match(bad.r.errors[0], /acme-api-preview/);
+  assert.equal(bad.calls, 0);
+  // An env that sets its own name is judged by that name only; env.preview is the binding source.
+  const named = await clash('{ "name": "acme", "env": { "api-preview": { "name": "ok" } } }');
+  assert.equal(named.r.ok, true);
+  const own = await go(stub(OK), { root: checkout(withEnv('{ "vars": {} }')) });
+  assert.equal(own.ok, true);
+});
+
+test("deploy: queue names in env.preview must end in -preview", async () => {
+  const q = (x) => `{ "queues": ${x} }`;
+  const bad = [
+    q('{ "producers": [{ "binding": "Q", "queue": "jobs" }] }'),
+    q('{ "consumers": [{ "queue": "jobs" }] }'),
+    q('{ "consumers": [{ "queue": "jobs-preview", "dead_letter_queue": "dlq" }] }'),
+    q('{ "producers": {} }'),
+    q('{ "producers": [{ "binding": "Q" }] }'),
+  ];
+  for (const pv of bad) {
+    const w = stub(OK);
+    const r = await go(w, { root: checkout(withEnv(pv)) });
+    assert.equal(r.ok, false, pv);
+    assert.match(r.errors[0], /^api: .*queue/, pv);
+    assert.equal(w.calls.length, 0, pv);
+  }
+  const good = q(
+    '{ "producers": [{ "binding": "Q", "queue": "jobs-preview" }], "consumers": [{ "queue": "jobs-preview", "dead_letter_queue": "dlq-preview" }] }',
+  );
+  assert.equal((await go(stub(OK), { root: checkout(withEnv(good)) })).ok, true);
+});
+
+test("CLI: deploy reads the artifact directory from PREVIEW_ARTIFACT when no argument is given", () => {
+  const dir = artifact((d) => writeFileSync(join(d, "apps/api/wrangler.json"), "{}"));
+  const r = spawnSync("node", [SCRIPT, "deploy"], {
+    cwd: checkout(),
+    env: { ...process.env, PR_NUMBER: "7", PREVIEW_ARTIFACT: dir, ...TOKENS },
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /apps\/api\/wrangler\.json: forbidden name/);
+});
+
+test("CLI: deploy without Cloudflare credentials fails early, pointing at the preview environment", () => {
+  for (const missing of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) {
+    const r = spawnSync("node", [SCRIPT, "deploy", artifact()], {
+      cwd: checkout(),
+      env: { ...process.env, PR_NUMBER: "7", ...TOKENS, [missing]: "" },
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 1, missing);
+    assert.match(r.stderr, new RegExp(`${missing} is empty`), missing);
+    assert.match(r.stderr, /secrets of the `preview` environment/, missing);
+    assert.match(r.stderr, /Deployment branches/, missing);
+  }
+});
+
+test("the generated README says where the Cloudflare secrets live", async () => {
+  const text = await readFile(join(base.dir, "README.md"), "utf8");
+  assert.match(text, /CLOUDFLARE_API_TOKEN/);
+  assert.match(text, /CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(text, /secrets of the `preview` environment/);
+  assert.match(text, /Deployment branches[^\n]*main/);
+  assert.match(text, /never as repository secrets/i);
+});
+
+test("preview-deploy: setup-node has no pnpm cache and the package-manager cache is off", () => {
+  for (const wf of [dep.wf, withSecrets]) {
+    const node = usesStep(wf, /^actions\/setup-node@/);
+    assert.equal(node.with.cache, undefined);
+    assert.equal(node.with["package-manager-cache"], false);
+  }
 });

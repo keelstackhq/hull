@@ -3,7 +3,7 @@ description = "Workspace root: pnpm, Turborepo, TypeScript, Vite+, CI and AI lay
 
 [files]
 shared = ["package.json", "pnpm-workspace.yaml", "turbo.json", "packages/shared/package.json"]
-owned = [".github/workflows/ci.yml", ".github/workflows/preview.yml", ".github/scripts/preview.mjs", ".github/workflows/desktop.yml", ".github/scripts/affected.mjs", ".github/scripts/rust-affected.mjs", ".github/workflows/release.yml", ".github/scripts/release-plan.mjs", "scripts/agents-index.mjs", "Cargo.toml", "rust-toolchain.toml", "renovate.json"]
+owned = [".github/workflows/ci.yml", ".github/workflows/preview.yml", ".github/workflows/preview-deploy.yml", ".github/scripts/preview.mjs", ".github/workflows/desktop.yml", ".github/scripts/affected.mjs", ".github/scripts/rust-affected.mjs", ".github/workflows/release.yml", ".github/scripts/release-plan.mjs", "scripts/agents-index.mjs", "Cargo.toml", "rust-toolchain.toml", "renovate.json"]
 seed = ["AGENTS.md", "README.md", "docs/agents/project.md", "packages/shared/src/**"]
 
 [merge]

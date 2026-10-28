@@ -12,3 +12,11 @@ gh run view <id> --json jobs   # completedAt - startedAt of job "ci"
 ```
 
 Ignore cancelled and skipped runs. The job summary of each run also shows its duration.
+
+## PR previews
+
+`preview.yml` builds apps on every PR with no secrets; `preview-deploy.yml` (environment `preview`)
+uploads the result as version `pr-<n>` of `<app>-preview`. Store `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` only as secrets of the `preview` environment (and of the prod deploy
+environment), with Deployment branches set to Selected, `main`; never as repository secrets, which
+every PR workflow could read.

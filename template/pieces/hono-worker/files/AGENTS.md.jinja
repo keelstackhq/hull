@@ -13,8 +13,8 @@ Hono app on Cloudflare Workers. `wrangler.jsonc` enables Workers Logs (`observab
 - `LOG_LEVEL` (`info`, `warn`, `error`) drops request lines below it.
 - Sentry (bundled, about 1.2 MB) loads only when `SENTRY_DSN` is non-empty; set it with
   `wrangler secret put SENTRY_DSN`. Its events are scrubbed of query, headers and bodies.
-- Workers Logs free tier becomes 0.5 GB/day from 2026-12-01; lower
-  `observability.head_sampling_rate` (for example `0.1`) to sample fewer requests.
-- `build` is `wrangler deploy --dry-run --outdir dist` (no deploy). Never `vp run`. Tests: `vp test run`,
-  using `app.request()`. Preview: `pnpm deploy:preview` with `PR_NUMBER`; it needs the Worker to exist, so
-  deploy once with `pnpm turbo run deploy --filter=@{{ scope }}/{{ name }}` (`wrangler login` first).
+- Workers Logs free tier becomes 0.5 GB/day from 2026-12-01; lower `observability.head_sampling_rate`.
+- `build` is `wrangler deploy --dry-run --outdir dist` (no deploy). Never `vp run`. Tests: `vp test run`.
+- Previews deploy to `<app>-preview` as alias `pr-<n>`. Never create `<app>-preview` by hand.
+- Secrets set on the -preview Worker are readable by every PR.
+- `kv`/`d1`/`r2`/`queue`/`service` ids in `env.preview` must be preview-only resources; previews share that data.

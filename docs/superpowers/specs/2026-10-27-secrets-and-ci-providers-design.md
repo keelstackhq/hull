@@ -170,11 +170,13 @@ shared = { repo = "keelstackhq/secrets-shared" }                 # ref defaults 
 site   = { repo = "keelstackhq/secrets-keelstack", ref = "main" }
 
 [env.preview]
-CLOUDFLARE_API_TOKEN = "shared:preview/cloudflare.sops.yaml#CLOUDFLARE_API_TOKEN"
+CLOUDFLARE_API_TOKEN  = "shared:preview/cloudflare.sops.yaml#CLOUDFLARE_API_TOKEN"
+CLOUDFLARE_ACCOUNT_ID = "shared:preview/cloudflare.sops.yaml#CLOUDFLARE_ACCOUNT_ID"
 
 [env.prod]
-CLOUDFLARE_API_TOKEN = "shared:prod/cloudflare.sops.yaml#CLOUDFLARE_API_TOKEN"
-SENTRY_AUTH_TOKEN    = "site:prod/sentry.sops.yaml#token"
+CLOUDFLARE_API_TOKEN  = "shared:prod/cloudflare.sops.yaml#CLOUDFLARE_API_TOKEN"
+CLOUDFLARE_ACCOUNT_ID = "shared:prod/cloudflare.sops.yaml#CLOUDFLARE_ACCOUNT_ID"
+SENTRY_AUTH_TOKEN     = "site:prod/sentry.sops.yaml#token"
 
 [env.prod.files]                                                   # whole value to a file; the
 GCP_CREDENTIALS_FILE = "site:prod/gcp.sops.yaml#service_account"   # env var holds its path

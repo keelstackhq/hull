@@ -202,7 +202,7 @@ Root files (class in brackets):
   root Cargo changes only to `//` and `--affected` would skip the crates; the template keeps today's one-line layout without Rust and
   the multi-line block with it, via a marked `rust-cli`/`rust-tool` chain plus an unmarked chain whose `else` is the one-line form); tasks `build` (`dependsOn: ["^build"]`, outputs `dist/**`), `lint`, `format:check`, `typecheck`
   (`dependsOn: ["^build"]`), `test` (`dependsOn: ["^build"]`), `dev` (`persistent`, no cache),
-  `deploy:preview` and `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv` §8.2), `storybook:build` (outputs `storybook-static/**`),
+  `deploy` (no cache, `dependsOn: ["build"]`, `passThroughEnv: ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]`), `storybook:build` (outputs `storybook-static/**`),
   `build:desktop` (no cache). No `vp run` cache anywhere (Turbo caches, §7.1).
 - `tsconfig.base.json` [owned]: strict, `module: preserve`, `moduleResolution: bundler`,
   `jsx: react-jsx`, `jsxImportSource: preact`, `noEmit`, `verbatimModuleSyntax`, `isolatedModules`.
@@ -244,7 +244,7 @@ Root files (class in brackets):
 
 `package.json.jinja` [shared, json] scripts: `dev` `vp dev`, `build` `vp build`, `lint` `vp lint`,
 `format:check` `vp fmt --check`, `typecheck` `tsc --noEmit`, `test` `vp test run`, `preview` `vp preview`,
-`deploy:preview` `wrangler versions upload --preview-alias pr-$PR_NUMBER`, `deploy` `wrangler deploy`.
+`deploy` `wrangler deploy`.
 Dependencies: `preact`, cascivo (below), and `@<scope>/ui` (`workspace:*`) when `ui-storybook` is
 present, so turbo sees the ui → app edge; dev: `@preact/preset-vite`, `vite-plus`, `typescript`,
 `wrangler`. `vite.config.ts` [owned] with `@preact/preset-vite`; `tsconfig.json` [owned] extends
@@ -281,7 +281,7 @@ Astro 7 static site with `@astrojs/preact`. Scripts: `dev` `astro dev`, `build` 
 `vp fmt --check` (`.astro` excluded; oxfmt's `.astro` support is experimental and needs
 `@astrojs/compiler-rs`, so it stays off in v1), `typecheck` `tsc --noEmit` (`astro check` needs the
 TypeScript JS API, which TypeScript 7 does not ship; verify and document), `test` `vp test run`
-(the same in every piece), `deploy:preview`, `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
+(the same in every piece), `deploy`. `astro.config.mjs` [owned], `tsconfig.json` [owned],
 `wrangler.jsonc` [shared, text] (assets `./dist`), `src/pages/index.astro` [seed], `AGENTS.md` [owned] and `CLAUDE.md` [seed] (`@AGENTS.md`).
 Astro runs through package scripts (`vp run` would add a second cache; not used).
 
@@ -293,7 +293,7 @@ Hono on Workers. `wrangler.jsonc` [shared, text]: `main: "src/index.ts"`,
 SENTRY_DSN: "" }`, and commented lines showing OTel export destinations (Axiom), marked
 "verify against Cloudflare docs". Scripts: `dev` `wrangler dev`, `build`
 `wrangler deploy --dry-run --outdir dist`, `test` `vp test run`, `typecheck` `tsc --noEmit`, `lint`,
-`format:check`, `deploy:preview`, `deploy`.
+`format:check`, `deploy`.
 
 Files: `src/index.ts` [seed] (the app; imports hull glue), `src/hull/logging.ts` [owned],
 `src/hull/sentry.ts` [owned], `src/index.test.ts` [seed], `src/hull/logging.test.ts` [owned].
@@ -653,28 +653,34 @@ upstream.
 - Actions are pinned by tag in the template; Renovate pins digests (§8.6).
 - Not on the PR path: Playwright, Storybook build and visual tests, Tauri builds.
 
-### 8.2 `preview.yml`
+### 8.2 `preview.yml` and `preview-deploy.yml`
 
-A plain owned file rendered by `base` for every repo (user decision 2026-10-14: the contract subset
-cannot emit `${{` from a `.jinja` file, §4.3 item 8). A first step checks for `apps/*/wrangler.jsonc`
-and every later step is skipped when there is none, so base-only repos pay a ~5 s no-op. `on: pull_request`;
-same checkout/install; step skipped when `secrets.CLOUDFLARE_API_TOKEN` is empty (forks); runs
-`node .github/scripts/preview.mjs` [owned], which runs `pnpm turbo run deploy:preview --affected
---continue --log-prefix=task` with `PR_NUMBER`, `CLOUDFLARE_API_TOKEN`,
-`CLOUDFLARE_ACCOUNT_ID` (declared as `passThroughEnv` of `deploy:preview`/`deploy` in `turbo.json`,
-because turbo 2's strict env mode filters undeclared variables) and writes the `*.workers.dev`
-preview URLs from wrangler's output to the job summary. `permissions: contents: read` only.
+Two phases, so no job that runs PR code can read a secret (secrets spec 2026-10-27 §4.4).
+`preview.yml` is a plain owned file for every repo. A first step checks for `apps/*/wrangler.jsonc`
+and every later step is skipped when there is none (base-only repos pay a ~5 s no-op). `on:
+pull_request`, `permissions: contents: read`, no `secrets.`, no `environment:`, no Cloudflare
+variable: it builds the affected apps (`turbo run build --affected`; hono-worker writes the Worker
+bundle to `dist` with `wrangler deploy --dry-run --outdir dist`, static apps write their assets to
+`./dist`), runs `node .github/scripts/preview.mjs build` and uploads artifact `preview-<pr>`
+(`apps/<dir>/worker/`, `apps/<dir>/assets/`, `manifest.json`; `retention-days: 3`).
 
-A Worker that was never deployed cannot take a preview: `wrangler versions upload` (4.151.0) exits 1
-with "You cannot upload a new version of a Worker that does not yet exist". `preview.mjs` reads the
-`<pkg>:deploy:preview:` prefixed lines and the `Failed:` line of turbo's output; when every failed
-task is the `deploy:preview` of such a package, the step passes, the summary lists each skipped
-app with its one-time `pnpm turbo run deploy --filter=<pkg>`, and a `::notice` names it. Any other
-failure (build, auth, a mix) fails the job. Decision 2026-10-22 (found in a fresh Cloudflare
-account): a PR never creates or deploys a production Worker. Rejected: a deploy-on-`main` workflow
-(the template ships none; production deploys stay a repo choice) and `wrangler preview` (creates the
-parent Worker, but it is open beta in 4.151.0 and a different preview model with its own config).
-The deployable pieces' `AGENTS.md` names the one-time deploy.
+`preview-deploy.yml.jinja` (owned, `min_splice` 0.2.0 for its raw blocks) runs on `workflow_run` of
+`preview` (`completed`), only for a successful same-repo `pull_request` run, in environment
+`preview`. A `gate` job (no environment, no secrets) first checks that `apps/*/wrangler.jsonc` exists, so base-only repos never reach the environment. `deploy` checks out the default branch only, installs from its lockfile, takes the PR number
+from the event entry whose head sha matches (or the API by head sha), downloads `preview-<pr>` by run id and runs
+`preview.mjs deploy`, which rejects forbidden names (`wrangler.json*`, `package.json`, `*.toml`,
+lockfile, `_worker.js*`, symlinks), reads `wrangler.jsonc` from the default branch, writes a minimal
+config with only `env.preview` bindings (service, Durable Object and queue references must be
+`-preview`), and runs `wrangler versions upload --no-bundle --preview-alias pr-<n>` on the
+`<name>-preview` Worker. A first preview creates that Worker once from an empty stub; a PR never
+creates or deploys a production Worker. Credentials: `secrets.CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`, stored only as secrets of environment `preview` (and of the prod deploy
+environment once `deploy.yml` exists) with Deployment branches = Selected, `main`, never as
+repository secrets (`preview.mjs deploy` fails early with this hint when they are empty); or, with the `secrets` piece, the hoist action
+(`env: preview`). The deployable pieces' `AGENTS.md` states the rules (never create `<app>-preview`
+by hand; its secrets are readable by every PR; `env.preview` ids are preview-only resources).
+Rejected: a deploy-on-`main` workflow (production deploys stay a repo choice) and `wrangler
+preview` (open beta in 4.151.0).
 Caveats in the README: preview URLs are public unless Cloudflare Access protects them, and do not
 work for Workers with Durable Objects.
 
