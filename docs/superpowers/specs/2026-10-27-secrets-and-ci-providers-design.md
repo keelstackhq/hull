@@ -437,16 +437,29 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
 - **Affected early exit:** the same `affected` step (same turbo binary download, same
   `.github/scripts/affected.mjs`; the script path stays for both providers). `TURBO_SCM_BASE` from
   `scm-base.sh`: merge-queue branch `gh-readonly-queue/<base>/pr-<n>-<sha>` → `<sha>` only if it is
-  40 lowercase hex, an ancestor of `origin/<default>` and of HEAD, and not HEAD (else exit 1; §12
-  item 14); default branch → `<< pipeline.git.base_revision >>` (40 hex), or the parent commit when it
-  is empty (first pipeline, API or scheduled runs); else `git merge-base HEAD origin/<default>`. The
-  branch name is never printed or passed to git; the caller assigns the output first (`b=$(…)`) so a
-  failure stops the job.
+  40 lowercase hex, an ancestor of `origin/<default>` and of HEAD, and not HEAD; otherwise (forged
+  name, or the base of a stacked queue group) `git merge-base HEAD origin/<default>`, an honest
+  superset diff (§12 item 14); default branch → `<< pipeline.git.base_revision >>` (40 hex), or the
+  parent commit when it is empty (first pipeline, API or scheduled runs); else
+  `git merge-base HEAD origin/<default>`. The branch name is never printed or passed to git; the caller
+  assigns the output first (`b=$(…)`) so a failure stops the job.
   `TURBO_SCM_HEAD` = `CIRCLE_SHA1`.
-- **Caching:** pnpm store via `restore_cache`/`save_cache` keyed on `pnpm-lock.yaml`; turbo via
-  hoard `fs` in `~/.cache/hoard`, vendored hoard v0.4.0 command: saves
-  `hoard-v1-main~{{ .Revision }}` (default branch only) and restores the newest `hoard-v1-main~` prefix (P7). Rust: `~/.cargo` and `target/` keyed on
-  the git-ignored file `.rust-cache-key` (`rust-v2-{{ checksum ".rust-cache-key" }}`), written by the rust-affected step: the literal `skip` when no Rust work, else a hash of `Cargo.lock` + `rust-toolchain.toml` (either may be missing). No prefix fallback. `save_cache` cannot be conditioned on a file, so skip runs save an empty cache under the constant skip key; it cannot collide with a hash key and is immutable, so it is harmless.
+- **Caching:** CircleCI caches are not branch-scoped, so a same-repo PR could plant what the default
+  branch later restores. Every `save_cache` (pnpm, Rust, hoard) therefore runs on the default branch
+  only (`when` on `<< pipeline.git.branch >>`, the condition hoard.yml uses); PRs only restore. pnpm
+  store keyed on `pnpm-lock.yaml`; turbo via hoard `fs` in `~/.cache/hoard`, vendored hoard v0.4.0
+  command: saves `hoard-v1-main~{{ .Revision }}` and restores the newest `hoard-v1-main~` prefix (P7).
+  Rust: `~/.cargo/registry` and `target/` only (never `~/.cargo/bin`) keyed on the git-ignored file
+  `.rust-cache-key` (`rust-v2-{{ checksum ".rust-cache-key" }}`), written by the rust-affected step: the
+  literal `skip` when no Rust work, else a hash of `Cargo.lock` + `rust-toolchain.toml` (either may be
+  missing). No prefix fallback. A skip run on the default branch saves an empty cache under the
+  constant skip key, which cannot collide with a hash key and is immutable, so it is harmless.
+- **CircleCI Rust tools (deviation, for HU-9):** no cached binary is trusted. Tools install into
+  `$HOME/.hull-tools/bin` (never cached, first on PATH). cargo-deny 0.20.2 is the musl release
+  tarball, verified with `sha256sum -c` on every run (`9f12ed4c…8d5f`, from the release's `.sha256`
+  asset, 2026-10-28). cargo-nextest 0.9.148 publishes no checksum file reachable from here, so it is
+  built with `cargo install --locked` on every Rust run (slow); replace it with a pinned release
+  binary plus sha256 when a published checksum is available.
 - **Budgets:** GitHub budget unchanged (45 s typical PR, 15 s docs-only). CircleCI: setup + one job,
   docker executor, ≤ 75 s typical PR, ≤ 30 s docs-only (setup adds a container start). D-011
   extends D-007 to CircleCI: one workflow, setup + one job on the PR path, no macOS on the PR path,
@@ -614,7 +627,12 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    empty affected set and a green `ci-ok` on that head without any config change. Mitigation in code,
    not in a ruleset: the suffix is used only if it is an ancestor of `origin/<default>` (a PR author
    cannot add commits there) and of HEAD and is not HEAD, so a forged name can only yield an honest
-   diff from a default-branch commit.
+   diff from a default-branch commit. Any other suffix (forged, not 40 hex, not a commit) falls back to
+   `git merge-base HEAD origin/<default>`, not to an error. GitHub's queue-branch sha semantics: the
+   sha is the base of that queue entry, i.e. the default branch's head for group 1 and the previous
+   entry's commit afterwards; for group 2+ that commit is not on the default branch yet, so it fails
+   the ancestor check and the merge-base fallback applies (a superset diff, never smaller than the
+   truth).
 
 ## 13. Owner-only steps
 

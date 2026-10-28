@@ -230,3 +230,41 @@ test(".rust-cache-key is git-ignored in a rendered repo (it must not show up as 
     ".rust-cache-key",
   );
 });
+
+test("every save_cache is default-branch-only and never saves ~/.cargo/bin", async () => {
+  const saves = [];
+  const walk = (steps, onDefault) => {
+    for (const step of steps ?? []) {
+      if (typeof step === "string") continue;
+      if (step.save_cache) saves.push({ onDefault, paths: step.save_cache.paths });
+      if (step.when?.steps) {
+        const c = step.when.condition ?? {};
+        const main = [c, ...(c.and ?? [])].some(
+          (x) =>
+            Array.isArray(x.equal) &&
+            ["main", "<< parameters.default-branch >>"].includes(x.equal[0]) &&
+            x.equal[1] === "<< pipeline.git.branch >>",
+        );
+        walk(step.when.steps, onDefault || main);
+      }
+    }
+  };
+  walk(YAML.parse(ciOk).steps, false);
+  walk(YAML.parse(await read("src/commands/hoard.yml")).steps, false);
+  assert.ok(saves.length >= 3, "pnpm, rust and hoard caches");
+  for (const s of saves) {
+    assert.ok(s.onDefault, `save_cache ${JSON.stringify(s.paths)} runs on every branch`);
+    assert.ok(!s.paths.some((p) => p.includes(".cargo/bin")), "no binaries in the cache");
+  }
+});
+
+test("cargo-deny is verified on every run and cargo-nextest is never taken from a cache", () => {
+  const step = CI_PLAN.find((s) => s.id === "rust-tools").circleci;
+  const command = YAML.parse(step)[0].run.command;
+  assert.doesNotMatch(command, /command -v/);
+  const lines = command.split("\n");
+  const check = lines.findIndex((l) => l.includes("sha256sum -c") && l.includes("deny"));
+  assert.ok(check > 0);
+  assert.match(lines[check], /^echo/, "the check is not nested in an if");
+  assert.match(command, /cargo install --locked --root \S+ cargo-nextest@/);
+});

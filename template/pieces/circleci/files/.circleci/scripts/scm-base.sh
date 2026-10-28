@@ -1,8 +1,11 @@
 #!/bin/sh
 # Prints the TURBO_SCM_BASE for CircleCI (secrets-ci design §6.4).
-#   gh-readonly-queue/<base>/pr-<n>-<sha>  -> <sha>, only if it is 40 lowercase hex, on
-#                                             origin/<default>, an ancestor of HEAD and not HEAD
-#                                             (anyone can push a branch with that name), else exit 1
+#   gh-readonly-queue/<base>/pr-<n>-<sha>  -> <sha> when it is 40 lowercase hex, on origin/<default>,
+#                                             an ancestor of HEAD and not HEAD (anyone can push a
+#                                             branch with that name); otherwise (forged, or the base
+#                                             of a stacked queue group, which is the previous
+#                                             entry's commit and not on <default> yet) the
+#                                             merge-base below: an honest superset diff
 #   default branch                         -> $1 (pipeline.git.base_revision, 40 hex); when empty (the
 #                                             branch's first pipeline, API or scheduled runs),
 #                                             the parent commit
@@ -19,16 +22,16 @@ hex40() {
 case "$branch" in
   gh-readonly-queue/*/pr-*-*)
     sha="${branch##*-}"
-    hex40 "$sha" || { echo "scm-base: merge queue branch does not end in a commit sha" >&2; exit 1; }
     # The queue base is a default-branch commit, which a PR author cannot create; a forged
     # name can then only yield an honest diff from a default-branch commit.
-    if ! git merge-base --is-ancestor "$sha" "origin/$default" 2>/dev/null ||
-      ! git merge-base --is-ancestor "$sha" HEAD 2>/dev/null ||
-      [ "$sha" = "$(git rev-parse HEAD)" ]; then
-      echo "scm-base: merge queue base is not a default-branch ancestor of HEAD" >&2
-      exit 1
+    if hex40 "$sha" &&
+      git merge-base --is-ancestor "$sha" "origin/$default" 2>/dev/null &&
+      git merge-base --is-ancestor "$sha" HEAD 2>/dev/null &&
+      [ "$sha" != "$(git rev-parse HEAD)" ]; then
+      printf '%s\n' "$sha"
+    else
+      git merge-base HEAD "origin/$default"
     fi
-    printf '%s\n' "$sha"
     ;;
   "$default")
     base="${1:-}"

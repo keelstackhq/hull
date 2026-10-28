@@ -154,6 +154,15 @@ const GITHUB_STEPS = [
 
 // CircleCI bodies (list items of the job's `steps:`, 2-space indent). The GitHub `if: skip` guards
 // become `circleci-agent step halt` in `affected`, which ends the job successfully (S§6.4).
+// Caches are not branch-scoped on CircleCI: a PR could plant what the default branch restores, so
+// saving is limited to the default branch (hull's default; the same condition hoard.yml uses).
+const onDefault = (...steps) => [
+  "  - when:",
+  "      condition:",
+  "        equal: [main, << pipeline.git.branch >>]",
+  "      steps:",
+  ...steps.map((l) => `    ${l}`),
+];
 const rustOnly = '[ "$RUST" = true ] || exit 0';
 const CIRCLECI = {
   timer: yml('  - run: echo "export CI_START=$(date +%s)" >> "$BASH_ENV"'),
@@ -213,9 +222,11 @@ const CIRCLECI = {
     "  - run:",
     "      name: Install",
     "      command: pnpm install --frozen-lockfile --prefer-offline",
-    "  - save_cache:",
-    '      key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}',
-    "      paths: [~/.local/share/pnpm/store]",
+    ...onDefault(
+      "  - save_cache:",
+      '      key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}',
+      "      paths: [~/.local/share/pnpm/store]",
+    ),
   ),
   "turbo-cache": yml(
     "  # hoard 0.4.0, verified 2026-10-28; sha256 is the linux-x64 musl archive",
@@ -270,26 +281,31 @@ const CIRCLECI = {
     "      name: cargo-nextest and cargo-deny",
     "      command: |",
     `        ${rustOnly}`,
-    "        # nextest publishes no checksum file, so it stays a pinned source build",
-    "        command -v cargo-nextest >/dev/null || cargo install --locked cargo-nextest@0.9.148",
+    "        # Tools live in $HOME/.hull-tools, which no cache ever restores or saves, and come first on",
+    "        # PATH: a binary from a cache (CircleCI caches are not branch-scoped) is never trusted.",
+    '        tools="$HOME/.hull-tools"',
+    '        mkdir -p "$tools/bin"',
+    '        echo "export PATH=\\"$tools/bin:\\$PATH\\"" >> "$BASH_ENV"',
+    "        # nextest publishes no checksum file we can reach, so it is rebuilt from the pinned source",
+    "        # on every Rust run (crates verified by its Cargo.lock; slow, accepted).",
+    '        cargo install --locked --root "$tools" cargo-nextest@0.9.148',
     "        # cargo-deny 0.20.2 musl, sha256 from the release's .sha256 asset, 2026-10-28",
-    "        if ! command -v cargo-deny >/dev/null; then",
-    '          t="$(mktemp -d)"',
-    '          curl -fsSL -o "$t/deny.tgz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"',
-    '          echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  $t/deny.tgz" | sha256sum -c - || exit 1',
-    '          tar -xzf "$t/deny.tgz" -C "$t" --strip-components=1 cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny',
-    '          mkdir -p "$HOME/.cargo/bin"',
-    '          install -m 755 "$t/cargo-deny" "$HOME/.cargo/bin/cargo-deny"',
-    "        fi",
+    '        t="$(mktemp -d)"',
+    '        curl -fsSL -o "$t/deny.tgz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"',
+    '        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  $t/deny.tgz" | sha256sum -c - || exit 1',
+    '        tar -xzf "$t/deny.tgz" -C "$t" --strip-components=1 cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny',
+    '        install -m 755 "$t/cargo-deny" "$tools/bin/cargo-deny"',
   ),
   "run-affected": yml(
     "  - run:",
     "      name: Run affected tasks",
     `      command: pnpm turbo run ${tasks} --affected --output-logs=errors-only`,
-    "  - run: mkdir -p ~/.cargo/bin ~/.cargo/registry target",
-    "  - save_cache:",
-    '      key: rust-v2-{{ checksum ".rust-cache-key" }}',
-    "      paths: [~/.cargo/bin, ~/.cargo/registry, target]",
+    "  - run: mkdir -p ~/.cargo/registry target",
+    ...onDefault(
+      "  - save_cache:",
+      '      key: rust-v2-{{ checksum ".rust-cache-key" }}',
+      "      paths: [~/.cargo/registry, target]",
+    ),
   ),
   duration: yml(
     "  - hoard:",
