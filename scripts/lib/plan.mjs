@@ -74,6 +74,24 @@ export function resolveRequest(t, req, { implicitBase = false } = {}) {
     order.push(inst);
   }
 
+  // Like splice, a bare `--data key=x` resolves against the template vars, then the vars of the
+  // SELECTED pieces; every selected piece declaring it gets the value. `name` stays qualified.
+  const owners = new Map();
+  for (const id of seen.keys()) {
+    for (const k of Object.keys(t.pieces.get(id).vars)) {
+      owners.set(k, [...(owners.get(k) ?? []), id]);
+    }
+  }
+  const vars = {};
+  for (const [k, v] of Object.entries(req.vars)) {
+    const o = k in t.vars || k === "name" ? undefined : owners.get(k);
+    for (const key of o ? o.map((id) => `${id}.${k}`) : [k]) {
+      if (key in vars) throw new UsageError(`var "${key}" given twice`);
+      vars[key] = v;
+    }
+  }
+  req = { ...req, vars };
+
   const known = new Set(Object.keys(t.vars));
   for (const piece of t.pieces.values()) {
     for (const k of Object.keys(piece.vars)) known.add(`${piece.id}.${k}`);
@@ -98,7 +116,9 @@ export function resolveRequest(t, req, { implicitBase = false } = {}) {
     if (inst.piece.multiple) vars.name = inst.name;
     for (const [k, spec] of Object.entries(inst.piece.vars)) {
       let v = k === "name" ? inst.name : (req.vars[`${inst.piece.id}.${k}`] ?? spec.default);
-      if (v === undefined) throw new UsageError(`var "${inst.piece.id}.${k}" is required`);
+      if (v === undefined) {
+        throw new UsageError(`${k} is required (piece ${inst.piece.id})`);
+      }
       checkPattern(spec, `${inst.piece.id}.${k}`, v);
       vars[k] = v;
     }

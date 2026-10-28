@@ -22,6 +22,10 @@ const COMBOS = [
   ["base", "docs"],
 ];
 const comboVars = combosJson.vars ?? {};
+const varsFor = (pieces) => ({
+  ...comboVars,
+  ...(pieces.includes("secrets") ? { context_prefix: "hullci" } : {}),
+});
 /** Always-loaded bytes ceiling: measured max 3,764 (web) plus 10 %, rounded up. */
 const CEILING = 4150;
 
@@ -44,7 +48,7 @@ const agentsText = async (dir) => ({
 
 test("per combo: AGENTS.md <= 60, CLAUDE.md <= 20, together <= 80, no triple newline", async () => {
   for (const pieces of COMBOS) {
-    const { dir } = await renderCombo(pieces, comboVars);
+    const { dir } = await renderCombo(pieces, varsFor(pieces));
     const { agents, claude } = await agentsText(dir);
     assert.ok(lineCount(agents) <= 60, `${pieces} AGENTS.md ${lineCount(agents)}`);
     assert.ok(lineCount(claude) <= 20, `${pieces} CLAUDE.md ${lineCount(claude)}`);
@@ -212,9 +216,9 @@ test("piece bullets sit under ## Pieces in AGENTS.md with no blank lines between
   assert.ok(!/## Pieces/.test(await read(dir, "CLAUDE.md")));
 });
 
-test("every piece id except base and docs has a branch in both Pieces chains and one bullet", () => {
+test("every piece id except base, docs and secrets has a branch in both Pieces chains and one bullet", () => {
   const ids = readdirSync(join(REAL_TEMPLATE, "pieces")).filter(
-    (i) => i !== "base" && i !== "docs",
+    (i) => i !== "base" && i !== "docs" && i !== "secrets",
   );
   const src = readFileSync(join(REAL_TEMPLATE, "pieces/base/files/AGENTS.md.jinja"), "utf8");
   const [, heading, rest] = /same-branches #\}([\s\S]*?)\{% endif %\}([\s\S]*)/.exec(src);
@@ -229,7 +233,7 @@ test("every piece id except base and docs has a branch in both Pieces chains and
 
 test("always-loaded bytes per combo (AGENTS + CLAUDE + project + index) stay under the ceiling", async () => {
   for (const pieces of COMBOS) {
-    const { dir } = await renderCombo(pieces, comboVars);
+    const { dir } = await renderCombo(pieces, varsFor(pieces));
     const idx = spawnSync("node", ["scripts/agents-index.mjs"], { cwd: dir, encoding: "utf8" });
     assert.equal(idx.status, 0, `${pieces}: ${idx.stderr}`);
     let bytes = 0;

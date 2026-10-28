@@ -679,8 +679,9 @@ environment once `deploy.yml` exists) with Deployment branches = Selected, `main
 repository secrets (`preview.mjs deploy` fails early with this hint when they are empty); or, with the `secrets` piece, the hoist action
 (`env: preview`). The deployable pieces' `AGENTS.md` states the rules (never create `<app>-preview`
 by hand; its secrets are readable by every PR; `env.preview` ids are preview-only resources).
-Rejected: a deploy-on-`main` workflow (production deploys stay a repo choice) and `wrangler
-preview` (open beta in 4.151.0).
+Without the `secrets` piece a deploy-on-`main` workflow is rejected (production deploys stay a repo
+choice); with it, `deploy.yml` deploys `main` to prod behind the `prod` environment (hoist action,
+`CLOUDFLARE_*` only as environment secrets). `wrangler preview` is rejected (open beta in 4.151.0).
 Caveats in the README: preview URLs are public unless Cloudflare Access protects them, and do not
 work for Workers with Durable Objects.
 

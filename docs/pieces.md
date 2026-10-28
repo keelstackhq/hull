@@ -287,6 +287,31 @@ Merge strategies:
 - `Cargo.toml`: toml
 - `package.json`: json
 
+## secrets
+
+hoist secrets: secrets.toml manifest, deploy-on-main workflow and the agent rules for secrets
+
+- Multiple instances: no
+- Target: repo root
+- Requires: `base`
+
+Variables:
+
+- `context_prefix`: CircleCI context prefix (usually the repo name); pattern `^[a-z0-9-]+$`
+
+Files (owned):
+
+- `docs/agents/secrets.md`
+- `.github/workflows/deploy.yml`
+
+Files (shared):
+
+- none
+
+Files (seed):
+
+- `secrets.toml`
+
 ## tauri-app
 
 Tauri v2 desktop shell around a preact-app instance; Rust builds only in the scheduled desktop workflow
