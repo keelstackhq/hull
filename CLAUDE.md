@@ -17,11 +17,14 @@ versions and config, never app logic. Consumers render it with `splice` from
 ```
 template/splice.toml            template manifest (format 1)
 template/pieces/<id>/           piece.toml + files/ (base, preact-app, ui-storybook, astro-site,
-                                hono-worker, rust-tool, rust-cli, npm-cli, ts-lib, tauri-app, docs)
+                                hono-worker, rust-tool, rust-cli, npm-cli, ts-lib, tauri-app, docs,
+                                secrets, circleci, circleci-only)
 rigging/                        splice channel template (empty base meta; core, claude, skills; §14)
-template-rust/                  pure Rust template (base, rust-cli; no Node/Turborepo; §15)
+template-rust/                  pure Rust template (base, rust-cli, circleci, circleci-only; no
+                                Node/Turborepo; §15)
 scripts/render.mjs, lib/        dev renderer (contract §1-§4, §8, §9; `new` only)
-scripts/combos.json             piece combinations hull CI renders
+scripts/combos/                 one JSON fragment per combo hull CI renders (+ _vars.json)
+scripts/gen-ci.mjs              generates template/ ci.yml from the CI plan (scripts/lib/ci-tasks.mjs)
 scripts/dogfood.mjs             render combos, run their CI command
 scripts/affected-combos.mjs     which combos a diff touches
 scripts/release-tag.mjs         hull's own release: version = top dated CHANGELOG.md heading (§10.5)
@@ -66,6 +69,9 @@ change under `template/` or `scripts/`, run dogfood for the combos `affected-com
   never on the PR path.
 - **CI task list** is `CI_TASKS` in `scripts/lib/ci-tasks.mjs`; the parity test keeps the generated
   workflow, the base `ci` script and dogfood in sync. `template-rust` uses `RUST_CI_STEPS` likewise.
+- **Jobs that decrypt secrets never run on PR-controlled code**: environment-gated, default-branch
+  code only (secrets spec `2026-10-27-secrets-and-ci-providers-design.md` §4.4); `preview.yml`
+  builds with no secrets, `preview-deploy.yml` deploys.
 - **Generated `AGENTS.md` + `CLAUDE.md` ≤ 80 lines** (`AGENTS.md` ≤ 60, `CLAUDE.md` ≤ 20). Per-instance notes:
   `<target>/AGENTS.md` owned, `<target>/CLAUDE.md` seed.
 - **No secrets in logs** (hono-worker logs never include query strings, headers or bodies).

@@ -60,6 +60,18 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - 2026-10-26 · auto-release · `ci: tag and release hull from CHANGELOG.md on main` · tests/release-tag.test.mjs 12 + release.yml structure test; `node scripts/release-tag.mjs` on a7ebb3f: v0.3.0 already tagged, nothing to release, previous v0.2.2. v0.3.0 was tagged and released by hand on 2026-10-26; CHANGELOG now dates it.
 - 2026-10-28 · docspack pin · `feat(docs): pin the keelstack docs pack to 0.1.1` · `npm view @keelstackhq/docspack` 2026-10-28: latest 0.1.1, published 2026-10-28T06:32Z, no dependencies. `docs/packs.json` gains an optional exact `version` (hint `pnpm add -D -E`); base `pnpm-workspace.yaml` excludes `@keelstackhq/docspack@0.1.1` from the 3-day gate. Follow-up: drop that exclude (and its assertion in tests/base.test.mjs) after 2026-10-31.
+- 2026-10-27 · secrets-ci/HU-1a · `refactor: combos as fragments in scripts/combos/` (#28) · `scripts/combos.json` becomes one fragment per combo plus `_vars.json`; combos now in alphabetical order (`affected-combos.test.mjs` expectation changed, nothing depends on the order).
+- 2026-10-27 · secrets-ci/HU-1b · `refactor: CI_PLAN and gen-ci generate ci.yml` (#29) · `scripts/gen-ci.mjs` renders `template/`'s `ci.yml` from one step list; the file gains 13 `# step: <id>` comments, steps unchanged.
+- 2026-10-28 · secrets-ci/HU-2 · `feat: circleci piece` (#44, #45) · opt-in "both" mode: `.circleci/` setup pipeline, job `ci-ok`, hoard cache, pinned and sha-checked binaries, `.rust-cache-key` in base `.gitignore`. Deviations: executor `cimg/node` (setup job `cimg/base`); nextest 0.9.148 comes from its release tarball with a sha256 we computed on 2026-10-28 (nextest publishes no checksum file), checked on every run; early exit uses `circleci-agent step halt`. Unverified until a canary runs: spec §12 items 1, 3, 8.
+- 2026-10-28 · secrets-ci/HU-3 · `feat: circleci-only piece and ci-ok mirror` (#46) · `ci.yml` becomes `ci.yml.jinja` (same path), `ci.yml`/`desktop.yml` not written with `circleci-only`, owned `circleci-status.yml` mirrors `ci-ok`/`bosun-ok`, CircleCI desktop jobs. Spec §12 item 16 (`pipeline.trigger_source` values) is unverified.
+- 2026-10-28 · secrets-ci/HU-4 · `feat: secrets piece, two-phase previews, deploy.yml` (#38, #39, #40, #42) · `preview.mjs build|deploy`, `preview.yml` (no secrets) plus owned `preview-deploy.yml` (environment `preview`), `deploy:preview` removed, secret-reading jobs behind environments (`splice-bot`, `release-pr`), new `secrets` piece with `deploy.yml` (environment `prod`) and `docs/agents/secrets.md`. Deviation: the `secrets` tests were written after the code (two review rounds checked them). Not verified locally: `wrangler versions upload --no-bundle --preview-alias`, a real run of both workflows, hoist's action inputs.
+- 2026-10-28 · secrets-ci/HU-4 guard · `feat: release refuses to tag while TODO(hoist-release) pins remain` (#36, #37) · `release-tag.mjs` fails closed while a `keelstackhq/hoist/secrets@<placeholder>` pin is in `template/` (also loose spellings); currently `preview-deploy.yml.jinja` and `deploy.yml.jinja`.
+- 2026-10-28 · secrets-ci/HU-7 · `feat(template-rust): circleci piece` and `circleci-only piece` (#48, #49) · template-rust gets the same two pieces (budgets 75 s typical, 30 s docs-only), `# step:` lines in its `ci.yml`; `circleci-status.yml` of `template/` also requires `sender.type == 'Bot'`. `circleci config validate` is not run (needs api.circleci.com); dogfood packs the config and checks its structure.
+- 2026-10-27 · secrets-ci/HU-8 · `docs: contract rule 9.27` (#26) and `docs: contract rule 9.28 (--data keys)` (#41, #43) · rules added to `docs/template-format.md` (byte-identical with splice, D-003); the dev renderer resolves `--data` keys per 9.28.
+- 2026-10-28 · update bot · `feat: weekly splice update bot for template/ repos` (#50, #53, #54, #55, #56) · `template/` ships owned `splice.yml`; token modes App, `SPLICE_BOT_TOKEN`, `github.token`, session (`SPLICE_BOT=off`); template-rust `release.yml` uses an optional release App for `prepare` and `publish`; `[[post]]` lockfile refresh on update (skipped by splice on conflicts; known gap: post hooks see the action's `GH_TOKEN`); `min_splice` 0.3.0.
+- 2026-10-28 · ci-extra · `feat: seeded scripts/ci-extra.sh hook, run last in CI` (#52) · seed no-op script in both templates; last CI step `ci-extra` on GitHub and CircleCI, skipped on docs-only and unaffected PRs.
+- 2026-10-28 · fixes · #33 `package-manager-cache: false` in base `release.yml` job `npm`; #57 hono-worker leak tests use marker `zQsecretQz` (the old marker made `logging.test.ts` about 2% flaky); #51 comment on template-rust `members`.
+- 2026-10-28 · secrets-ci/HU-9 (docs part) · `docs: secrets + CircleCI wrap-up (changelog, progress, CLAUDE.md)` · CHANGELOG v0.4.0 unreleased completed, Blocked and Status updated, CLAUDE.md layout and decrypt rule, README CI-time sections no longer name `ci.yml` in `circleci-only` repos. Not in this commit: base spec updates, replacing the `TODO(hoist-release)` pins (need hoist released), HU-5 and HU-6, action SHA pins (#58 not merged when written).
 
 ## Measurements
 
@@ -88,7 +100,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Desktop build verified only on GitHub: this container has no webkit2gtk-4.1. Action: run `.github/workflows/desktop.yml` via workflow_dispatch and confirm `pnpm turbo run build:desktop` produces a `.deb` for the `desktop` combo.
 
-- Cloudflare preview smoke test (needs account): keelstackhq/example-app has the secrets; its first preview run (#11) failed because the Workers were never deployed (fixed in v0.2.2 by a skip). Action: deploy `apps/api` and `apps/web` once (`pnpm turbo run deploy --filter=@keelstackhq/api --filter=@keelstackhq/web` after `wrangler login`), re-run the PR's `preview.yml`, and check it uploads `pr-<n>` versions and lists the `*.workers.dev` URLs in the job summary.
+- Cloudflare preview smoke test (needs account), two-phase previews: in keelstackhq/example-app create the environment `preview` (Deployment branches: Selected → main), move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` there and delete the repository secrets. Deploy `apps/api` and `apps/web` once (`pnpm turbo run deploy --filter=@keelstackhq/api --filter=@keelstackhq/web` after `wrangler login`; a never-deployed Worker cannot get versions). After `splice update`, open a PR and check that `preview.yml` uploads the artifact `preview-<pr>` and `preview-deploy.yml` (environment `preview`) deploys `<app>-preview` with alias `pr-<n>` (`wrangler versions upload --no-bundle --preview-alias`, assets, the `gh api … --jq '$ENV…'` PR-number fallback) and lists the `*.workers.dev` URLs in the job summary.
 
 - Cloudflare account needed: verify that the empty `vars.SENTRY_DSN` in a generated `wrangler.jsonc` does not override a `wrangler secret put SENTRY_DSN` value on `wrangler deploy` (docs are silent). If it does, drop it from `vars` (spec §6.5 + plan 02 Global Constraints).
 
@@ -100,6 +112,28 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - keelstackhq/hull: create environment `splice-bot` (Deployment branches: Selected → main) BEFORE the next splice.yml run, move SPLICE_BOT_TOKEN into it, delete the repo secret
 
+- v0.4.0 cannot tag until hoist is released and the `TODO(hoist-release)` pins in `template/pieces/base/files/.github/workflows/preview-deploy.yml.jinja` and `template/pieces/secrets/files/.github/workflows/deploy.yml.jinja` are replaced. Action: release hoist (keelstackhq/hoist), then replace `keelstackhq/hoist/secrets@<40 zeros> # TODO(hoist-release)` in both files with the release commit SHA and `# vX.Y.Z`; `release-tag.mjs` refuses to tag until then.
+
+- Release-tag ruleset in every consumer repo (spec §0 P2; keelstack, hull-canary-circleci and each later one). Action, on github.com: Settings → Rules → Rulesets → New tag ruleset `release-tags`, Active, bypass Repository admin only, include `*-v*`, rules: restrict creations, updates and deletions, block force pushes. Check with `bash scripts/owner/bootstrap-secrets.sh --check-rulesets OWNER/REPO...`.
+
+- template-rust repo with that ruleset (for example rust-canary once it releases): create a release GitHub App (Contents write only; no Workflows permission needed) and install it, add it to the ruleset bypass list (mode "always"), set the repository variable `HOIST_RELEASE_APP_CLIENT_ID` and the secret `HOIST_RELEASE_APP_KEY` in environments `release-pr` and `release`, then run `bash scripts/owner/bootstrap-secrets.sh --check-rulesets --allow-app <app-id> OWNER/REPO`.
+
+- template-rust consumers (rust-canary): create the environments `release-pr` and `splice-bot` (Deployment branches: Selected → main) and move `HOIST_RELEASE_TOKEN` and `SPLICE_BOT_TOKEN` into them, then delete the repository secrets, before the next `release.yml` / `splice.yml` run.
+
+- Optional, hull's update bot with a GitHub App: create an App with Contents, Pull requests and Workflows write, install it on keelstackhq/hull, set the variable `SPLICE_APP_CLIENT_ID` and the secret `SPLICE_APP_KEY` in environment `splice-bot`. Or session mode: set the repository variable `SPLICE_BOT=off`. Nothing changes until one is set.
+
+- `secrets` piece verification (needs hoist and a Cloudflare account): create environment `prod` (Selected → main) with `SOPS_AGE_KEY`; set org variable `SECRETS_READ_APP_ID` and org secret `SECRETS_READ_APP_KEY`; `hoist secrets grant` creates the environments (docs/agents/secrets.md); run `deploy.yml` once on `main`.
+
+- CircleCI project settings for each CircleCI consumer, before its first pipeline (spec §0 P3; CAN-1 checks them on hull-canary-circleci). Action, on app.circleci.com → the project → Project settings → Advanced: enable "dynamic config using setup workflows"; "Build forked pull requests" on; "Pass secrets to builds from forked pull requests" OFF; "Prevent unregistered users from triggering builds" off (needed for the merge queue). Triggers: PRs, default-branch pushes and "Pushes to merge queues". Organization settings → Contexts: restrict `secrets-read` and `<repo>-prod` to the project.
+- CircleCI canary (spec §12, CAN-1, for example hull-canary-circleci): verify `checkout: method: blobless`, `pipeline.git.base_revision` on GitHub App pipelines, the continuation API without orbs, `circleci config validate` online (`CIRCLECI_VALIDATE=1`), the `circleci-app[bot]` sender (record its numeric `sender.id`), the `ci/circleci: ci-ok` context and `pipeline.trigger_source` `scheduled_pipeline` / `api` (items 1, 3, 8, 16); measure the 75 s / 30 s Rust budgets.
+
+- circleci-only repos with tauri-app (consumer step, also in the generated `AGENTS.md`): CircleCI Project Settings → Triggers → add a weekly scheduled trigger on branch `main` for the desktop builds.
+
+- splice release that stops passing token variables to post hooks (cross-repo). Action: after it is out, repin `keelstackhq/splice/action` in `splice.yml` of hull, `template/` and `template-rust/` to that release's SHA.
+
+- Agent follow-up after 2026-10-31: drop the `@keelstackhq/docspack@0.1.1` `minimumReleaseAgeExclude` from base `pnpm-workspace.yaml` and its assertion in `tests/base.test.mjs` (published 2026-10-28, the 3-day gate has then passed).
+
+
 ## Status
 
 Written 2026-10-15 when the build loop stopped. Plans 01 and 02 are fully checked. Plan 03 Tasks 1–5
@@ -107,6 +141,8 @@ are checked; Tasks 6–8 are Blocked (hoard and splice are unreleased; the relea
 Milestones 1, 2 and 3 are reviewed (lines above). Updated 2026-10-17 after the milestone 4 final review: 580 tests pass, lint and format are clean.
 
 **Milestone 4 (2026-10-17, plan 04 agent layer and skeletons, Tasks 1–12):** `AGENTS.md` canonical with a thin `CLAUDE.md`, project `Explore` on haiku, PreToolUse guard hook (asks on owned edits), generated docs index with a CI check, per-instance `AGENTS.md`, new pieces `ts-lib`, `rust-cli`, `npm-cli`, tag-driven `release.yml` with provenance, combos `cli` and `lib` dogfooded. Spec: `docs/superpowers/specs/2026-10-17-hull-agent-layer-and-skeletons-design.md` (approved; base spec amended). Final review 2026-10-17: with fixes, all fixed in one wave (Done line `04/final review`). Task 12 (cli CI timing on `keelstackhq/cli-canary`) is not done.
+
+**Secrets + CircleCI (plan `2026-10-27-secrets-ci-hull.md`, updated 2026-10-28):** HU-1a, 1b, 2, 3, 4, 7 and 8 are done (Done lines above), with the update bot, `ci-extra` and `min_splice` 0.3.0 on top. HU-5 (secrets on CircleCI) and HU-6 (`template-secrets/`) are not started. HU-9 is partly done: CHANGELOG v0.4.0 stays `unreleased`; v0.4.0 cannot tag until hoist is released and the `TODO(hoist-release)` pins are replaced (Blocked). Base spec updates and action SHA pins are still open.
 
 **Open items after milestone 4**
 

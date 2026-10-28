@@ -12,17 +12,66 @@ Keep `unreleased` while changes accumulate.
 **Upgrade: move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the `preview` environment
 (Deployment branches → `main`), then delete the repository-level `CLOUDFLARE_*` secrets.**
 
+- **Upgrade: `min_splice` rises to 0.3.0 (raw blocks; contract rule 9.27, an empty re-render removes
+  owned files). Upgrade splice (CLI, `pnpm dlx` pin, the update-bot action) before updating. An
+  existing repo switches to CircleCI-only with `splice add circleci` then `splice add circleci-only`
+  (removes `ci.yml`).** `rigging` stays at 0.2.0.
 - Jobs that read a secret declare an `environment:` (Deployment branches → `main`): `splice.yml`
   uses `splice-bot`; template-rust `release.yml` job `prepare` uses `release-pr`.
   **Upgrade: first create the `splice-bot` (and, for Rust repos, `release-pr`) environment with
   Deployment branches = Selected → `main` (a first run would auto-create an unprotected one), then
   move `SPLICE_BOT_TOKEN` / `HOIST_RELEASE_TOKEN` there and delete the repository-level secrets.**
+- **Upgrade (TypeScript repos): `template/` now ships `.github/workflows/splice.yml`, the weekly
+  update bot (it also renders with `circleci-only`). Create the `splice-bot` environment first, as
+  in the bullet above.** The README sections "Update bot" and "pick a token mode" are
+  seed: existing repos do not get them.
+- Update bot and release PR token, in this order: GitHub App (variable `SPLICE_APP_CLIENT_ID` and
+  secret `SPLICE_APP_KEY` in `splice-bot`; the App needs Contents, Pull requests and Workflows
+  write), then PAT (`SPLICE_BOT_TOKEN`), then `github.token`. A PR opened with `github.token` gets
+  no CI and cannot change workflows. Session mode: set the repository variable `SPLICE_BOT=off`.
+  Nothing changes until one of these is set. template-rust `release.yml` `prepare` uses
+  `HOIST_RELEASE_APP_CLIENT_ID` (repository variable) and `HOIST_RELEASE_APP_KEY` (secret).
+- **Upgrade (template-rust with a `release-tags` ruleset): install the release App, add it to the
+  ruleset bypass list (mode always), set the repository variable `HOIST_RELEASE_APP_CLIENT_ID` and
+  the secret `HOIST_RELEASE_APP_KEY` in both `release-pr` and `release`.** `publish` then pushes the
+  tag with the App token (`contents: write` only); without the App it uses `github.token`.
+- **Upgrade: expect merge conflicts on `splice update`** in base `pnpm-workspace.yaml` when the repo
+  has its own `minimumReleaseAgeExclude` (contract §5: an array is one value), and in template-rust
+  `Cargo.toml` when `members` was edited locally.
+- Lockfiles refresh on update: `[[post]]` hooks run `pnpm install --lockfile-only --ignore-scripts`
+  (template/) and `cargo update --workspace` (template-rust). splice skips post hooks when a merge
+  conflicts, so after resolving a conflict PR run the command by hand. Known gap: splice 0.3.0 runs
+  post hooks with the action's `GH_TOKEN` in their environment, so a `.pnpmfile.cjs` or a cargo
+  resolve can read the bot token. splice is removing it; `splice.yml` moves to that release.
 - PR previews run in two phases: `preview.yml` builds with no secrets and uploads `preview-<pr>`;
-  `preview-deploy.yml` (environment `preview`, default-branch code only) deploys `<app>-preview`.
-- **Upgrade: `min_splice` rises to 0.3.0 (raw blocks; contract rule 9.27, an empty re-render removes
-  owned files). Upgrade splice (CLI, `pnpm dlx` pin, the update-bot action) before updating. An
-  existing repo switches to CircleCI-only with `splice add circleci` then `splice add circleci-only`
-  (removes `ci.yml`).**
+  `preview-deploy.yml` (environment `preview`, default-branch code only) deploys the Worker
+  `<app>-preview` with alias `pr-<n>`. Never create `<app>-preview` by hand; its secrets are
+  readable by every PR, so the `env.preview` IDs in `wrangler.jsonc` must be preview-only. The
+  `deploy:preview` scripts and turbo task are gone, and `deploy` no longer gets `PR_NUMBER`.
+- New piece `secrets` (opt-in, requires base; required var `context_prefix`): seed `secrets.toml`,
+  owned `deploy.yml` (push to `main`, environment `prod`, hoist secrets; not written with
+  `circleci-only`) and `docs/agents/secrets.md`. It needs hoist released (see Blocked).
+- New pieces `circleci` ("both" mode: a CircleCI `ci-ok` next to the unchanged GitHub `ci.yml`) and
+  `circleci-only` (no `ci.yml`, `desktop.yml` or `deploy.yml`; `circleci-status.yml` mirrors the
+  CircleCI `ci-ok` / `bosun-ok` as GitHub statuses), for `template/` and template-rust. Base
+  `.gitignore` gains `.rust-cache-key`. CircleCI desktop builds (circleci-only with tauri-app) need
+  a weekly scheduled trigger on `main` in CircleCI Project Settings → Triggers. The READMEs' CI
+  time section now covers CircleCI-only repos; README is seed, so existing repos do not get it. On CircleCI,
+  cargo-nextest 0.9.148 and cargo-deny 0.20.2 come from pinned, sha256-checked release binaries,
+  checked on every run.
+- New seed `scripts/ci-extra.sh` (no-op) in both templates and a last CI step `ci-extra` on GitHub
+  and CircleCI (skipped on docs-only and unaffected PRs). The base `ci` script is unchanged.
+- The docs piece pins the `keelstack` pack `@keelstackhq/docspack` 0.1.1 in `docs/packs.json`
+  (new optional exact `version` field); base `pnpm-workspace.yaml` excludes it from
+  `minimumReleaseAge` until 2026-10-31.
+- Fix: base `release.yml` job `npm` sets `package-manager-cache: false` (a rust-cli release failed
+  with "Unable to locate executable file: pnpm").
+- Fix: hono-worker `src/hull/logging.test.ts` (owned) uses a marker no request id can contain; the
+  old one failed about 2% of runs. Existing repos get it on `splice update`.
+- Fix: template-rust pins `keelstackhq/splice/action` to the v0.3.0 commit and installs hoist with
+  `--ignore-scripts`. `circleci-status.yml` also requires `sender.type == 'Bot'`.
+- Contract rule 9.28 (`--data` keys are bare variable names; dotted keys exit 2) is added to
+  `docs/template-format.md`. It documents existing splice behaviour; `format` stays 1.
 
 ## v0.3.1 — 2026-10-27
 

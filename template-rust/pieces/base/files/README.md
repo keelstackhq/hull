@@ -18,12 +18,16 @@ node scripts/agents-index.mjs
 
 ## Measure CI time
 
-Budget for job `ci`: 45 s on a typical PR, 15 s docs-only. Measure the last 20 runs:
+Budget for job `ci`: 45 s on a typical PR, 15 s docs-only. With GitHub CI (no `circleci-only`
+piece), measure the last 20 runs:
 
 ```bash
 gh run list -w ci.yml -L 20 --json databaseId
 gh run view <id> --json jobs   # completedAt - startedAt of job "ci"
 ```
+
+With `circleci-only` there is no `ci.yml`: read the duration of the CircleCI job `ci-ok` in the
+CircleCI pipeline (budget there: 75 s on a typical PR, 30 s docs-only).
 
 ## Releasing
 
