@@ -13,7 +13,7 @@ app.get("/hello", (c) => c.text("hi"));
 app.get("/cb", (c) => c.text("cb"));
 app.get("/teapot", (c) => c.text("no", 500));
 app.get("/leak", () => {
-  throw new SyntaxError('Unexpected token, "{"token":"abc"}" is not valid JSON');
+  throw new SyntaxError('Unexpected token, "{"token":"zQsecretQz"}" is not valid JSON');
 });
 app.get("/denied", () => {
   throw new HTTPException(401, { message: "nope" });
@@ -51,8 +51,8 @@ it("logs one JSON line per request", async () => {
 });
 
 it("drops the query string", async () => {
-  await app.request("/cb?token=abc");
-  expect(raw()).not.toContain("abc");
+  await app.request("/cb?token=zQsecretQz");
+  expect(raw()).not.toContain("zQsecretQz");
   expect(lines()[0]?.path).toBe("/cb");
 });
 
@@ -71,14 +71,14 @@ it("warn for 404, error for 500", async () => {
 });
 
 it("thrown error gives one error line and 500 with the same requestId", async () => {
-  const res = await app.request("/boom?token=abc");
+  const res = await app.request("/boom?token=zQsecretQz");
   const body = (await res.json()) as { error: string; requestId: string };
   expect(res.status).toBe(500);
   expect(body).toEqual({ error: "internal", requestId: expect.any(String) });
   expect(lines()).toHaveLength(1);
   expect(lines().filter((l) => l.level === "error")).toHaveLength(1);
   expect(lines().every((l) => l.requestId === body.requestId)).toBe(true);
-  expect(raw()).not.toContain("abc");
+  expect(raw()).not.toContain("zQsecretQz");
 });
 
 it("echoes x-request-id", async () => {
@@ -104,7 +104,7 @@ it("withOptionalSentry serves requests without loading Sentry when SENTRY_DSN is
 it("never logs the error message, which can quote the request body", async () => {
   const res = await app.request("/leak");
   expect(res.status).toBe(500);
-  expect(raw()).not.toContain("abc");
+  expect(raw()).not.toContain("zQsecretQz");
   expect(lines()).toHaveLength(1);
   expect(lines()[0]).toMatchObject({ level: "error", msg: "SyntaxError" });
 });
@@ -140,28 +140,33 @@ it("honours LOG_LEVEL", async () => {
 it("scrubEvent removes query, headers, cookies and body from Sentry events", () => {
   const event = {
     request: {
-      url: "https://x/cb?token=abc",
-      query_string: "token=abc",
-      headers: { authorization: "Bearer abc" },
-      cookies: { session: "abc" },
-      data: { token: "abc" },
+      url: "https://x/cb?token=zQsecretQz",
+      query_string: "token=zQsecretQz",
+      headers: { authorization: "Bearer zQsecretQz" },
+      cookies: { session: "zQsecretQz" },
+      data: { token: "zQsecretQz" },
       method: "GET",
     },
   } as unknown as Parameters<typeof scrubEvent>[0];
   const out = scrubEvent(event);
-  expect(JSON.stringify(out)).not.toContain("abc");
+  expect(JSON.stringify(out)).not.toContain("zQsecretQz");
   expect(out.request).toEqual({ url: "https://x/cb", method: "GET" });
 });
 
 it("scrubEvent blanks exception messages and drops breadcrumbs", () => {
   const event = {
-    exception: { values: [{ type: "SyntaxError", value: 'bad {"token":"abc"}', stacktrace: {} }] },
+    exception: {
+      values: [{ type: "SyntaxError", value: 'bad {"token":"zQsecretQz"}', stacktrace: {} }],
+    },
     breadcrumbs: [
-      { message: "GET https://x/cb?token=abc", data: { url: "https://x/cb?token=abc" } },
+      {
+        message: "GET https://x/cb?token=zQsecretQz",
+        data: { url: "https://x/cb?token=zQsecretQz" },
+      },
     ],
   } as unknown as Parameters<typeof scrubEvent>[0];
   const out = scrubEvent(event);
-  expect(JSON.stringify(out)).not.toContain("abc");
+  expect(JSON.stringify(out)).not.toContain("zQsecretQz");
   expect(out.exception?.values?.[0]).toMatchObject({ type: "SyntaxError", value: "" });
   expect(out.breadcrumbs).toBeUndefined();
 });

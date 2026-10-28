@@ -113,3 +113,16 @@ test("per-instance notes: AGENTS.md owned within 20 lines, CLAUDE.md seed", asyn
   const { agents } = await assertInstanceNotes(["base", "hono-worker:api"], "apps/api");
   assert.match(agents, /^# /);
 });
+
+test("logging tests use a secret marker no request id or timestamp can contain", async () => {
+  const src = await readFile(
+    new URL("../template/pieces/hono-worker/files/src/hull/logging.test.ts", import.meta.url),
+    "utf8",
+  );
+  // A random UUID requestId is hex: a hex-only marker like "abc" made the leak checks flaky.
+  assert.ok(!/["=\s]abc["\s}]/.test(src), "no hex-only marker");
+  const markers = new Set(src.match(/zQsecretQz/g) ?? []);
+  assert.equal(markers.size, 1, "one shared marker");
+  assert.match("zQsecretQz", /[g-zG-Z]/, "marker has a non-hex letter");
+  assert.ok((src.match(/not\.toContain\("zQsecretQz"\)/g) ?? []).length >= 5, "leak checks use it");
+});
