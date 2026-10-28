@@ -97,6 +97,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - Plan 03 Task 8 (release v0.1.0): needs human go-ahead. Action: merge this branch to `main` once CI is green there, then add `CHANGELOG.md` (an agent can draft it on request) and run `git tag v0.1.0 && git push origin v0.1.0` (agents are denied `git tag`).
 
+- keelstackhq/hull: create environment `splice-bot` (Deployment branches: Selected → main) BEFORE the next splice.yml run, move SPLICE_BOT_TOKEN into it, delete the repo secret
+
 ## Status
 
 Written 2026-10-15 when the build loop stopped. Plans 01 and 02 are fully checked. Plan 03 Tasks 1–5
