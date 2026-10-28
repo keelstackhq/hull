@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.4.0 — unreleased
+## v0.4.0 — 2026-10-28
 
 **Upgrade: move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the `preview` environment
 (Deployment branches → `main`), then delete the repository-level `CLOUDFLARE_*` secrets.**
@@ -40,9 +40,11 @@ Keep `unreleased` while changes accumulate.
   `Cargo.toml` when `members` was edited locally.
 - Lockfiles refresh on update: `[[post]]` hooks run `pnpm install --lockfile-only --ignore-scripts`
   (template/) and `cargo update --workspace` (template-rust). splice skips post hooks when a merge
-  conflicts, so after resolving a conflict PR run the command by hand. Known gap: splice 0.3.0 runs
-  post hooks with the action's `GH_TOKEN` in their environment, so a `.pnpmfile.cjs` or a cargo
-  resolve can read the bot token. splice is removing it; `splice.yml` moves to that release.
+  conflicts, so after resolving a conflict PR run the command by hand. The update bot pins
+  splice 0.3.1, which strips token-like variables from post hooks, so they don't see the bot token.
+- Every GitHub Action in both templates is pinned by full commit SHA with a `# vX.Y.Z` comment;
+  `docs/actions.md` lists them for an org allowlist. Renovate keeps generated repos' pins current.
+  pnpm/action-setup moves to v4.4.0 (Node 24).
 - PR previews run in two phases: `preview.yml` builds with no secrets and uploads `preview-<pr>`;
   `preview-deploy.yml` (environment `preview`, default-branch code only) deploys the Worker
   `<app>-preview` with alias `pr-<n>`. Never create `<app>-preview` by hand; its secrets are
@@ -50,7 +52,7 @@ Keep `unreleased` while changes accumulate.
   `deploy:preview` scripts and turbo task are gone, and `deploy` no longer gets `PR_NUMBER`.
 - New piece `secrets` (opt-in, requires base; required var `context_prefix`): seed `secrets.toml`,
   owned `deploy.yml` (push to `main`, environment `prod`, hoist secrets; not written with
-  `circleci-only`) and `docs/agents/secrets.md`. It needs hoist released (see Blocked).
+  `circleci-only`) and `docs/agents/secrets.md`. Uses hoist secrets v0.3.0.
 - New pieces `circleci` ("both" mode: a CircleCI `ci-ok` next to the unchanged GitHub `ci.yml`) and
   `circleci-only` (no `ci.yml`, `desktop.yml` or `deploy.yml`; `circleci-status.yml` mirrors the
   CircleCI `ci-ok` / `bosun-ok` as GitHub statuses), for `template/` and template-rust. Base

@@ -226,18 +226,21 @@ test("preview-deploy without secrets: Cloudflare secrets from environment previe
 
 test("preview-deploy with secrets: hoist secrets action, SHA-pinned, env preview, explicit keys", () => {
   const d = stepsOf(withSecrets).at(-1);
-  assert.match(d.uses, /^keelstackhq\/hoist\/secrets@0{40}$/);
+  assert.match(d.uses, /^keelstackhq\/hoist\/secrets@[0-9a-f]{40}$/);
   assert.equal(d.with.env, "preview");
   assert.equal(d.with.keys, "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID");
   assert.equal(d.with.run, "node .github/scripts/preview.mjs deploy");
   assert.equal(d.with["app-id"], "${{ vars.SECRETS_READ_APP_ID }}");
   assert.equal(d.with["app-key"], "${{ secrets.SECRETS_READ_APP_KEY }}");
   assert.equal(d.with["age-key"], "${{ secrets.SOPS_AGE_KEY }}");
+  // workflow_run: hoist's exec needs the triggering workflow's file, else it exits 2
+  assert.equal(d.with["workflow-run-path"], ".github/workflows/preview.yml");
+  assert.deepEqual(withSecrets.on.workflow_run.workflows, ["preview"]);
   assert.equal(d.env.PR_NUMBER, "${{ steps.pr.outputs.number }}");
   assert.equal(withSecrets.jobs.deploy.environment, "preview");
   assert.doesNotMatch(JSON.stringify(withSecrets), /secrets\.CLOUDFLARE/);
   const src = SECRETS_SRC.split("\n").find((l) => l.includes("hoist/secrets@"));
-  assert.match(src, /@0{40} # TODO\(hoist-release\)$/);
+  assert.match(src, /@24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f # v0\.3\.0$/);
 });
 
 test("deployable pieces document previews, not a one-time first deploy", async () => {

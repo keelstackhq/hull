@@ -22,8 +22,8 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
 | `dtolnay/rust-toolchain` | stable branch, 2026-10-28 | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` |
 | `keelstackhq/hoard` | v0.4.0 | `06291684834e8d8a82b8d3f5e7c9f5677497f4e2` |
-| `keelstackhq/hoist/secrets` | placeholder, not a real pin (TODO(hoist-release)) | `0000000000000000000000000000000000000000` |
-| `keelstackhq/splice/action` | v0.3.0 | `5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0` |
+| `keelstackhq/hoist/secrets` | v0.3.0 | `24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f` |
+| `keelstackhq/splice/action` | v0.3.1 | `f7ac4efddb3b23b4f1dca29dfb72e3f81a707f32` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
 | `Swatinem/rust-cache` | v2.9.3 | `d1527c8f67ef9af357290475d4af4b0fab8f12e0` |
 | `taiki-e/install-action` | v2.87.32 | `5488ac5a951645ce95062214902ac4b6bc1a1037` |
@@ -49,8 +49,8 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
 | `dtolnay/rust-toolchain` | stable branch, 2026-10-28 | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` |
 | `keelstackhq/hoard` | v0.4.0 | `06291684834e8d8a82b8d3f5e7c9f5677497f4e2` |
-| `keelstackhq/hoist/secrets` | placeholder, not a real pin (TODO(hoist-release)) | `0000000000000000000000000000000000000000` |
-| `keelstackhq/splice/action` | v0.3.0 | `5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0` |
+| `keelstackhq/hoist/secrets` | v0.3.0 | `24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f` |
+| `keelstackhq/splice/action` | v0.3.1 | `f7ac4efddb3b23b4f1dca29dfb72e3f81a707f32` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
 | `Swatinem/rust-cache` | v2.9.3 | `d1527c8f67ef9af357290475d4af4b0fab8f12e0` |
 | `taiki-e/install-action` | v2.87.32 | `5488ac5a951645ce95062214902ac4b6bc1a1037` |
@@ -93,7 +93,7 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | --- | --- | --- |
 | `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
 | `actions/setup-node` | v5.0.0 | `a0853c24544627f65ddf259abe73b1d18a591444` |
-| `keelstackhq/hoist/secrets` | placeholder, not a real pin (TODO(hoist-release)) | `0000000000000000000000000000000000000000` |
+| `keelstackhq/hoist/secrets` | v0.3.0 | `24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
 
 ### template/tauri-app
@@ -120,7 +120,7 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/download-artifact` | v8.0.2 | `9000827ccba6bdab643e8b6fd33ac0654aef8333` |
 | `actions/setup-node` | v5.0.0 | `a0853c24544627f65ddf259abe73b1d18a591444` |
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
-| `keelstackhq/splice/action` | v0.3.0 | `5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0` |
+| `keelstackhq/splice/action` | v0.3.1 | `f7ac4efddb3b23b4f1dca29dfb72e3f81a707f32` |
 | `Swatinem/rust-cache` | v2.9.3 | `d1527c8f67ef9af357290475d4af4b0fab8f12e0` |
 | `taiki-e/install-action` | v2.87.32 | `5488ac5a951645ce95062214902ac4b6bc1a1037` |
 
@@ -178,4 +178,4 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | --- | --- | --- |
 | `actions/checkout` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
 | `actions/create-github-app-token` | v3.3.0 | `64ab729a6294000f5aa4a4bc0b73d1f32bc45510` |
-| `keelstackhq/splice/action` | v0.3.0 | `5d64f250fd1e0fcf27690b425a2f9f8de5fd4ac0` |
+| `keelstackhq/splice/action` | v0.3.1 | `f7ac4efddb3b23b4f1dca29dfb72e3f81a707f32` |

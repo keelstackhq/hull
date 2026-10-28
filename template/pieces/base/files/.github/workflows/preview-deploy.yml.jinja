@@ -75,7 +75,7 @@ jobs:
           path: ${{ runner.temp }}/preview
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
-{% endraw %}{% if "secrets" in pieces %}{% raw %}      - uses: keelstackhq/hoist/secrets@0000000000000000000000000000000000000000 # TODO(hoist-release)
+{% endraw %}{% if "secrets" in pieces %}{% raw %}      - uses: keelstackhq/hoist/secrets@24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f # v0.3.0
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           PREVIEW_ARTIFACT: ${{ runner.temp }}/preview
@@ -85,7 +85,9 @@ jobs:
           run: node .github/scripts/preview.mjs deploy
           app-id: ${{ vars.SECRETS_READ_APP_ID }}
           app-key: ${{ secrets.SECRETS_READ_APP_KEY }}
-          age-key: ${{ secrets.SOPS_AGE_KEY }}{% endraw %}{% else %}{% raw %}      - name: Deploy previews
+          age-key: ${{ secrets.SOPS_AGE_KEY }}
+          # workflow_run: hoist checks the triggering workflow (preview.yml) by its file path
+          workflow-run-path: .github/workflows/preview.yml{% endraw %}{% else %}{% raw %}      - name: Deploy previews
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

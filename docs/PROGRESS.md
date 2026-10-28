@@ -72,6 +72,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-28 · ci-extra · `feat: seeded scripts/ci-extra.sh hook, run last in CI` (#52) · seed no-op script in both templates; last CI step `ci-extra` on GitHub and CircleCI, skipped on docs-only and unaffected PRs.
 - 2026-10-28 · fixes · #33 `package-manager-cache: false` in base `release.yml` job `npm`; #57 hono-worker leak tests use marker `zQsecretQz` (the old marker made `logging.test.ts` about 2% flaky); #51 comment on template-rust `members`.
 - 2026-10-28 · secrets-ci/HU-9 (docs part) · `docs: secrets + CircleCI wrap-up (changelog, progress, CLAUDE.md)` · CHANGELOG v0.4.0 unreleased completed, Blocked and Status updated, CLAUDE.md layout and decrypt rule, README CI-time sections no longer name `ci.yml` in `circleci-only` repos. Not in this commit: base spec updates, replacing the `TODO(hoist-release)` pins (need hoist released), HU-5 and HU-6, action SHA pins (#58 not merged when written).
+- 2026-10-28 · secrets-ci/HU-9 (release) · `release: v0.4.0 — pin hoist v0.3.0 secrets action` · hoist secrets@24b2dcb (v0.3.0) in preview-deploy and deploy, preview-deploy passes `workflow-run-path`, splice 0.3.1 pinned, CHANGELOG dated; 936 tests pass, 12 combos dogfooded.
 
 ## Measurements
 
@@ -112,8 +113,6 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 - keelstackhq/hull: create environment `splice-bot` (Deployment branches: Selected → main) BEFORE the next splice.yml run, move SPLICE_BOT_TOKEN into it, delete the repo secret
 
-- v0.4.0 cannot tag until hoist is released and the `TODO(hoist-release)` pins in `template/pieces/base/files/.github/workflows/preview-deploy.yml.jinja` and `template/pieces/secrets/files/.github/workflows/deploy.yml.jinja` are replaced. Action: release hoist (keelstackhq/hoist), then replace `keelstackhq/hoist/secrets@<40 zeros> # TODO(hoist-release)` in both files with the release commit SHA and `# vX.Y.Z`; `release-tag.mjs` refuses to tag until then.
-
 - Release-tag ruleset in every consumer repo (spec §0 P2; keelstack, hull-canary-circleci and each later one). Action, on github.com: Settings → Rules → Rulesets → New tag ruleset `release-tags`, Active, bypass Repository admin only, include `*-v*`, rules: restrict creations, updates and deletions, block force pushes. Check with `bash scripts/owner/bootstrap-secrets.sh --check-rulesets OWNER/REPO...`.
 
 - template-rust repo with that ruleset (for example rust-canary once it releases): create a release GitHub App (Contents write only; no Workflows permission needed) and install it, add it to the ruleset bypass list (mode "always"), set the repository variable `HOIST_RELEASE_APP_CLIENT_ID` and the secret `HOIST_RELEASE_APP_KEY` in environments `release-pr` and `release`, then run `bash scripts/owner/bootstrap-secrets.sh --check-rulesets --allow-app <app-id> OWNER/REPO`.
@@ -142,7 +141,7 @@ Milestones 1, 2 and 3 are reviewed (lines above). Updated 2026-10-17 after the m
 
 **Milestone 4 (2026-10-17, plan 04 agent layer and skeletons, Tasks 1–12):** `AGENTS.md` canonical with a thin `CLAUDE.md`, project `Explore` on haiku, PreToolUse guard hook (asks on owned edits), generated docs index with a CI check, per-instance `AGENTS.md`, new pieces `ts-lib`, `rust-cli`, `npm-cli`, tag-driven `release.yml` with provenance, combos `cli` and `lib` dogfooded. Spec: `docs/superpowers/specs/2026-10-17-hull-agent-layer-and-skeletons-design.md` (approved; base spec amended). Final review 2026-10-17: with fixes, all fixed in one wave (Done line `04/final review`). Task 12 (cli CI timing on `keelstackhq/cli-canary`) is not done.
 
-**Secrets + CircleCI (plan `2026-10-27-secrets-ci-hull.md`, updated 2026-10-28):** HU-1a, 1b, 2, 3, 4, 7 and 8 are done (Done lines above), with the update bot, `ci-extra` and `min_splice` 0.3.0 on top. HU-5 (secrets on CircleCI) and HU-6 (`template-secrets/`) are not started. HU-9 is partly done: CHANGELOG v0.4.0 stays `unreleased`; v0.4.0 cannot tag until hoist is released and the `TODO(hoist-release)` pins are replaced (Blocked). Base spec updates and action SHA pins are still open.
+**Secrets + CircleCI (plan `2026-10-27-secrets-ci-hull.md`, updated 2026-10-28):** HU-1a, 1b, 2, 3, 4, 7 and 8 are done (Done lines above), with the update bot, `ci-extra` and `min_splice` 0.3.0 on top. HU-5 (secrets on CircleCI) and HU-6 (`template-secrets/`) are not started. HU-9 is done: CHANGELOG `v0.4.0 — 2026-10-28` pins hoist secrets v0.3.0 and splice 0.3.1; merging tags it after the owner approves the `release` environment.
 
 **Open items after milestone 4**
 

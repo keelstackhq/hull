@@ -3,7 +3,7 @@ import { cp, mkdir, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 /** The splice release hull renders with (hull CI installs exactly this version). */
-export const SPLICE_VERSION = "0.3.0";
+export const SPLICE_VERSION = "0.3.1";
 
 /** `SPLICE_BIN` when set, else `pnpm dlx @keelstackhq/splice@<SPLICE_VERSION>`. */
 export function spliceCommand(env = process.env) {
