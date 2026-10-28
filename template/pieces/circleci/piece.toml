@@ -1,0 +1,6 @@
+id = "circleci"
+description = "CircleCI as a second CI provider: TURBO_SCM_BASE script (config and jobs follow)"
+requires = ["base"]
+
+[files]
+owned = [".circleci/scripts/scm-base.sh"]

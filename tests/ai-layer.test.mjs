@@ -216,9 +216,9 @@ test("piece bullets sit under ## Pieces in AGENTS.md with no blank lines between
   assert.ok(!/## Pieces/.test(await read(dir, "CLAUDE.md")));
 });
 
-test("every piece id except base, docs and secrets has a branch in both Pieces chains and one bullet", () => {
+test("every piece id except base, docs, secrets and circleci has a branch in both Pieces chains and one bullet", () => {
   const ids = readdirSync(join(REAL_TEMPLATE, "pieces")).filter(
-    (i) => i !== "base" && i !== "docs" && i !== "secrets",
+    (i) => i !== "base" && i !== "docs" && i !== "secrets" && i !== "circleci",
   );
   const src = readFileSync(join(REAL_TEMPLATE, "pieces/base/files/AGENTS.md.jinja"), "utf8");
   const [, heading, rest] = /same-branches #\}([\s\S]*?)\{% endif %\}([\s\S]*)/.exec(src);

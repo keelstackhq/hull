@@ -88,6 +88,30 @@ Merge strategies:
 - `turbo.json`: json
 - `packages/shared/package.json`: json
 
+## circleci
+
+CircleCI as a second CI provider: TURBO_SCM_BASE script (config and jobs follow)
+
+- Multiple instances: no
+- Target: repo root
+- Requires: `base`
+
+Variables:
+
+- none
+
+Files (owned):
+
+- `.circleci/scripts/scm-base.sh`
+
+Files (shared):
+
+- none
+
+Files (seed):
+
+- none
+
 ## docs
 
 docspack: local, version-locked docs for AI agents, with a packs manifest

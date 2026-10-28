@@ -436,8 +436,12 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   `git fetch origin <default>` so turbo can diff. Unverified (§12).
 - **Affected early exit:** the same `affected` step (same turbo binary download, same
   `.github/scripts/affected.mjs`; the script path stays for both providers). `TURBO_SCM_BASE` from
-  `scm-base.sh`: merge-queue branch `gh-readonly-queue/<base>/pr-<n>-<sha>` → `<sha>`; default branch
-  → `<< pipeline.git.base_revision >>`; else `git merge-base HEAD origin/<default>`.
+  `scm-base.sh`: merge-queue branch `gh-readonly-queue/<base>/pr-<n>-<sha>` → `<sha>` only if it is
+  40 lowercase hex, an ancestor of `origin/<default>` and of HEAD, and not HEAD (else exit 1; §12
+  item 14); default branch → `<< pipeline.git.base_revision >>` (40 hex), or the parent commit when it
+  is empty (first pipeline, API or scheduled runs); else `git merge-base HEAD origin/<default>`. The
+  branch name is never printed or passed to git; the caller assigns the output first (`b=$(…)`) so a
+  failure stops the job.
   `TURBO_SCM_HEAD` = `CIRCLE_SHA1`.
 - **Caching:** pnpm store via `restore_cache`/`save_cache` keyed on `pnpm-lock.yaml`; turbo via
   hoard `fs` in `~/.cache/hoard`, cache key `hoard-v1-{{ .Branch }}-{{ .Revision }}` restoring
@@ -605,6 +609,12 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    `bootstrap-secrets.sh`; the script reads the restrictions back and refuses to store the key if it
    cannot see both, so a wrong guess fails closed (then add them in the UI and re-run; no key was stored
    for any consumer, since all environments and contexts are set up and checked before the first key). The mismatch error prints the raw API read-back, so the owner's paste shows the real shape.
+14. **Verified threat, fixed in `scm-base.sh` (HU-2a):** anyone who can push a branch can name it
+   `gh-readonly-queue/main/pr-1-<sha of their own HEAD>`; trusting the name would give base = HEAD, an
+   empty affected set and a green `ci-ok` on that head without any config change. Mitigation in code,
+   not in a ruleset: the suffix is used only if it is an ancestor of `origin/<default>` (a PR author
+   cannot add commits there) and of HEAD and is not HEAD, so a forged name can only yield an honest
+   diff from a default-branch commit.
 
 ## 13. Owner-only steps
 
