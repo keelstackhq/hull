@@ -7,6 +7,11 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.5.0 — unreleased
+
+- `docs/start-checklist.md` lists the human steps before autonomous work; base gets the `ready`
+  skill and `scripts/ready.mjs` (owned) to check them. New repos' `AGENTS.md` says run it first.
+
 ## v0.4.0 — 2026-10-28
 
 **Upgrade: move `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the `preview` environment
