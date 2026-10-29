@@ -72,16 +72,22 @@ test("requiredEnvironments reads `environment:` from the workflows", async () =>
 });
 
 /** Fake command runner: `answers` maps "cmd arg1 arg2" prefixes to stdout (or null = exit 1). */
-const fakeRun = (answers) => (cmd, args) => {
-  const line = [cmd, ...args].join(" ");
-  const keys = Object.keys(answers).sort((a, b) => b.length - a.length);
-  const key = keys.find((k) => line.startsWith(k));
-  if (key === undefined || answers[key] === null) return { ok: false, out: "", err: `no: ${line}` };
-  return { ok: true, out: answers[key], err: "" };
-};
+const fakeRun =
+  (answers, errs = {}) =>
+  (cmd, args) => {
+    const line = [cmd, ...args].join(" ");
+    const keys = Object.keys(answers).sort((a, b) => b.length - a.length);
+    const key = keys.find((k) => line.startsWith(k));
+    const errKey = Object.keys(errs).find((k) => line.startsWith(k));
+    if (errKey) return { ok: false, out: "", err: errs[errKey] };
+    if (key === undefined || answers[key] === null)
+      return { ok: false, out: "", err: `no: ${line}` };
+    return { ok: true, out: answers[key], err: "" };
+  };
 
 const GOOD_GH = {
   "gh --version": "gh 2",
+  "gh auth status": "Logged in",
   "gh repo view": "keelstackhq/demo\n",
   "gh api repos/keelstackhq/demo/actions/permissions": '{"enabled":true}',
   "gh api repos/keelstackhq/demo/rules/branches/main": JSON.stringify([
@@ -184,6 +190,35 @@ test("an `environment:` line may end in a comment", async () => {
   const d = await mkdtemp(join(tmpdir(), "ready-"));
   await put(d, ".github/workflows/a.yml", "    environment: prod # deploy\n");
   assert.deepEqual(requiredEnvironments(d), ["prod"]);
+});
+
+const GH_ITEMS = ["repo", "actions", "rulesets", "environments"];
+
+test("gh on PATH but not logged in: GitHub items are manual, not fail", async () => {
+  const root = await readyRepo();
+  const run = fakeRun({ ...GOOD_GH, "gh auth status": null });
+  const s = byId(runChecks({ root, run, node: "24.0.0" }));
+  for (const id of GH_ITEMS) assert.equal(s[id], "manual", id);
+});
+
+test("a 401/403 from the API is manual (the owner confirms), not fail", async () => {
+  const root = await readyRepo();
+  const errs = {
+    "gh api repos/keelstackhq/demo/actions": "gh: Resource not accessible (HTTP 403)",
+  };
+  const results = runChecks({ root, run: fakeRun(GOOD_GH, errs), node: "24.0.0" });
+  assert.equal(byId(results).actions, "manual");
+  assert.match(results.find((r) => r.id === "actions").note, /HTTP 403/);
+  assert.equal(byId(results).rulesets, "pass");
+});
+
+test("a failed gh repo view fails repo only; the other GitHub items do not cascade", async () => {
+  const root = await readyRepo();
+  const s = byId(
+    runChecks({ root, run: fakeRun({ ...GOOD_GH, "gh repo view": null }), node: "24.0.0" }),
+  );
+  assert.equal(s.repo, "fail");
+  for (const id of GH_ITEMS.slice(1)) assert.equal(s[id], "manual", id);
 });
 
 test("without gh, GitHub items are manual (not a pass); bosun and secrets run when present", async () => {

@@ -56,14 +56,24 @@ const manual = (note) => ({ status: "manual", note });
 export function runChecks({ root, run, node }) {
   const has = (cmd) => run(cmd, ["--version"]).ok;
   const file = (rel) => existsSync(join(root, rel));
-  const gh = has("gh");
+  // gh missing or logged out (the Claude Code web default), or a 401/403: the owner confirms.
+  const gh = has("gh") && run("gh", ["auth", "status"]).ok;
   let repo;
   const api = (path) => {
     const r = run("gh", ["api", `repos/${repo}/${path}`]);
-    if (!r.ok) throw new Error(`gh api ${path}: ${(r.err || r.out).trim().split("\n")[0]}`);
+    const msg = `gh api ${path}: ${(r.err || r.out).trim().split("\n")[0]}`;
+    if (!r.ok) throw Object.assign(new Error(msg), { manual: /HTTP 40[13]/.test(msg) });
     return JSON.parse(r.out);
   };
-  const noGh = manual("gh is not available here: the owner confirms this on github.com");
+  const noGh = manual("gh is not logged in here: the owner confirms this on github.com");
+  /** Pass when `cmd args` exits 0; else fail with its first output line. */
+  const tool = (cmd, ...args) => {
+    if (!has(cmd)) return fail(`${cmd} is not on PATH`);
+    const r = run(cmd, args);
+    const label = [cmd, ...args].join(" ");
+    return r.ok ? pass(label) : fail((r.err || r.out).trim().split("\n")[0] || `${label} failed`);
+  };
+  const noRepo = () => (gh ? manual("repo unknown (see repo): the owner confirms") : noGh);
 
   const checks = {
     repo() {
@@ -95,14 +105,14 @@ export function runChecks({ root, run, node }) {
       return missing.length ? fail(`missing: ${missing.join(", ")}`) : pass("tools on PATH");
     },
     actions() {
-      if (!repo) return gh ? fail("repo unknown") : noGh;
+      if (!repo) return noRepo();
       const p = api("actions/permissions");
       return p.enabled
         ? pass(`enabled (allowed: ${p.allowed_actions})`)
         : fail("Actions are disabled");
     },
     rulesets() {
-      if (!repo) return gh ? fail("repo unknown") : noGh;
+      if (!repo) return noRepo();
       const rules = api("rules/branches/main");
       const ciOk = rules.some(
         (r) =>
@@ -119,7 +129,7 @@ export function runChecks({ root, run, node }) {
       return gaps.length ? fail(gaps.join("; ")) : pass("ci-ok required on main; release-tags");
     },
     environments() {
-      if (!repo) return gh ? fail("repo unknown") : noGh;
+      if (!repo) return noRepo();
       const have = new Map(api("environments").environments.map((e) => [e.name, e]));
       const gaps = [];
       for (const name of requiredEnvironments(root)) {
@@ -144,30 +154,13 @@ export function runChecks({ root, run, node }) {
         ? fail(gaps.join("; "))
         : pass(requiredEnvironments(root).join(", ") || "none needed");
     },
-    secrets() {
-      if (!file("secrets.toml")) return pass("no secrets.toml");
-      if (!has("hoist")) return fail("hoist is not on PATH");
-      const r = run("hoist", ["secrets", "check"]);
-      return r.ok
-        ? pass("hoist secrets check")
-        : fail((r.err || r.out).trim().split("\n")[0] || "hoist secrets check failed");
-    },
-    bosun() {
-      if (!file(".bosun")) return pass("bosun not adopted");
-      if (!has("bosun")) return fail("bosun is not on PATH");
-      const r = run("bosun", ["doctor"]);
-      return r.ok
-        ? pass("bosun doctor")
-        : fail((r.err || r.out).trim().split("\n")[0] || "bosun doctor failed");
-    },
-    render() {
-      if (!file(".splice/lock.toml")) return fail("no .splice/lock.toml");
-      if (!has("splice")) return fail("splice is not on PATH");
-      const r = run("splice", ["check", "--offline"]);
-      return r.ok
-        ? pass("splice check")
-        : fail((r.err || r.out).trim().split("\n")[0] || "splice check failed");
-    },
+    secrets: () =>
+      file("secrets.toml") ? tool("hoist", "secrets", "check") : pass("no secrets.toml"),
+    bosun: () => (file(".bosun") ? tool("bosun", "doctor") : pass("bosun not adopted")),
+    render: () =>
+      file(".splice/lock.toml")
+        ? tool("splice", "check", "--offline")
+        : fail("no .splice/lock.toml"),
     plan() {
       const md = (rel) => file(rel) && readdirSync(join(root, rel)).some((n) => n.endsWith(".md"));
       const project = file("docs/agents/project.md")
@@ -185,7 +178,7 @@ export function runChecks({ root, run, node }) {
     try {
       return { ...item, ...checks[item.id]() };
     } catch (e) {
-      return { ...item, ...fail(e.message) };
+      return { ...item, ...(e.manual ? manual(e.message) : fail(e.message)) };
     }
   });
 }

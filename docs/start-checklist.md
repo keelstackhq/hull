@@ -19,9 +19,10 @@ Check: `gh repo view` names the repo.
 
 ### 2. Install the GitHub Apps · computer · ready: manual
 
-Install on the new repo:
+Org Settings → GitHub Apps (github.com/organizations/keelstackhq/settings/installations) →
+Configure each App → add the new repo:
 
-- Claude: github.com → Settings → Applications → Claude → Configure → add the repo.
+- Claude.
 - Renovate: add the repo to the Renovate App. `renovate.json` extends
   `github>keelstackhq/hull//renovate/default`. TODO(owner): which Renovate App installation.
 - Update bot (splice), pick one (the generated `README.md`, "Update bot: pick a token mode"):
