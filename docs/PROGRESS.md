@@ -76,6 +76,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-29 · start-checklist · `feat: project-start checklist and the ready check` · docs/start-checklist.md (11 items, shared ids with scripts/ready.mjs, tested); base `ready` skill; template-rust not covered yet.
 - 2026-10-29 · onboarding · `feat(ready): onboarding questions decide optional checklist items` · 7 questions (forms), seed docs/agents/onboarding.toml, ask/skipped statuses; hoist and bosun facts fill the checklist TODOs.
 - 2026-10-29 · release · `release: v0.5.0 — start checklist, ready and onboarding` · CHANGELOG dated; after D-012's end date `owner` is the recommended approvals answer.
+- 2026-10-29 · bosun 0.3.0 · `fix: start checklist matches bosun 0.3.0` · item 8 order and `bosun init --stack --plan`, keelstack greenfield-bosun link; item 10 and `ready` want `plans/<name>.md` with bosun; CHANGELOG v0.5.1.
 
 ## Measurements
 

@@ -22,7 +22,7 @@ export const ITEMS = [
   item("secrets", "auto", "Fix secrets.toml or the grants until `hoist secrets check` passes."),
   item("bosun", "auto", "Fix what `bosun doctor` reports."),
   item("render", "auto", "Render with `splice new` and commit; `splice check` must pass."),
-  item("plan", "auto", "Add docs/superpowers/plans/*.md or `## Steps` in docs/agents/project.md."),
+  item("plan", "auto", "Add docs/superpowers/plans/*.md (bosun: plans/<name>.md) or `## Steps`."),
   item("approvals", "auto", "Confirm with the owner how approvals reach agents (D-012)."),
 ];
 
@@ -344,6 +344,10 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
     },
     plan() {
       const md = (rel) => file(rel) && readdirSync(join(root, rel)).some((n) => n.endsWith(".md"));
+      // bosun reads only plans/<name>.md (its plan format); presence only, not the format.
+      if (answers.bosun === "yes") {
+        return md("plans") ? pass("bosun plan found") : fail("bosun = yes: no plans/<name>.md");
+      }
       const project = file("docs/agents/project.md")
         ? readFileSync(join(root, "docs/agents/project.md"), "utf8")
         : "";
