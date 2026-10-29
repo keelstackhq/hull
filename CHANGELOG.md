@@ -7,12 +7,13 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.5.0 — unreleased
+## v0.5.0 — 2026-10-29
 
 - `docs/start-checklist.md` lists the human steps before autonomous work; base gets the `ready`
   skill and `scripts/ready.mjs` (owned) to check them. New repos' `AGENTS.md` says run it first.
 - `ready` starts with onboarding questions (Claude Code forms); answers live in the new seed
   `docs/agents/onboarding.toml`. Items an answer turns off are `skipped`; unanswered ones `ask`.
+  The answers are checked against the repo (lock pieces, `SPLICE_BOT`, the D-012 end date).
 
 ## v0.4.0 — 2026-10-28
 
