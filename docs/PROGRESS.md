@@ -74,6 +74,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-28 · secrets-ci/HU-9 (docs part) · `docs: secrets + CircleCI wrap-up (changelog, progress, CLAUDE.md)` · CHANGELOG v0.4.0 unreleased completed, Blocked and Status updated, CLAUDE.md layout and decrypt rule, README CI-time sections no longer name `ci.yml` in `circleci-only` repos. Not in this commit: base spec updates, replacing the `TODO(hoist-release)` pins (need hoist released), HU-5 and HU-6, action SHA pins (#58 not merged when written).
 - 2026-10-28 · secrets-ci/HU-9 (release) · `release: v0.4.0 — pin hoist v0.3.0 secrets action` · hoist secrets@24b2dcb (v0.3.0) in preview-deploy and deploy, preview-deploy passes `workflow-run-path`, splice 0.3.1 pinned, CHANGELOG dated; 936 tests pass, 12 combos dogfooded.
 - 2026-10-29 · start-checklist · `feat: project-start checklist and the ready check` · docs/start-checklist.md (11 items, shared ids with scripts/ready.mjs, tested); base `ready` skill; template-rust not covered yet.
+- 2026-10-29 · onboarding · `feat(ready): onboarding questions decide optional checklist items` · 7 questions (forms), seed docs/agents/onboarding.toml, ask/skipped statuses; hoist and bosun facts fill the checklist TODOs.
 
 ## Measurements
 

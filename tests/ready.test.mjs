@@ -12,14 +12,61 @@ const SCRIPT = fileURLToPath(
   new URL("../template/pieces/base/files/scripts/ready.mjs", import.meta.url),
 );
 const DOC = fileURLToPath(new URL("../docs/start-checklist.md", import.meta.url));
-const { ITEMS, checklistUrl, requiredEnvironments, runChecks, report } = await import(SCRIPT);
+const { ITEMS, QUESTIONS, checklistUrl, readAnswers, requiredEnvironments, runChecks, report } =
+  await import(SCRIPT);
 
-/** Checklist items in doc order: `<a id="x"></a>` then a heading ending `· ready: auto|manual`. */
+/** Doc items: `<a id="x"></a>`, then `### N. Title · where · ready: kind · required|optional: q`. */
 function docItems(text) {
   const re =
-    /^<a id="([a-z-]+)"><\/a>\n\n### \d+\. .+ · (phone|computer) · ready: (auto|manual)$/gm;
-  return [...text.matchAll(re)].map((m) => ({ id: m[1], where: m[2], kind: m[3] }));
+    /^<a id="([a-z-]+)"><\/a>\n\n### \d+\. .+ · (phone|computer) · ready: (auto|manual) · (required|optional: [a-z_]+)$/gm;
+  return [...text.matchAll(re)].map((m) => ({ id: m[1], where: m[2], kind: m[3], need: m[4] }));
 }
+
+/** Rows of the doc's onboarding table: | `id` | question | `v1`, `v2` | `item`, ... | */
+function docQuestions(text) {
+  const re = /^\| `([a-z_]+)` +\| ([^|]+) \| ([^|]+) \| ([^|]+) \|$/gm;
+  const ticks = (cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+  return [...text.matchAll(re)].map((m) => ({
+    id: m[1],
+    question: m[2].trim(),
+    values: ticks(m[3]),
+    items: ticks(m[4]),
+  }));
+}
+
+test("onboarding questions: doc table = QUESTIONS (ids, text, option values, gated items)", () => {
+  assert.deepEqual(
+    docQuestions(readFileSync(DOC, "utf8")),
+    QUESTIONS.map((q) => ({
+      id: q.id,
+      question: q.question,
+      values: q.options.map((o) => o.value),
+      items: q.items,
+    })),
+  );
+});
+
+test("an item is optional exactly when a question can turn it off, and the doc names it", () => {
+  const doc = Object.fromEntries(docItems(readFileSync(DOC, "utf8")).map((d) => [d.id, d.need]));
+  for (const i of ITEMS) {
+    const q = QUESTIONS.find((x) => x.items.includes(i.id) && x.off?.length);
+    assert.equal(doc[i.id], q ? `optional: ${q.id}` : "required", i.id);
+  }
+});
+
+test("questions fit AskUserQuestion: 2-4 options, header <= 12, gated items exist", () => {
+  for (const q of QUESTIONS) {
+    assert.ok(q.options.length >= 2 && q.options.length <= 4, q.id);
+    assert.ok(q.header.length <= 12, q.id);
+    assert.ok(q.question.endsWith("?"), q.id);
+    for (const o of q.options) assert.ok(o.description.length > 10, `${q.id}.${o.value}`);
+    for (const id of q.items)
+      assert.ok(
+        ITEMS.some((i) => i.id === id),
+        `${q.id} -> ${id}`,
+      );
+  }
+});
 
 test("checklist doc and ready.mjs list the same items, in order, with the same kind", () => {
   const doc = docItems(readFileSync(DOC, "utf8"));
@@ -123,6 +170,16 @@ const GOOD_GH = {
   "splice check --offline": "ok",
 };
 
+const ANSWERS = `# answers
+pieces = ["web"]
+ci = "github"
+update_bot = "app"
+approvals = "bootstrap"
+apps = ["claude", "renovate", "splice"]
+secrets = "none"
+bosun = "no"
+`;
+
 const readyRepo = async () => {
   const d = await mkdtemp(join(tmpdir(), "ready-"));
   await put(d, "package.json", '{"packageManager":"pnpm@12.11.2"}\n');
@@ -133,27 +190,153 @@ const readyRepo = async () => {
     "    environment: release\n    environment: splice-bot\n",
   );
   await put(d, "docs/superpowers/plans/2026-11-01-first.md", "# Plan\n");
+  await put(d, "docs/agents/onboarding.toml", ANSWERS);
   return d;
 };
 
 const byId = (results) => Object.fromEntries(results.map((r) => [r.id, r.status]));
 
-test("a ready repo: every auto item passes, manual items stay manual, exit 0", async () => {
+test("a ready repo: every item passes or is skipped as chosen, exit 0", async () => {
   const root = await readyRepo();
   const results = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0" });
+  const s = byId(results);
   for (const i of ITEMS) {
-    assert.equal(byId(results)[i.id], i.kind === "auto" ? "pass" : "manual", i.id);
+    assert.equal(s[i.id], ["secrets", "bosun"].includes(i.id) ? "skipped" : "pass", i.id);
   }
+  assert.equal(results.find((r) => r.id === "apps").note, "confirmed: claude, renovate, splice");
+  assert.equal(results.find((r) => r.id === "bosun").note, "chosen: no");
   const { text, code } = report(results, "https://x/start-checklist.md");
   assert.equal(code, 0);
-  assert.match(text, /^manual +apps .*\n +fix: .*\n +see: https:\/\/x\/start-checklist\.md#apps$/m);
-  assert.match(text, /confirm every manual item/);
+  assert.match(text, /^skipped +bosun +chosen: no$/m);
+  assert.match(text, /^ready: /m);
+});
+
+test("no answers: question-gated items are `ask`, exit 1; a manual item keeps its link", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", "# no answers yet\n");
+  const results = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0" });
+  const s = byId(results);
+  for (const id of ["render", "apps", "approvals", "secrets", "bosun", "environments"]) {
+    assert.equal(s[id], "ask", id);
+  }
+  assert.equal(s.repo, "pass");
+  const { text, code } = report(results, "https://x/start-checklist.md");
+  assert.equal(code, 1);
+  assert.match(
+    text,
+    /^ask +apps .*`apps`.*\n +fix: .*--questions.*\n +see: https:\/\/x\/start-checklist\.md#apps$/m,
+  );
+});
+
+test("update_bot = session: no splice-bot environment is needed", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace('"app"', '"session"'));
+  const gh = {
+    ...GOOD_GH,
+    "gh api repos/keelstackhq/demo/environments": JSON.stringify({
+      environments: [
+        JSON.parse(GOOD_GH["gh api repos/keelstackhq/demo/environments"]).environments[0],
+      ],
+    }),
+  };
+  assert.equal(byId(runChecks({ root, run: fakeRun(gh), node: "24.0.0" })).environments, "pass");
+});
+
+test("enabled optional items must pass: secrets = hoist needs secrets.toml", async () => {
+  const root = await readyRepo();
+  await put(
+    root,
+    "docs/agents/onboarding.toml",
+    ANSWERS.replace('secrets = "none"', 'secrets = "hoist"'),
+  );
+  const r = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" }).find(
+    (x) => x.id === "secrets",
+  );
+  assert.equal(r.status, "fail");
+  assert.match(r.note, /secrets\.toml/);
+});
+
+test("hand-edited answers: TOML quotes and comments parse; a bad line is `ask`, not a crash", async () => {
+  const root = await readyRepo();
+  const text = ANSWERS.replace('ci = "github"', "ci = 'github' # chosen in chat").replace(
+    'bosun = "no"',
+    "bosun = yes please",
+  );
+  await put(root, "docs/agents/onboarding.toml", text);
+  assert.equal(readAnswers(root).ci, "github");
+  const results = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" });
+  const bosun = results.find((r) => r.id === "bosun");
+  assert.equal(bosun.status, "ask");
+  assert.match(bosun.note, /not a valid answer/);
+  const r = spawnSync(process.execPath, [SCRIPT, "--questions"], { cwd: root, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test("answers checked against the repo: claude App required; files contradicting `none` fail", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace('"claude", ', ""));
+  await put(root, "secrets.toml", "");
+  await put(root, ".bosun/bosun.toml", "");
+  const s = byId(runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" }));
+  assert.equal(s.apps, "fail");
+  assert.equal(s.secrets, "fail");
+  assert.equal(s.bosun, "fail");
+});
+
+test("update_bot = session with bosun = yes still needs splice-bot (bosun uses its token)", async () => {
+  const root = await readyRepo();
+  const text = ANSWERS.replace('"app"', '"session"').replace('bosun = "no"', 'bosun = "yes"');
+  await put(root, "docs/agents/onboarding.toml", text);
+  const gh = {
+    ...GOOD_GH,
+    "gh api repos/keelstackhq/demo/environments": JSON.stringify({
+      environments: [
+        JSON.parse(GOOD_GH["gh api repos/keelstackhq/demo/environments"]).environments[0],
+      ],
+    }),
+  };
+  const r = runChecks({ root, run: fakeRun(gh), node: "24.0.0" }).find(
+    (x) => x.id === "environments",
+  );
+  assert.match(r.note, /splice-bot missing/);
+});
+
+test("--answer: an empty multi-select is recorded as []; an unknown id lists the ids", async () => {
+  const root = await readyRepo();
+  const cli = (...args) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, encoding: "utf8" });
+  assert.equal(cli("--answer", "apps=").status, 0);
+  assert.deepEqual(readAnswers(root).apps, []);
+  const r = cli("--answer", "colour=red");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /unknown question colour; ids: pieces, ci, /);
+});
+
+test("readAnswers parses strings and lists; --answer writes them and --questions shows them", async () => {
+  const root = await readyRepo();
+  assert.deepEqual(readAnswers(root).pieces, ["web"]);
+  assert.equal(readAnswers(root).ci, "github");
+  const cli = (...args) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, encoding: "utf8" });
+  let r = cli("--answer", "bosun=yes", "pieces=web,cli");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readAnswers(root).bosun, "yes");
+  assert.deepEqual(readAnswers(root).pieces, ["web", "cli"]);
+  assert.equal(readAnswers(root).ci, "github", "other answers are kept");
+  r = cli("--answer", "bosun=maybe");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /bosun: maybe is not one of yes, no/);
+  r = cli("--questions");
+  const qs = JSON.parse(r.stdout);
+  assert.equal(qs.length, QUESTIONS.length);
+  assert.deepEqual(qs.find((q) => q.id === "bosun").answer, "yes");
+  assert.equal(qs[0].options[0].recommended, true);
 });
 
 test("missing environment, ruleset, plan and old node fail with a fix; exit 1", async () => {
   const root = await readyRepo();
   await put(root, ".github/workflows/p.yml", "    environment: preview\n");
-  spawnSync("rm", ["-rf", join(root, "docs")]);
+  spawnSync("rm", ["-rf", join(root, "docs/superpowers")]);
   const gh = { ...GOOD_GH, "gh api repos/keelstackhq/demo/rulesets": "[]" };
   const results = runChecks({ root, run: fakeRun(gh), node: "22.1.0" });
   const s = byId(results);
@@ -225,6 +408,8 @@ test("without gh, GitHub items are manual (not a pass); bosun and secrets run wh
   const root = await readyRepo();
   await put(root, ".bosun/bosun.toml", "");
   await put(root, "secrets.toml", "");
+  const yes = ANSWERS.replace('secrets = "none"', 'secrets = "hoist"').replace('"no"', '"yes"');
+  await put(root, "docs/agents/onboarding.toml", yes);
   const run = fakeRun({
     "pnpm --version": "12.0.0",
     "splice --version": "1",
@@ -246,6 +431,8 @@ test("base renders scripts/ready.mjs and the ready skill (owned); AGENTS.md says
   const cls = Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
   assert.equal(cls["scripts/ready.mjs"], "owned");
   assert.equal(cls[".claude/skills/ready/SKILL.md"], "owned");
+  assert.equal(cls["docs/agents/onboarding.toml"], "seed");
+  assert.deepEqual(readAnswers(dir), {}, "rendered with no answers");
   const skill = await readFile(join(dir, ".claude/skills/ready/SKILL.md"), "utf8");
   assert.match(skill, /^---\nname: ready\n/);
   assert.match(skill, /node scripts\/ready\.mjs/);
@@ -256,5 +443,5 @@ test("ready.mjs runs as a script and exits 1 outside a ready repo", async () => 
   const d = await mkdtemp(join(tmpdir(), "ready-"));
   const r = spawnSync(process.execPath, [SCRIPT], { cwd: d, encoding: "utf8", env: { PATH: "" } });
   assert.equal(r.status, 1, r.stderr);
-  assert.match(r.stdout, /^fail +render /m);
+  assert.match(r.stdout, /^ask +render /m);
 });
