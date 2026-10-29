@@ -532,3 +532,15 @@ test("after BOOTSTRAP_END, `owner` (not `bootstrap`) is the recommended approval
     "both",
   );
 });
+
+test("bosun = yes: the plan must be plans/<name>.md (bosun reads only that)", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace('bosun = "no"', 'bosun = "yes"'));
+  await put(root, ".bosun/bosun.toml", "");
+  const plan = () =>
+    runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" }).find((x) => x.id === "plan");
+  assert.equal(plan().status, "fail", "docs/superpowers/plans is not enough with bosun");
+  assert.match(plan().note, /plans\/<name>\.md/);
+  await put(root, "plans/first.md", "# Plan\n");
+  assert.equal(plan().status, "pass");
+});

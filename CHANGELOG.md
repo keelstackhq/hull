@@ -7,6 +7,12 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.5.1 — 2026-10-29
+
+- Start checklist matches bosun 0.3.0: `bosun init` needs `--stack` and `--plan`; the owner
+  merges the bosun setup PR before `hoist apply`. With bosun, `ready` wants the plan in
+  `plans/<name>.md`.
+
 ## v0.5.0 — 2026-10-29
 
 - `docs/start-checklist.md` lists the human steps before autonomous work; base gets the `ready`
