@@ -79,6 +79,7 @@ Files (shared):
 Files (seed):
 
 - `AGENTS.md`
+- `docs/agents/onboarding.toml`
 - `scripts/ci-extra.sh`
 - `README.md`
 - `docs/agents/project.md`

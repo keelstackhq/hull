@@ -11,6 +11,8 @@ Keep `unreleased` while changes accumulate.
 
 - `docs/start-checklist.md` lists the human steps before autonomous work; base gets the `ready`
   skill and `scripts/ready.mjs` (owned) to check them. New repos' `AGENTS.md` says run it first.
+- `ready` starts with onboarding questions (Claude Code forms); answers live in the new seed
+  `docs/agents/onboarding.toml`. Items an answer turns off are `skipped`; unanswered ones `ask`.
 
 ## v0.4.0 — 2026-10-28
 

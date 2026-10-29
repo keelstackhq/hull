@@ -1,0 +1,2 @@
+# Onboarding answers for scripts/ready.mjs; the `ready` skill asks the questions.
+# Seed (splice never overwrites it). Change one: node scripts/ready.mjs --answer id=value
