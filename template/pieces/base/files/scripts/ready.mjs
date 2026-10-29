@@ -367,6 +367,21 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
   });
 }
 
+/** QUESTIONS for the skill, with answers; once bootstrap mode is over, `owner` is recommended. */
+export function questions(answers, today = new Date().toISOString().slice(0, 10)) {
+  return QUESTIONS.map(({ id, header, question, multi, options }) => {
+    const late = id === "approvals" && today > BOOTSTRAP_END;
+    return {
+      id,
+      header,
+      question,
+      multiSelect: Boolean(multi),
+      answer: answers[id] ?? null,
+      options: options.map((o, i) => ({ ...o, recommended: late ? o.value === "owner" : i === 0 })),
+    };
+  });
+}
+
 /** Text report and exit code. */
 export function report(results, url) {
   const lines = [];
@@ -406,15 +421,7 @@ if (isMain()) {
   const root = process.cwd();
   const [flag, ...rest] = process.argv.slice(2);
   if (flag === "--questions") {
-    const answers = readAnswers(root);
-    const qs = QUESTIONS.map(({ id, header, question, multi, options }) => ({
-      id,
-      header,
-      question,
-      multiSelect: Boolean(multi),
-      answer: answers[id] ?? null,
-      options: options.map((o, i) => ({ ...o, recommended: i === 0 })),
-    }));
+    const qs = questions(readAnswers(root));
     process.stdout.write(`${JSON.stringify(qs, null, 2)}\n`);
     process.exit(0);
   }

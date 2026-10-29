@@ -16,6 +16,7 @@ const {
   BOOTSTRAP_END,
   ITEMS,
   QUESTIONS,
+  questions,
   checklistUrl,
   readAnswers,
   requiredEnvironments,
@@ -516,4 +517,18 @@ test("ready.mjs runs as a script and exits 1 outside a ready repo", async () => 
   const r = spawnSync(process.execPath, [SCRIPT], { cwd: d, encoding: "utf8", env: { PATH: "" } });
   assert.equal(r.status, 1, r.stderr);
   assert.match(r.stdout, /^ask +render /m);
+});
+
+test("after BOOTSTRAP_END, `owner` (not `bootstrap`) is the recommended approvals option", () => {
+  const rec = (today) =>
+    questions({}, today)
+      .find((q) => q.id === "approvals")
+      .options.filter((o) => o.recommended)
+      .map((o) => o.value);
+  assert.deepEqual(rec(BOOTSTRAP_END), ["bootstrap"]);
+  assert.deepEqual(rec("2026-12-01"), ["owner"]);
+  assert.deepEqual(
+    questions({ ci: "both" }, "2026-12-01").find((q) => q.id === "ci").answer,
+    "both",
+  );
 });
