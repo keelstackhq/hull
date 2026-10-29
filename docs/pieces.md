@@ -64,6 +64,7 @@ Files (owned):
 - `.github/workflows/splice.yml`
 - `.github/scripts/release-plan.mjs`
 - `scripts/agents-index.mjs`
+- `scripts/ready.mjs`
 - `Cargo.toml`
 - `rust-toolchain.toml`
 - `renovate.json`
