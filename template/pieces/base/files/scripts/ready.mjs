@@ -113,6 +113,15 @@ export const QUESTIONS = [
   },
 ];
 
+/** Pieces each `pieces` answer renders; the lock must list them. */
+const PIECES = {
+  web: ["preact-app", "hono-worker"],
+  site: ["astro-site"],
+  lib: ["ts-lib"],
+  cli: ["rust-cli", "npm-cli"],
+};
+/** Last day of D-012 bootstrap mode (UTC, inclusive). */
+export const BOOTSTRAP_END = "2026-11-30";
 const ANSWERS = "docs/agents/onboarding.toml";
 const HEADER = `# Onboarding answers for scripts/ready.mjs; the \`ready\` skill asks the questions.
 # Seed (splice never overwrites it). Change one: node scripts/ready.mjs --answer id=value
@@ -176,7 +185,7 @@ const manual = (note) => ({ status: "manual", note });
 const ASK_FIX = "Run the `ready` skill: it asks via `node scripts/ready.mjs --questions`.";
 
 /** Run every item. ctx: { root, run(cmd, args) → { ok, out, err }, node: version string }. */
-export function runChecks({ root, run, node }) {
+export function runChecks({ root, run, node, today = new Date().toISOString().slice(0, 10) }) {
   const has = (cmd) => run(cmd, ["--version"]).ok;
   const file = (rel) => existsSync(join(root, rel));
   // gh missing or logged out (the Claude Code web default), or a 401/403: the owner confirms.
@@ -228,6 +237,9 @@ export function runChecks({ root, run, node }) {
     apps() {
       const apps = [].concat(answers.apps);
       if (!apps.includes("claude")) return fail("the Claude App is required");
+      if (answers.secrets === "hoist" && !apps.includes("secrets")) {
+        return fail("secrets = hoist, but secrets read access is not confirmed");
+      }
       if (answers.update_bot === "app" && !apps.includes("splice")) {
         return fail("update bot is a GitHub App, but that App is not installed");
       }
@@ -300,6 +312,16 @@ export function runChecks({ root, run, node }) {
           gaps.push("release has no required reviewer");
         }
       }
+      // Session mode needs SPLICE_BOT=off, or splice.yml runs and auto-creates splice-bot.
+      if (answers.update_bot === "session") {
+        let value;
+        try {
+          value = api("actions/variables/SPLICE_BOT").value;
+        } catch (e) {
+          if (e.manual) throw e;
+        }
+        if (value !== "off") gaps.push("update bot is session, but variable SPLICE_BOT is not off");
+      }
       return gaps.length ? fail(gaps.join("; ")) : pass(names.join(", ") || "none needed");
     },
     secrets: () =>
@@ -307,10 +329,19 @@ export function runChecks({ root, run, node }) {
         ? tool("hoist", "secrets", "check")
         : fail("no secrets.toml: add the secrets piece"),
     bosun: () => (file(".bosun") ? tool("bosun", "doctor") : fail("no .bosun/: run bosun init")),
-    render: () =>
-      file(".splice/lock.toml")
-        ? tool("splice", "check", "--offline")
-        : fail("no .splice/lock.toml"),
+    render() {
+      if (!file(".splice/lock.toml")) return fail("no .splice/lock.toml");
+      const lock = readFileSync(join(root, ".splice/lock.toml"), "utf8");
+      const ids = [...lock.matchAll(/^\[\[pieces\]\]\s*\nid\s*=\s*"([^"]+)"/gm)].map((m) => m[1]);
+      const want = [].concat(answers.pieces).flatMap((p) => PIECES[p]);
+      const missing = want.filter((id) => !ids.includes(id));
+      if (missing.length) return fail(`pieces answer needs ${missing.join(", ")}, not in the lock`);
+      const ci = ids.find((id) => id.startsWith("circleci"));
+      const ciWant = { github: undefined, circleci: "circleci-only", both: "circleci" }[answers.ci];
+      if (ci !== ciWant)
+        return fail(`ci = ${answers.ci}, but the lock has ${ci ?? "no CircleCI piece"}`);
+      return tool("splice", "check", "--offline");
+    },
     plan() {
       const md = (rel) => file(rel) && readdirSync(join(root, rel)).some((n) => n.endsWith(".md"));
       const project = file("docs/agents/project.md")
@@ -321,7 +352,10 @@ export function runChecks({ root, run, node }) {
         ? pass("plan found")
         : fail("no plan or brief");
     },
-    approvals: () => pass(`confirmed: ${answers.approvals}`),
+    approvals: () =>
+      answers.approvals === "bootstrap" && today > BOOTSTRAP_END
+        ? fail(`bootstrap mode ended ${BOOTSTRAP_END} (D-012); pick owner`)
+        : pass(`confirmed: ${answers.approvals}`),
   };
 
   return ITEMS.map((item) => {

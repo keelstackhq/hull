@@ -53,7 +53,8 @@ Configure each App → add the new repo:
 - bosun: no App yet (designed, not built); it uses the Claude App.
 - While hoist is private: hoist → Settings → Actions → Access → the keelstackhq org (once).
 
-Check: the owner's answer to `apps`; with update bot `app`, `splice` must be among them.
+Check: the owner's answer to `apps` includes `claude`, plus `splice` with update bot `app` and
+`secrets` with `secrets` = `hoist`.
 
 <a id="environment"></a>
 
@@ -111,7 +112,7 @@ bot), `preview` (web pieces), `prod` (`secrets` piece); template-rust adds `rele
 TODO(owner): reviewers on `prod` (`preview` and `splice-bot` run unattended, so no reviewer).
 
 Check: each named environment exists; `release` deploys from tag `*-v*` with a required reviewer,
-the others from branch `main`.
+the others from branch `main`. With update bot `session`, variable `SPLICE_BOT` is `off`.
 
 <a id="secrets"></a>
 
@@ -121,9 +122,10 @@ Only when pieces need them. With the `secrets` piece (D-010): the bundles live s
 in a private secrets repo; the owner grants each environment its age key with
 `hoist secrets grant <owner/repo> --env <env>` in the secrets repo (or hull's
 `scripts/owner/bootstrap-secrets.sh`), which sets the environment secret `SOPS_AGE_KEY`; the
-environment must exist first (item 6), and the printed git commands go in as a secrets-repo PR. `secrets.toml` maps `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` from the bundles. Without it: those two are secrets of the `preview` (and
-prod deploy) environment, never repository secrets. Agents never hold age keys or see values.
+environment must exist first (item 6), and the printed git commands go in as a secrets-repo PR.
+`secrets.toml` maps `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the bundles. Without
+it: those two are secrets of the `preview` (and prod deploy) environment, never repository
+secrets. Agents never hold age keys or see values.
 
 Check: with `secrets` = `hoist`, `secrets.toml` exists and `hoist secrets check` passes (the
 owner also runs `hoist secrets check` in the secrets repo, then `--remote` here).
@@ -153,7 +155,8 @@ Ask the first agent to render it, or do it on a computer:
 `pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template <repo> --ref vX.Y.Z --piece <id>[:<name>] ...`
 (base is always rendered), then commit `.splice/lock.toml` with the files and push.
 
-Check: `.splice/lock.toml` exists and `splice check --offline` passes.
+Check: `.splice/lock.toml` lists the pieces the `pieces` and `ci` answers need, and
+`splice check --offline` passes.
 
 <a id="plan"></a>
 
@@ -175,4 +178,4 @@ orchestrator may approve gated PRs itself after green checks and an independent 
 head; environments, tags, releases, decisions merges, branch rules and secrets still need the
 owner (release-environment taps on the phone).
 
-Check: the owner's answer to `approvals`.
+Check: the owner's answer to `approvals`; `bootstrap` fails after 2026-11-30 UTC.

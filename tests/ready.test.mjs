@@ -12,8 +12,16 @@ const SCRIPT = fileURLToPath(
   new URL("../template/pieces/base/files/scripts/ready.mjs", import.meta.url),
 );
 const DOC = fileURLToPath(new URL("../docs/start-checklist.md", import.meta.url));
-const { ITEMS, QUESTIONS, checklistUrl, readAnswers, requiredEnvironments, runChecks, report } =
-  await import(SCRIPT);
+const {
+  BOOTSTRAP_END,
+  ITEMS,
+  QUESTIONS,
+  checklistUrl,
+  readAnswers,
+  requiredEnvironments,
+  runChecks,
+  report,
+} = await import(SCRIPT);
 
 /** Doc items: `<a id="x"></a>`, then `### N. Title · where · ready: kind · required|optional: q`. */
 function docItems(text) {
@@ -165,6 +173,8 @@ const GOOD_GH = {
   }),
   "gh api repos/keelstackhq/demo/environments/splice-bot/deployment-branch-policies":
     JSON.stringify({ branch_policies: [{ name: "main", type: "branch" }] }),
+  "gh api repos/keelstackhq/demo/actions/variables/SPLICE_BOT":
+    '{"name":"SPLICE_BOT","value":"off"}',
   "pnpm --version": "12.11.2\n",
   "splice --version": "splice 0.3.1",
   "splice check --offline": "ok",
@@ -180,10 +190,22 @@ secrets = "none"
 bosun = "no"
 `;
 
+const LOCK = `[template]
+version = "0.5.0"
+
+[[pieces]]
+id = "preact-app"
+name = "web"
+
+[[pieces]]
+id = "hono-worker"
+name = "api"
+`;
+
 const readyRepo = async () => {
   const d = await mkdtemp(join(tmpdir(), "ready-"));
   await put(d, "package.json", '{"packageManager":"pnpm@12.11.2"}\n');
-  await put(d, ".splice/lock.toml", '[template]\nversion = "0.5.0"\n');
+  await put(d, ".splice/lock.toml", LOCK);
   await put(
     d,
     ".github/workflows/r.yml",
@@ -310,6 +332,56 @@ test("--answer: an empty multi-select is recorded as []; an unknown id lists the
   const r = cli("--answer", "colour=red");
   assert.equal(r.status, 2);
   assert.match(r.stderr, /unknown question colour; ids: pieces, ci, /);
+});
+
+test("pieces and ci answers must match the lock", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace('["web"]', '["web", "cli"]'));
+  let r = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" }).find((x) => x.id === "render");
+  assert.equal(r.status, "fail");
+  assert.match(r.note, /rust-cli, npm-cli/);
+  await put(root, "docs/agents/onboarding.toml", ANSWERS);
+  await put(root, ".splice/lock.toml", `${LOCK}\n[[pieces]]\nid = "circleci"\n`);
+  r = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" }).find((x) => x.id === "render");
+  assert.equal(r.status, "fail");
+  assert.match(r.note, /ci = github, but the lock has circleci/);
+});
+
+test("update_bot = session needs SPLICE_BOT=off; 403 is manual", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace('"app"', '"session"'));
+  const VAR = "gh api repos/keelstackhq/demo/actions/variables/SPLICE_BOT";
+  const env = (gh, errs) =>
+    runChecks({ root, run: fakeRun(gh, errs), node: "24.0.0" }).find(
+      (x) => x.id === "environments",
+    );
+  assert.equal(env(GOOD_GH).status, "pass");
+  const on = env({ ...GOOD_GH, [VAR]: '{"name":"SPLICE_BOT","value":"on"}' });
+  assert.equal(on.status, "fail");
+  assert.match(on.note, /SPLICE_BOT/);
+  assert.equal(env(GOOD_GH, { [VAR]: "gh: Not Found (HTTP 404)" }).status, "fail");
+  assert.equal(env(GOOD_GH, { [VAR]: "gh: Forbidden (HTTP 403)" }).status, "manual");
+});
+
+test("approvals = bootstrap fails after BOOTSTRAP_END; secrets = hoist needs the secrets App", async () => {
+  const root = await readyRepo();
+  const approvals = (today) =>
+    runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0", today }).find(
+      (x) => x.id === "approvals",
+    );
+  assert.equal(BOOTSTRAP_END, "2026-11-30");
+  assert.equal(approvals("2026-11-30").status, "pass");
+  assert.equal(approvals("2026-12-01").status, "fail");
+  await put(
+    root,
+    "docs/agents/onboarding.toml",
+    ANSWERS.replace('secrets = "none"', 'secrets = "hoist"'),
+  );
+  const apps = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.0.0" }).find(
+    (x) => x.id === "apps",
+  );
+  assert.equal(apps.status, "fail");
+  assert.match(apps.note, /secrets read/);
 });
 
 test("readAnswers parses strings and lists; --answer writes them and --questions shows them", async () => {
