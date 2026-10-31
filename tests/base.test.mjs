@@ -41,7 +41,7 @@ test("catalog pins exact versions from the spec", async () => {
   assert.equal(ws.minimumReleaseAge, 4320);
   // Young pins go here as exact name@version entries (never ranges), dropped once 3 days old.
   for (const e of ws.minimumReleaseAgeExclude ?? []) assert.match(e, /^.+@\d+\.\d+\.\d+$/, e);
-  assert.deepEqual(ws.minimumReleaseAgeExclude, ["@keelstackhq/docspack@0.1.1"]);
+  assert.equal(ws.minimumReleaseAgeExclude, undefined, "no young pins today");
   assert.deepEqual(ws.allowBuilds, { esbuild: true, workerd: true, sharp: true });
   assert.equal(ws.peerDependencyRules.allowedVersions["storybook>vite-plus"], "1");
   assert.equal(ws.peerDependencyRules.allowedVersions.vite, "1");

@@ -52,6 +52,3 @@ minimumReleaseAge: 4320
 
 # A pin younger than 3 days at render time needs an exact `name@version` entry under
 # `minimumReleaseAgeExclude` (never a range), dropped once the version is 3 days old.
-minimumReleaseAgeExclude:
-  # docs pack in docs/packs.json; remove after 2026-10-31, when 0.1.1 is 3 days old
-  - "@keelstackhq/docspack@0.1.1"
