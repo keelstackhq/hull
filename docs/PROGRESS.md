@@ -77,6 +77,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-29 · onboarding · `feat(ready): onboarding questions decide optional checklist items` · 7 questions (forms), seed docs/agents/onboarding.toml, ask/skipped statuses; hoist and bosun facts fill the checklist TODOs.
 - 2026-10-29 · release · `release: v0.5.0 — start checklist, ready and onboarding` · CHANGELOG dated; after D-012's end date `owner` is the recommended approvals answer.
 - 2026-10-29 · bosun 0.3.0 · `fix: start checklist matches bosun 0.3.0` · item 8 order and `bosun init --stack --plan`, keelstack greenfield-bosun link; item 10 and `ready` want `plans/<name>.md` with bosun; CHANGELOG v0.5.1.
+- 2026-10-31 · docspack age · `chore: drop the docspack 0.1.1 release-age exclude` · `npm view` 2026-10-31T07:02Z: 0.1.1 published 2026-10-28T06:32Z, past the 3-day gate; base `pnpm-workspace.yaml` has no `minimumReleaseAgeExclude` now.
 
 ## Measurements
 
@@ -133,8 +134,6 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - circleci-only repos with tauri-app (consumer step, also in the generated `AGENTS.md`): CircleCI Project Settings → Triggers → add a weekly scheduled trigger on branch `main` for the desktop builds.
 
 - splice release that stops passing token variables to post hooks (cross-repo). Action: after it is out, repin `keelstackhq/splice/action` in `splice.yml` of hull, `template/` and `template-rust/` to that release's SHA.
-
-- Agent follow-up after 2026-10-31: drop the `@keelstackhq/docspack@0.1.1` `minimumReleaseAgeExclude` from base `pnpm-workspace.yaml` and its assertion in `tests/base.test.mjs` (published 2026-10-28, the 3-day gate has then passed).
 
 
 ## Status
