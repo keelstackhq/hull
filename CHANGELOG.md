@@ -7,8 +7,12 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.5.2 — unreleased
+## v0.5.2 — 2026-11-01
 
+- Start checklist targets bosun 0.4.0 (`@keelstackhq/bosun@0.4.0`, tag `v0.4.0` = `7eb2fa4`):
+  the first plan goes in through `bosun init --plan`, amendments with `bosun plan pr`; `allow:` is
+  optional; agents enable auto-merge at PR open, the owner merges by hand only when GitHub says
+  the PR is already clean.
 - template-rust ships `ready` too (skill, `scripts/ready.mjs`, seed `docs/agents/onboarding.toml`),
   generated from template/ by `scripts/sync-shared.mjs`; its `cli` answer means `rust-cli` only.
 - New template-rust onboarding question `release` (default no): with no, the release environments
