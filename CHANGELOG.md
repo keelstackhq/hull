@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.5.2 — unreleased
+## v0.5.2 — 2026-11-01
 
 - template-rust ships `ready` too (skill, `scripts/ready.mjs`, seed `docs/agents/onboarding.toml`),
   generated from template/ by `scripts/sync-shared.mjs`; its `cli` answer means `rust-cli` only.
