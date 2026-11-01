@@ -13,22 +13,23 @@ here, at the hull tag the repo was rendered from. Agents start autonomous work o
 recommended default) and records the answers in `docs/agents/onboarding.toml` (seed). An item is
 `ask` until its questions are answered, and `skipped (chosen: …)` when an answer turns it off.
 
-| Question     | Asks                                               | Options (first = recommended)             | Decides items  | Templates       |
-| ------------ | -------------------------------------------------- | ----------------------------------------- | -------------- | --------------- |
-| `pieces`     | What will this repo hold?                          | `web`, `site`, `cli`, `lib`               | `render`       | both            |
-| `ci`         | Which CI provider runs ci-ok?                      | `github`, `circleci`, `both`              | `render`       | both            |
-| `update_bot` | Who opens the weekly splice update PRs?            | `app`, `pat`, `session`                   | `environments` | both            |
-| `approvals`  | How are gated PRs approved?                        | `bootstrap`, `owner`                      | `approvals`    | both            |
-| `apps`       | Which GitHub Apps are installed on the repo?       | `claude`, `renovate`, `splice`, `secrets` | `apps`         | both            |
-| `release`    | Will this repo publish releases?                   | `no`, `yes`                               | `environments` | `template-rust` |
-| `secrets`    | Does the repo need secrets, such as deploy tokens? | `hoist`, `none`                           | `secrets`      | `template`      |
-| `bosun`      | Adopt bosun governance now?                        | `yes`, `no`                               | `bosun`        | both            |
+| Question     | Asks                                               | Options (first = recommended)                        | Decides items  | Templates       |
+| ------------ | -------------------------------------------------- | ---------------------------------------------------- | -------------- | --------------- |
+| `pieces`     | What will this repo hold?                          | `web`, `site`, `cli`, `lib`                          | `render`       | both            |
+| `ci`         | Which CI provider runs ci-ok?                      | `github`, `circleci`, `both`                         | `render`       | both            |
+| `update_bot` | Who opens the weekly splice update PRs?            | `app`, `pat`, `session`                              | `environments` | both            |
+| `approvals`  | How are gated PRs approved?                        | `bootstrap`, `owner`                                 | `approvals`    | both            |
+| `apps`       | Which GitHub Apps are installed on the repo?       | `claude`, `renovate`, `splice`, `secrets`, `release` | `apps`         | both            |
+| `release`    | Will this repo publish releases?                   | `no`, `yes`                                          | `environments` | `template-rust` |
+| `secrets`    | Does the repo need secrets, such as deploy tokens? | `hoist`, `none`                                      | `secrets`      | `template`      |
+| `bosun`      | Adopt bosun governance now?                        | `yes`, `no`                                          | `bosun`        | both            |
 
 In `template-rust`, `pieces` offers only `cli` (`rust-cli`) and `lib` (library crates), `apps`
-has no `secrets` option, and there is no `secrets` question (no secrets piece: that item is
-skipped). `release` is asked only there, because its `release.yml` publishes only with
-`HOIST_RELEASE=enabled`: with `no`, the `release` and `release-pr` environments and the release App
-are not needed yet, and `HOIST_RELEASE` must not be `enabled`. The `release-tags` ruleset stays
+offers `release` instead of `secrets` (template/ the other way round), and there is no `secrets`
+question (no secrets piece: that item is skipped, and a `secrets.toml` fails). `release` is asked
+only there, because its `release.yml` publishes only with `HOIST_RELEASE=enabled`: with `no`, the
+`release` and `release-pr` environments and the release App are not needed yet, and
+`HOIST_RELEASE` must not be `enabled`. The `release-tags` ruleset stays
 required in every repo (spec §0 P2): `template/` runs `release.yml` on every `*-v*` tag push.
 
 <a id="repo"></a>
@@ -63,8 +64,8 @@ Configure each App → add the new repo:
 - bosun: no App yet (designed, not built); it uses the Claude App.
 - While hoist is private: hoist → Settings → Actions → Access → the keelstackhq org (once).
 
-Check: the owner's answer to `apps` includes `claude`, plus `splice` with update bot `app` and
-`secrets` with `secrets` = `hoist`.
+Check: the owner's answer to `apps` includes `claude`, plus `splice` with update bot `app`,
+`secrets` with `secrets` = `hoist`, and `release` with `release` = `yes` (template-rust).
 
 <a id="environment"></a>
 
@@ -116,14 +117,16 @@ Check: the rules on `main` require `ci-ok`; an active tag ruleset `release-tags`
 
 Create every environment the rendered workflows name (`environment:` in `.github/workflows/`),
 before their first run: a first run would auto-create an unprotected one. Deployment branches and
-tags = Selected: `release` (`release.yml` runs on tag pushes; in template-rust only with
-`release` = `yes`) gets the tag rule `*-v*` and the owner as required reviewer (D-008); every other
-one gets branch `main`: `splice-bot` (update bot), `preview` (web pieces), `prod` (`secrets`
-piece); template-rust adds `release-pr` (only with `release` = `yes`).
+tags = Selected. `release` gets the owner as required reviewer (D-008) and, in `template/` (its
+`release.yml` runs on tag pushes), the tag rule `*-v*`; in template-rust (only with `release` =
+`yes`; its `publish` job runs on push to main) branch `main`. Every other one gets branch `main`:
+`splice-bot` (update bot), `preview` (web pieces), `prod` (`secrets` piece), and in template-rust
+`release-pr` (only with `release` = `yes`).
 TODO(owner): reviewers on `prod` (`preview` and `splice-bot` run unattended, so no reviewer).
 
-Check: each named environment exists; `release` deploys from tag `*-v*` with a required reviewer,
-the others from branch `main`. With update bot `session`, variable `SPLICE_BOT` is `off`.
+Check: each named environment exists; `release` has a required reviewer and deploys from tag
+`*-v*` (template/) or branch `main` (template-rust); the others deploy from branch `main`. With
+update bot `session`, variable `SPLICE_BOT` is `off`.
 
 <a id="secrets"></a>
 

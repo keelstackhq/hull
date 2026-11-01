@@ -67,9 +67,13 @@ test("an item is optional exactly when a question can turn it off, and the doc n
   }
 });
 
-test("questions fit AskUserQuestion: 2-4 options, header <= 12, gated items exist", () => {
+test("questions fit AskUserQuestion: 2-4 options per template, header <= 12, gated items exist", () => {
+  for (const t of TEMPLATES) {
+    for (const q of questions({}, "2026-11-01", t)) {
+      assert.ok(q.options.length >= 2 && q.options.length <= 4, `${t} ${q.id}`);
+    }
+  }
   for (const q of QUESTIONS) {
-    assert.ok(q.options.length >= 2 && q.options.length <= 4, q.id);
     assert.ok(q.header.length <= 12, q.id);
     assert.ok(q.question.endsWith("?"), q.id);
     for (const o of q.options) assert.ok(o.description.length > 10, `${q.id}.${o.value}`);
@@ -681,4 +685,63 @@ test("template-rust CLI: --questions has no secrets; --answer rejects web and se
   assert.equal(cli("--answer", "pieces=web").status, 2);
   assert.equal(cli("--answer", "secrets=none").status, 2);
   assert.equal(cli("--answer", "pieces=cli", "release=no").status, 0);
+});
+
+test("template-rust release = yes: release deploys from branch main with a reviewer; App required", async () => {
+  const root = await rustRepo();
+  await put(
+    root,
+    ".github/workflows/rel.yml",
+    "    environment: release\n    environment: release-pr\n",
+  );
+  const answers = (await readFile(join(root, "docs/agents/onboarding.toml"), "utf8")).replace(
+    '["claude", "renovate", "splice"]',
+    '["claude", "renovate", "splice", "release"]',
+  );
+  await put(root, "docs/agents/onboarding.toml", answers);
+  const envs = (release) =>
+    JSON.stringify({
+      environments: [
+        {
+          name: "release",
+          deployment_branch_policy: { custom_branch_policies: true },
+          protection_rules: release,
+        },
+        {
+          name: "release-pr",
+          deployment_branch_policy: { custom_branch_policies: true },
+          protection_rules: [],
+        },
+        JSON.parse(GOOD_GH["gh api repos/keelstackhq/demo/environments"]).environments[1],
+      ],
+    });
+  const main = JSON.stringify({ branch_policies: [{ name: "main", type: "branch" }] });
+  const gh = (release, releasePolicy = main) => ({
+    "gh api repos/keelstackhq/demo/environments": envs(release),
+    "gh api repos/keelstackhq/demo/environments/release/deployment-branch-policies": releasePolicy,
+    "gh api repos/keelstackhq/demo/environments/release-pr/deployment-branch-policies": main,
+  });
+  const check = (extra, id) =>
+    runChecks({ root, run: rustRun(extra), node: "24.0.0" }).find((x) => x.id === id);
+  assert.equal(check(gh([{ type: "required_reviewers" }]), "environments").status, "pass");
+  const noReviewer = check(gh([]), "environments");
+  assert.equal(noReviewer.status, "fail");
+  assert.match(noReviewer.note, /release has no required reviewer/);
+  const tagOnly = JSON.stringify({ branch_policies: [{ name: "*-v*", type: "tag" }] });
+  assert.match(
+    check(gh([{ type: "required_reviewers" }], tagOnly), "environments").note,
+    /release does not deploy from branch main/,
+  );
+  await put(root, "docs/agents/onboarding.toml", answers.replace(', "release"]', "]"));
+  const apps = check(gh([{ type: "required_reviewers" }]), "apps");
+  assert.equal(apps.status, "fail");
+  assert.match(apps.note, /release App/);
+});
+
+test("template-rust: a secrets.toml fails (no secrets piece) instead of being skipped", async () => {
+  const root = await rustRepo();
+  await put(root, "secrets.toml", "");
+  const r = runChecks({ root, run: rustRun(), node: "24.0.0" }).find((x) => x.id === "secrets");
+  assert.equal(r.status, "fail");
+  assert.match(r.note, /secrets\.toml/);
 });

@@ -89,6 +89,9 @@ export const QUESTIONS = [
       opt("secrets", "Secrets read", "Repo added to the SECRETS_READ_APP_* org settings", [
         "template",
       ]),
+      opt("release", "Release App", "hoist's release App (HOIST_RELEASE_APP_*), for releases", [
+        "template-rust",
+      ]),
     ],
   },
   {
@@ -140,7 +143,10 @@ const PIECES = {
   "template-rust": { lib: [], cli: ["rust-cli"] },
 };
 
-/** The hull template this repo was rendered from: the lock's source, else no package.json. */
+/**
+ * The hull template this repo was rendered from: the lock's source (written by splice, trusted),
+ * else no package.json.
+ */
 export function profileOf(root) {
   let source = "";
   try {
@@ -249,6 +255,9 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
   /** ask when a gating question is unanswered; skipped when an answer turns the item off. */
   const gate = (id) => {
     const absent = QUESTIONS.find((x) => x.items.includes(id) && x.off && !inProfile(x, profile));
+    if (absent && absent.present && file(absent.present)) {
+      return fail(`${absent.present} exists, but ${profile} has no ${absent.id} piece`);
+    }
     if (absent) return { status: "skipped", note: `no ${absent.id} piece in ${profile}` };
     for (const q of questionsOf(profile).filter((x) => x.items.includes(id))) {
       const a = answers[q.id];
@@ -281,6 +290,9 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       if (!apps.includes("claude")) return fail("the Claude App is required");
       if (answers.secrets === "hoist" && !apps.includes("secrets")) {
         return fail("secrets = hoist, but secrets read access is not confirmed");
+      }
+      if (profile === "template-rust" && answers.release === "yes" && !apps.includes("release")) {
+        return fail("release = yes, but the release App is not confirmed");
       }
       if (answers.update_bot === "app" && !apps.includes("splice")) {
         return fail("update bot is a GitHub App, but that App is not installed");
@@ -351,8 +363,10 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       );
       for (const name of names) {
         const e = have.get(name);
-        // release.yml runs on `*-v*` tag pushes; every other environment deploys from main.
-        const [type, ref] = name === "release" ? ["tag", "*-v*"] : ["branch", "main"];
+        // template/'s release.yml runs on `*-v*` tag pushes; template-rust's publish job runs on
+        // push to main. Every other environment deploys from main.
+        const tagged = name === "release" && profile === "template";
+        const [type, ref] = tagged ? ["tag", "*-v*"] : ["branch", "main"];
         const custom = e?.deployment_branch_policy?.custom_branch_policies;
         const policies = custom
           ? api(`environments/${name}/deployment-branch-policies`).branch_policies
