@@ -148,9 +148,12 @@ owner also runs `hoist secrets check` in the secrets repo, then `--remote` here)
 
 ### 8. Set up bosun · computer · ready: auto · optional: bosun
 
-Only with `bosun` = `yes`; walkthrough: https://keelstack.dev/docs/greenfield-bosun/. In order:
+Only with `bosun` = `yes`, using bosun 0.4.0 (npm `@keelstackhq/bosun@0.4.0`, tag `v0.4.0` =
+`7eb2fa46b25c1cb9de34867a86c7bff29421ca54`); walkthrough:
+https://keelstack.dev/docs/greenfield-bosun/. In order:
 
-1. Write the plan first: the agent turns the brief (item 10) into `plans/<name>.md`.
+1. Write the plan first: the agent turns the brief (item 10) into `plans/<name>.md`, with its
+   `allow:` entries, and runs `bosun plan pr`.
    `bosun init --stack rust|ts-pnpm --plan <file> --owner <login>` (`--stack` is required) opens
    the setup PR with the channel files; fill `governance/owners.toml`.
 2. The owner approves the setup PR's head (the Claude Code form; `/bosun approve <sha>` as the
@@ -163,7 +166,8 @@ Only with `bosun` = `yes`; walkthrough: https://keelstack.dev/docs/greenfield-bo
 
 Optional: `.bosun/approvers.toml` with the orchestrator's public key (role owner), enrolled by an
 R-gov PR the owner approves on GitHub; after that, approvals go through the Claude Code form.
-Bootstrap mode needs bosun ≥ 0.3.0 pinned.
+From then on, agents enable auto-merge when they open a PR; the owner merges by hand only when
+GitHub says the PR is already clean.
 
 Check: with `bosun` = `yes`, `bosun doctor` passes (the owner also runs `bosun doctor --remote`).
 
@@ -185,8 +189,8 @@ Check: `.splice/lock.toml` lists the pieces the `pieces` and `ci` answers need, 
 Send the brief in chat. The agent writes it as a spec in `docs/superpowers/specs/` and a plan in
 `docs/superpowers/plans/`, or, for a small project, as a `## Steps` list in
 `docs/agents/project.md`. Plans end with an owner-steps section (D-009). With `bosun` = `yes`, the
-plan goes in `plans/<name>.md` in bosun's plan format (bosun reads only that); the product spec
-stays in `docs/superpowers/specs/`.
+plan goes in `plans/<name>.md` in bosun's plan format, with `allow:` entries (bosun reads only
+that), submitted with `bosun plan pr`; the product spec stays in `docs/superpowers/specs/`.
 
 Check: a `.md` file in either directory, or a `## Steps` list in `docs/agents/project.md`; with
 `bosun` = `yes`, a `plans/<name>.md`.
