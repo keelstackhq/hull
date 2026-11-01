@@ -26,7 +26,9 @@ export const ITEMS = [
   item("approvals", "auto", "Confirm with the owner how approvals reach agents (D-012)."),
 ];
 
-const opt = (value, label, description) => ({ value, label, description });
+/** hull templates; a question or option without `templates` is in both. */
+export const TEMPLATES = ["template", "template-rust"];
+const opt = (value, label, description, templates) => ({ value, label, description, templates });
 /** Asked by the `ready` skill. The first option is the recommended default; `off` skips `items`. */
 export const QUESTIONS = [
   {
@@ -36,10 +38,10 @@ export const QUESTIONS = [
     items: ["render"],
     question: "What will this repo hold?",
     options: [
-      opt("web", "Web app", "preact-app with a hono-worker API, deployed to Cloudflare"),
-      opt("site", "Static site", "astro-site with Preact islands"),
-      opt("lib", "Library", "ts-lib: a publishable ESM package"),
-      opt("cli", "CLI", "rust-cli with an npm-cli launcher"),
+      opt("web", "Web app", "preact-app with a hono-worker API, on Cloudflare", ["template"]),
+      opt("site", "Static site", "astro-site with Preact islands", ["template"]),
+      opt("cli", "CLI", "rust-cli (with an npm-cli launcher in template/)"),
+      opt("lib", "Library", "ts-lib in template/; library crates only in template-rust"),
     ],
   },
   {
@@ -84,12 +86,29 @@ export const QUESTIONS = [
       opt("claude", "Claude", "Required: agents push branches and open PRs"),
       opt("renovate", "Renovate", "Dependency PRs from the hull Renovate preset"),
       opt("splice", "Update bot App", "Needed when the update bot is a GitHub App"),
-      opt("secrets", "Secrets read", "Repo added to the SECRETS_READ_APP_* org settings"),
+      opt("secrets", "Secrets read", "Repo added to the SECRETS_READ_APP_* org settings", [
+        "template",
+      ]),
+      opt("release", "Release App", "hoist's release App (HOIST_RELEASE_APP_*), for releases", [
+        "template-rust",
+      ]),
+    ],
+  },
+  {
+    id: "release",
+    header: "Release",
+    templates: ["template-rust"],
+    items: ["environments"],
+    question: "Will this repo publish releases?",
+    options: [
+      opt("no", "Not yet", "HOIST_RELEASE stays off: no release environments or release App yet"),
+      opt("yes", "Yes", "hoist releases: release and release-pr environments, the release App"),
     ],
   },
   {
     id: "secrets",
     header: "Secrets",
+    templates: ["template"],
     items: ["secrets"],
     off: ["none"],
     present: "secrets.toml",
@@ -113,13 +132,39 @@ export const QUESTIONS = [
   },
 ];
 
-/** Pieces each `pieces` answer renders; the lock must list them. */
+/** Pieces each `pieces` answer renders, per template; the lock must list them. */
 const PIECES = {
-  web: ["preact-app", "hono-worker"],
-  site: ["astro-site"],
-  lib: ["ts-lib"],
-  cli: ["rust-cli", "npm-cli"],
+  template: {
+    web: ["preact-app", "hono-worker"],
+    site: ["astro-site"],
+    lib: ["ts-lib"],
+    cli: ["rust-cli", "npm-cli"],
+  },
+  "template-rust": { lib: [], cli: ["rust-cli"] },
 };
+
+/**
+ * The hull template this repo was rendered from: the lock's source (written by splice, trusted),
+ * else no package.json.
+ */
+export function profileOf(root) {
+  let source = "";
+  try {
+    source =
+      /^source\s*=\s*"([^"]*)"/m.exec(readFileSync(join(root, ".splice/lock.toml"), "utf8"))?.[1] ??
+      "";
+  } catch {}
+  if (source) return source.endsWith("//template-rust") ? "template-rust" : "template";
+  return existsSync(join(root, "package.json")) ? "template" : "template-rust";
+}
+
+/** The questions and options of one template. */
+const inProfile = (x, profile) => !x.templates || x.templates.includes(profile);
+const questionsOf = (profile) =>
+  QUESTIONS.filter((q) => inProfile(q, profile)).map((q) => ({
+    ...q,
+    options: q.options.filter((o) => inProfile(o, profile)),
+  }));
 /** Last day of D-012 bootstrap mode (UTC, inclusive). */
 export const BOOTSTRAP_END = "2026-11-30";
 const ANSWERS = "docs/agents/onboarding.toml";
@@ -206,9 +251,15 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
     return r.ok ? pass(label) : fail((r.err || r.out).trim().split("\n")[0] || `${label} failed`);
   };
   const answers = readAnswers(root);
+  const profile = profileOf(root);
   /** ask when a gating question is unanswered; skipped when an answer turns the item off. */
   const gate = (id) => {
-    for (const q of QUESTIONS.filter((x) => x.items.includes(id))) {
+    const absent = QUESTIONS.find((x) => x.items.includes(id) && x.off && !inProfile(x, profile));
+    if (absent && absent.present && file(absent.present)) {
+      return fail(`${absent.present} exists, but ${profile} has no ${absent.id} piece`);
+    }
+    if (absent) return { status: "skipped", note: `no ${absent.id} piece in ${profile}` };
+    for (const q of questionsOf(profile).filter((x) => x.items.includes(id))) {
       const a = answers[q.id];
       if (a === undefined)
         return { status: "ask", note: `answer question \`${q.id}\``, fix: ASK_FIX };
@@ -240,6 +291,9 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       if (answers.secrets === "hoist" && !apps.includes("secrets")) {
         return fail("secrets = hoist, but secrets read access is not confirmed");
       }
+      if (profile === "template-rust" && answers.release === "yes" && !apps.includes("release")) {
+        return fail("release = yes, but the release App is not confirmed");
+      }
       if (answers.update_bot === "app" && !apps.includes("splice")) {
         return fail("update bot is a GitHub App, but that App is not installed");
       }
@@ -251,8 +305,8 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       const want = /pnpm@(\d+)/.exec(
         file("package.json") ? readFileSync(join(root, "package.json"), "utf8") : "",
       );
-      const pnpm = run("pnpm", ["--version"]);
-      if (!pnpm.ok || (want && pnpm.out.trim().split(".")[0] !== want[1]))
+      const pnpm = file("package.json") && run("pnpm", ["--version"]);
+      if (pnpm && (!pnpm.ok || (want && pnpm.out.trim().split(".")[0] !== want[1])))
         missing.push(`pnpm ${want?.[1] ?? ""}`.trim());
       const tools = [
         ["splice", true],
@@ -291,13 +345,28 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       if (!repo) return noRepo();
       const have = new Map(api("environments").environments.map((e) => [e.name, e]));
       const gaps = [];
+      // template-rust releases only run with HOIST_RELEASE=enabled (release.yml's gate).
+      const noRelease = profile === "template-rust" && answers.release === "no";
+      if (noRelease) {
+        let value;
+        try {
+          value = api("actions/variables/HOIST_RELEASE").value;
+        } catch (e) {
+          if (e.manual) throw e;
+        }
+        if (value === "enabled") gaps.push("release = no, but variable HOIST_RELEASE is enabled");
+      }
       // Session mode skips the update job, but bosun still uses splice-bot's token.
       const session = answers.update_bot === "session" && answers.bosun !== "yes";
-      const names = requiredEnvironments(root).filter((n) => !(session && n === "splice-bot"));
+      const names = requiredEnvironments(root).filter(
+        (n) => !(session && n === "splice-bot") && !(noRelease && /^release/.test(n)),
+      );
       for (const name of names) {
         const e = have.get(name);
-        // release.yml runs on `*-v*` tag pushes; every other environment deploys from main.
-        const [type, ref] = name === "release" ? ["tag", "*-v*"] : ["branch", "main"];
+        // template/'s release.yml runs on `*-v*` tag pushes; template-rust's publish job runs on
+        // push to main. Every other environment deploys from main.
+        const tagged = name === "release" && profile === "template";
+        const [type, ref] = tagged ? ["tag", "*-v*"] : ["branch", "main"];
         const custom = e?.deployment_branch_policy?.custom_branch_policies;
         const policies = custom
           ? api(`environments/${name}/deployment-branch-policies`).branch_policies
@@ -333,7 +402,7 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       if (!file(".splice/lock.toml")) return fail("no .splice/lock.toml");
       const lock = readFileSync(join(root, ".splice/lock.toml"), "utf8");
       const ids = [...lock.matchAll(/^\[\[pieces\]\]\s*\nid\s*=\s*"([^"]+)"/gm)].map((m) => m[1]);
-      const want = [].concat(answers.pieces).flatMap((p) => PIECES[p]);
+      const want = [].concat(answers.pieces).flatMap((p) => PIECES[profile][p] ?? []);
       const missing = want.filter((id) => !ids.includes(id));
       if (missing.length) return fail(`pieces answer needs ${missing.join(", ")}, not in the lock`);
       const ci = ids.find((id) => id.startsWith("circleci"));
@@ -372,8 +441,12 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
 }
 
 /** QUESTIONS for the skill, with answers; once bootstrap mode is over, `owner` is recommended. */
-export function questions(answers, today = new Date().toISOString().slice(0, 10)) {
-  return QUESTIONS.map(({ id, header, question, multi, options }) => {
+export function questions(
+  answers,
+  today = new Date().toISOString().slice(0, 10),
+  profile = "template",
+) {
+  return questionsOf(profile).map(({ id, header, question, multi, options }) => {
     const late = id === "approvals" && today > BOOTSTRAP_END;
     return {
       id,
@@ -381,7 +454,10 @@ export function questions(answers, today = new Date().toISOString().slice(0, 10)
       question,
       multiSelect: Boolean(multi),
       answer: answers[id] ?? null,
-      options: options.map((o, i) => ({ ...o, recommended: late ? o.value === "owner" : i === 0 })),
+      options: options.map(({ templates, ...o }, i) => ({
+        ...o,
+        recommended: late ? o.value === "owner" : i === 0,
+      })),
     };
   });
 }
@@ -425,7 +501,7 @@ if (isMain()) {
   const root = process.cwd();
   const [flag, ...rest] = process.argv.slice(2);
   if (flag === "--questions") {
-    const qs = questions(readAnswers(root));
+    const qs = questions(readAnswers(root), undefined, profileOf(root));
     process.stdout.write(`${JSON.stringify(qs, null, 2)}\n`);
     process.exit(0);
   }
@@ -433,11 +509,10 @@ if (isMain()) {
     const answers = readAnswers(root);
     for (const arg of rest) {
       const [id, value = ""] = arg.split("=");
-      const q = QUESTIONS.find((x) => x.id === id);
+      const asked = questionsOf(profileOf(root));
+      const q = asked.find((x) => x.id === id);
       if (!q) {
-        process.stderr.write(
-          `unknown question ${id}; ids: ${QUESTIONS.map((x) => x.id).join(", ")}\n`,
-        );
+        process.stderr.write(`unknown question ${id}; ids: ${asked.map((x) => x.id).join(", ")}\n`);
         process.exit(2);
       }
       const values = value === "" ? [] : value.split(",");

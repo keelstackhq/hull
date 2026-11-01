@@ -7,6 +7,14 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.5.2 — unreleased
+
+- template-rust ships `ready` too (skill, `scripts/ready.mjs`, seed `docs/agents/onboarding.toml`),
+  generated from template/ by `scripts/sync-shared.mjs`; its `cli` answer means `rust-cli` only.
+- New template-rust onboarding question `release` (default no): with no, the release environments
+  and App are not needed and `HOIST_RELEASE` must not be `enabled`. `release-tags` stays required
+  everywhere. Checklist: bosun Routines run hourly.
+
 ## v0.5.1 — 2026-10-29
 
 - Start checklist matches bosun 0.3.0: `bosun init` needs `--stack` and `--plan`; the owner
