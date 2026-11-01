@@ -23,6 +23,7 @@ rigging/                        splice channel template (empty base meta; core, 
 template-rust/                  pure Rust template (base, rust-cli, circleci, circleci-only; no
                                 Node/Turborepo; §15)
 scripts/render.mjs, lib/        dev renderer (contract §1-§4, §8, §9; `new` only)
+scripts/sync-shared.mjs         template-rust copies of shared files (ready); edit template/, rerun it
 scripts/combos/                 one JSON fragment per combo hull CI renders (+ _vars.json)
 scripts/gen-ci.mjs              generates template/ ci.yml from the CI plan (scripts/lib/ci-tasks.mjs)
 scripts/dogfood.mjs             render combos, run their CI command

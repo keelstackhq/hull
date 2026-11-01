@@ -16,6 +16,8 @@ const {
   BOOTSTRAP_END,
   ITEMS,
   QUESTIONS,
+  TEMPLATES,
+  profileOf,
   questions,
   checklistUrl,
   readAnswers,
@@ -33,13 +35,14 @@ function docItems(text) {
 
 /** Rows of the doc's onboarding table: | `id` | question | `v1`, `v2` | `item`, ... | */
 function docQuestions(text) {
-  const re = /^\| `([a-z_]+)` +\| ([^|]+) \| ([^|]+) \| ([^|]+) \|$/gm;
+  const re = /^\| `([a-z_]+)` +\| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$/gm;
   const ticks = (cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
   return [...text.matchAll(re)].map((m) => ({
     id: m[1],
     question: m[2].trim(),
     values: ticks(m[3]),
     items: ticks(m[4]),
+    templates: m[5].trim() === "both" ? TEMPLATES : ticks(m[5]),
   }));
 }
 
@@ -51,6 +54,7 @@ test("onboarding questions: doc table = QUESTIONS (ids, text, option values, gat
       question: q.question,
       values: q.options.map((o) => o.value),
       items: q.items,
+      templates: q.templates ?? TEMPLATES,
     })),
   );
 });
@@ -186,6 +190,7 @@ pieces = ["web"]
 ci = "github"
 update_bot = "app"
 approvals = "bootstrap"
+release = "yes"
 apps = ["claude", "renovate", "splice"]
 secrets = "none"
 bosun = "no"
@@ -401,7 +406,7 @@ test("readAnswers parses strings and lists; --answer writes them and --questions
   assert.match(r.stderr, /bosun: maybe is not one of yes, no/);
   r = cli("--questions");
   const qs = JSON.parse(r.stdout);
-  assert.equal(qs.length, QUESTIONS.length);
+  assert.equal(qs.length, questions({}, undefined, "template").length);
   assert.deepEqual(qs.find((q) => q.id === "bosun").answer, "yes");
   assert.equal(qs[0].options[0].recommended, true);
 });
@@ -543,4 +548,137 @@ test("bosun = yes: the plan must be plans/<name>.md (bosun reads only that)", as
   assert.match(plan().note, /plans\/<name>\.md/);
   await put(root, "plans/first.md", "# Plan\n");
   assert.equal(plan().status, "pass");
+});
+
+const SYNC = fileURLToPath(new URL("../scripts/sync-shared.mjs", import.meta.url));
+
+test("template-rust's ready files are generated from template/ and in sync", () => {
+  const r = spawnSync(process.execPath, [SYNC, "--check"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test("template-rust base renders ready (owned) and the seed answers; AGENTS.md says run it first", async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), "ready-rust-")), "out");
+  const { renderNew } = await import("../scripts/render.mjs");
+  const template = fileURLToPath(new URL("../template-rust", import.meta.url));
+  const result = await renderNew({ template, out: dir, pieces: [], vars: {} });
+  const cls = Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
+  assert.equal(cls["scripts/ready.mjs"], "owned");
+  assert.equal(cls[".claude/skills/ready/SKILL.md"], "owned");
+  assert.equal(cls["docs/agents/onboarding.toml"], "seed");
+  assert.match(await readFile(join(dir, "AGENTS.md"), "utf8"), /`ready`.*first/);
+});
+
+const RUST_LOCK = `[template]
+source = "gh:keelstackhq/hull//template-rust"
+version = "0.5.2"
+
+[[pieces]]
+id = "rust-cli"
+name = "cli"
+`;
+
+const rustRepo = async () => {
+  const d = await readyRepo();
+  spawnSync("rm", ["-f", join(d, "package.json")]);
+  await put(d, "Cargo.toml", "[workspace]\n");
+  await put(d, ".splice/lock.toml", RUST_LOCK);
+  await put(
+    d,
+    "docs/agents/onboarding.toml",
+    ANSWERS.replace('["web"]', '["cli"]').replace(/^secrets = .*\n/m, ""),
+  );
+  return d;
+};
+const rustRun = (extra = {}) =>
+  fakeRun({ ...GOOD_GH, "cargo --version": "cargo 1", "pnpm --version": null, ...extra });
+
+test("profileOf: lock source picks template-rust; else template", async () => {
+  assert.equal(profileOf(await rustRepo()), "template-rust");
+  assert.equal(profileOf(await readyRepo()), "template");
+});
+
+test("template-rust profile: cli = rust-cli only, no pnpm, no secrets question", async () => {
+  const root = await rustRepo();
+  const results = runChecks({ root, run: rustRun(), node: "24.0.0" });
+  const s = byId(results);
+  assert.equal(s.render, "pass", results.find((r) => r.id === "render").note);
+  assert.equal(s.environment, "pass", results.find((r) => r.id === "environment").note);
+  assert.equal(s.secrets, "skipped");
+  assert.match(results.find((r) => r.id === "secrets").note, /template-rust/);
+  const qs = questions({}, "2026-11-01", "template-rust");
+  assert.equal(
+    qs.some((q) => q.id === "secrets"),
+    false,
+  );
+  assert.deepEqual(
+    qs.find((q) => q.id === "pieces").options.map((o) => o.value),
+    ["cli", "lib"],
+  );
+});
+
+test("template-rust release = no: no release environments, HOIST_RELEASE must not be enabled", async () => {
+  const root = await rustRepo();
+  await put(
+    root,
+    ".github/workflows/rel.yml",
+    "    environment: release\n    environment: release-pr\n",
+  );
+  const answers = await readFile(join(root, "docs/agents/onboarding.toml"), "utf8");
+  await put(
+    root,
+    "docs/agents/onboarding.toml",
+    answers.replace('release = "yes"', 'release = "no"'),
+  );
+  const VAR = "gh api repos/keelstackhq/demo/actions/variables/HOIST_RELEASE";
+  const gh = {
+    "gh api repos/keelstackhq/demo/environments": JSON.stringify({
+      environments: [
+        JSON.parse(GOOD_GH["gh api repos/keelstackhq/demo/environments"]).environments[1],
+      ],
+    }),
+  };
+  const env = (extra, errs) =>
+    runChecks({
+      root,
+      run: fakeRun({ ...GOOD_GH, "cargo --version": "1", ...gh, ...extra }, errs),
+      node: "24.0.0",
+    }).find((x) => x.id === "environments");
+  assert.equal(env({}, { [VAR]: "gh: Not Found (HTTP 404)" }).status, "pass");
+  const on = env({ [VAR]: '{"name":"HOIST_RELEASE","value":"enabled"}' });
+  assert.equal(on.status, "fail");
+  assert.match(on.note, /HOIST_RELEASE/);
+  await put(root, "docs/agents/onboarding.toml", answers.replace(/^release = .*\n/m, ""));
+  assert.equal(env({}).status, "ask");
+});
+
+test("template/: no release question; release-tags and the release environment stay required", async () => {
+  assert.equal(
+    questions({}, "2026-11-01", "template").some((q) => q.id === "release"),
+    false,
+  );
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace('release = "yes"\n', ""));
+  const gh = { ...GOOD_GH, "gh api repos/keelstackhq/demo/rulesets": "[]" };
+  const s = byId(runChecks({ root, run: fakeRun(gh), node: "24.0.0" }));
+  assert.equal(s.rulesets, "fail", "release-tags is required in every repo (spec §0 P2)");
+  assert.equal(s.environments, "pass");
+});
+
+test("template-rust CLI: --questions has no secrets; --answer rejects web and secrets", async () => {
+  const root = await rustRepo();
+  const cli = (...args) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, encoding: "utf8" });
+  const qs = JSON.parse(cli("--questions").stdout);
+  assert.equal(
+    qs.some((q) => q.id === "secrets"),
+    false,
+  );
+  assert.equal(
+    qs.find((q) => q.id === "apps").options.some((o) => o.value === "secrets"),
+    false,
+  );
+  assert.equal(cli("--answer", "pieces=web").status, 2);
+  assert.equal(cli("--answer", "secrets=none").status, 2);
+  assert.equal(cli("--answer", "pieces=cli", "release=no").status, 0);
 });
