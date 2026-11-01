@@ -152,8 +152,8 @@ Only with `bosun` = `yes`, using bosun 0.4.0 (npm `@keelstackhq/bosun@0.4.0`, ta
 `7eb2fa46b25c1cb9de34867a86c7bff29421ca54`); walkthrough:
 https://keelstack.dev/docs/greenfield-bosun/. In order:
 
-1. Write the plan first: the agent turns the brief (item 10) into `plans/<name>.md`, with its
-   `allow:` entries, and runs `bosun plan pr`.
+1. Write the plan first: the agent turns the brief (item 10) into `plans/<name>.md`; this first
+   plan goes in through `bosun init --plan`.
    `bosun init --stack rust|ts-pnpm --plan <file> --owner <login>` (`--stack` is required) opens
    the setup PR with the channel files; fill `governance/owners.toml`.
 2. The owner approves the setup PR's head (the Claude Code form; `/bosun approve <sha>` as the
@@ -166,8 +166,9 @@ https://keelstack.dev/docs/greenfield-bosun/. In order:
 
 Optional: `.bosun/approvers.toml` with the orchestrator's public key (role owner), enrolled by an
 R-gov PR the owner approves on GitHub; after that, approvals go through the Claude Code form.
-From then on, agents enable auto-merge when they open a PR; the owner merges by hand only when
-GitHub says the PR is already clean.
+
+Once the setup PR is merged, agents enable auto-merge when they open a PR; the owner merges by
+hand only when GitHub says the PR is already clean.
 
 Check: with `bosun` = `yes`, `bosun doctor` passes (the owner also runs `bosun doctor --remote`).
 
@@ -189,8 +190,11 @@ Check: `.splice/lock.toml` lists the pieces the `pieces` and `ci` answers need, 
 Send the brief in chat. The agent writes it as a spec in `docs/superpowers/specs/` and a plan in
 `docs/superpowers/plans/`, or, for a small project, as a `## Steps` list in
 `docs/agents/project.md`. Plans end with an owner-steps section (D-009). With `bosun` = `yes`, the
-plan goes in `plans/<name>.md` in bosun's plan format, with `allow:` entries (bosun reads only
-that), submitted with `bosun plan pr`; the product spec stays in `docs/superpowers/specs/`.
+plan goes in `plans/<name>.md` in bosun's plan format (bosun reads only that); the first plan goes
+in through `bosun init --plan` (item 8), later amendments with `bosun plan pr`, which needs the
+setup PR merged (it exits 4 while main has no owners). `allow:` is optional: only for tasks that
+must delete or skip tests (`delete-test`, `skip`, `only`, `fewer-asserts`). The product spec stays
+in `docs/superpowers/specs/`.
 
 Check: a `.md` file in either directory, or a `## Steps` list in `docs/agents/project.md`; with
 `bosun` = `yes`, a `plans/<name>.md`.

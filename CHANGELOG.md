@@ -10,8 +10,9 @@ Keep `unreleased` while changes accumulate.
 ## v0.5.2 — 2026-11-01
 
 - Start checklist targets bosun 0.4.0 (`@keelstackhq/bosun@0.4.0`, tag `v0.4.0` = `7eb2fa4`):
-  plans with `allow:` entries and `bosun plan pr`; agents enable auto-merge at PR open, the owner
-  merges by hand only when GitHub says the PR is already clean.
+  the first plan goes in through `bosun init --plan`, amendments with `bosun plan pr`; `allow:` is
+  optional; agents enable auto-merge at PR open, the owner merges by hand only when GitHub says
+  the PR is already clean.
 - template-rust ships `ready` too (skill, `scripts/ready.mjs`, seed `docs/agents/onboarding.toml`),
   generated from template/ by `scripts/sync-shared.mjs`; its `cli` answer means `rust-cli` only.
 - New template-rust onboarding question `release` (default no): with no, the release environments
