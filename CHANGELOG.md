@@ -7,8 +7,10 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.6.0 — unreleased
+## v0.6.0 — 2026-11-02
 
+- splice 0.4.0 (`splice adopt`) is pinned: `keelstackhq/splice/action@a3564c7` (v0.4.0) in hull's
+  and both templates' `splice.yml`, and `@keelstackhq/splice@0.4.0` in hull's CI.
 - `ready --assess [--json]`: a read-only look at an existing repo (signals, the template and
   pieces that fit, with moves, and the files that would clash by class); works copied alone.
   Without a lock, `render` is `ask` ("not adopted") and points at `splice adopt`.

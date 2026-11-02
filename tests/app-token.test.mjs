@@ -116,7 +116,7 @@ test("release.yml prepare: App token step pinned and gated, precedence app > PAT
   for (const f of [SPLICE, RUST_SPLICE, TS_SPLICE])
     assert.match(
       readFileSync(path(f), "utf8"),
-      /uses: keelstackhq\/splice\/action@f7ac4efddb3b23b4f1dca29dfb72e3f81a707f32 # v0\.3\.1\n/,
+      /uses: keelstackhq\/splice\/action@a3564c7154a091b9d130cab942cc24e2f8299e51 # v0\.4\.0\n/,
       f,
     );
   assert.ok(raw.includes("--ignore-scripts"));

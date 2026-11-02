@@ -78,3 +78,14 @@ test("adopt.md's fetch URL is pinned to the CHANGELOG's top version, with a sha2
   if (top[2] !== "unreleased")
     assert.doesNotMatch(DOC, /ASSESS_SHA256/, "the release fills in the sha256");
 });
+
+test("adopt.md's sha256 check is the real sha256 of ready.mjs (once filled in)", async () => {
+  const { createHash } = await import("node:crypto");
+  const m = /^echo "([0-9a-f]{64}|ASSESS_SHA256) {2}\/tmp\/assess\.mjs" \| sha256sum -c$/m.exec(
+    DOC,
+  );
+  assert.ok(m, "the check-before-run line");
+  if (m[1] === "ASSESS_SHA256") return;
+  const file = read("template/pieces/base/files/scripts/ready.mjs");
+  assert.equal(m[1], createHash("sha256").update(file).digest("hex"));
+});

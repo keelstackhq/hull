@@ -69,7 +69,7 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   assert.match(checkout.uses, /^actions\/checkout@/);
   assert.equal(checkout.with["persist-credentials"], false);
   // it receives a token with workflows: write, so it is pinned by commit SHA
-  assert.equal(bot.uses, "keelstackhq/splice/action@f7ac4efddb3b23b4f1dca29dfb72e3f81a707f32");
+  assert.equal(bot.uses, "keelstackhq/splice/action@a3564c7154a091b9d130cab942cc24e2f8299e51");
   assert.equal(bot.with.scope, "all");
   assert.equal(
     bot.with.token,
