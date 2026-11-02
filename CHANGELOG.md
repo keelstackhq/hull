@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.6.1 — unreleased
+## v0.6.1 — 2026-11-02
 
 - `ready --assess --json` has a fixed, versioned output schema (`hull.assess/1`): `schema`, `stack`
   and per-piece `name` and `unsure` (null when sure) are always present, documented in
