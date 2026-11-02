@@ -7,6 +7,9 @@ repo, the `ready` skill (`node scripts/ready.mjs`) runs the automatable checks a
 here, at the hull tag the repo was rendered from. Agents start autonomous work only when it exits
 0 and the owner has confirmed every `manual` item. `TODO(owner)` marks facts not yet written down.
 
+An existing repo? Start with [Adopt an existing repo](adopt.md): it ends with `ready` and the
+items below.
+
 ## Onboarding questions
 
 `ready` first asks these as Claude Code forms (at most 4 per form; the first option is the

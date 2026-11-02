@@ -73,7 +73,7 @@ test("a pnpm repo: template/, pieces with reasons, moves for off-layout code, cl
     a.next,
     "on a branch: splice adopt gh:keelstackhq/hull//template --piece preact-app:web " +
       "--piece hono-worker:api --piece rust-tool:tool --dry-run --json; review, then run it " +
-      "without --dry-run (needs splice >= 0.4.0)",
+      "without --dry-run (needs splice >= 0.4.0; hull docs/adopt.md)",
   );
 });
 

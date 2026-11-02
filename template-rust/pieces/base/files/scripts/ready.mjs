@@ -249,7 +249,7 @@ const adoptCommand = (template, pieces = []) =>
     .map(shq)
     .join(" ");
 const adoptNext = (cmd) =>
-  `on a branch: ${cmd}; review, then run it without --dry-run (needs splice >= 0.4.0)`;
+  `on a branch: ${cmd}; review, then run it without --dry-run (needs splice >= 0.4.0; hull docs/adopt.md)`;
 const ADOPT = adoptNext(adoptCommand("<template>"));
 /** splice's instance-name rule (piece.toml `name.pattern`). */
 const NAME_RE = /^[a-z][a-z0-9-]*$/;

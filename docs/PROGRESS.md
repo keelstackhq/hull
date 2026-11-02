@@ -81,6 +81,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-11-01 · first-user feedback B5 · `feat(ready): template-rust ships ready; release question` · `scripts/sync-shared.mjs` generates template-rust's ready files (tested in sync); profile from the lock's source; template-rust `release` question (release-tags stays required everywhere, spec §0 P2); Routines hourly. F9 (guard refusals) belongs to bosun's guard, not hull's.
 - 2026-11-01 · release · `release: v0.5.2 — ready in template-rust` · CHANGELOG dated.
 - 2026-11-02 · adopt A · `feat(ready): --assess for existing repos` · DETECT signals, CLASH table tested against fresh renders, pieces with moves, render `ask` without a lock; `splice adopt` flags pending splice.
+- 2026-11-02 · adopt B · `docs: adopt.md for existing repos` · detection table tied to DETECT, clashes by class with splice adopt's dry-run actions, 11-step order; start checklist links it.
 
 ## Measurements
 
