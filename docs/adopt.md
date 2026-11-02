@@ -21,12 +21,12 @@ follows [the start checklist](start-checklist.md) instead. This file is versione
 check its sha256 before running it, from the repo root:
 
 ```bash
-curl -fsSL https://keelstack.dev/assess/v0.6.0.mjs -o /tmp/assess.mjs
-echo "c425300387529849b84c04bcb3fb6a38aba4de920c84fdf7fe792e7e2fb4691d  /tmp/assess.mjs" | sha256sum -c
+curl -fsSL https://keelstack.dev/assess/v0.6.1.mjs -o /tmp/assess.mjs
+echo "77f7f697a6b066444215b529d0aba753bffd43b38595a05d5b928e42e841ed47  /tmp/assess.mjs" | sha256sum -c
 node /tmp/assess.mjs --assess --json
 ```
 
-The sha256 is that of hull v0.6.0's `template/pieces/base/files/scripts/ready.mjs` (a hull test
+The sha256 is that of hull v0.6.1's `template/pieces/base/files/scripts/ready.mjs` (a hull test
 keeps it equal); never use an unpinned latest URL. With a hull clone, run that file directly. It
 reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 
@@ -55,6 +55,25 @@ move; code elsewhere is moved by hand on the branch, before `splice adopt`.
   tooling only;
 - the repo uses npm or yarn: template/ moves it to pnpm 12;
 - preact sits under `packages/`: a UI library (`ui-storybook`) or an app.
+
+## Output of --assess --json
+
+| Field        | Type                                  | Meaning                                                    |
+| ------------ | ------------------------------------- | ---------------------------------------------------------- |
+| `schema`     | string                                | always `hull.assess/1`                                     |
+| `template`   | `"template"`, `"template-rust"`, null | the hull template that fits; null: channels only           |
+| `stack`      | `"ts-pnpm"`, `"rust"`, null           | `bosun init --stack` value for the template (null if none) |
+| `confidence` | `"high"`, `"low"`                     | low when `unsure` is not empty                             |
+| `unsure`     | string[]                              | questions for the owner; never guessed                     |
+| `pieces`     | object[]                              | pieces that fit, each with a move                          |
+| `signals`    | object[]                              | what was found: `id`, `signal`, `evidence` (string[])      |
+| `clashes`    | object                                | `owned`, `shared`, `seed`, `targets`: string[] of paths    |
+| `next`       | string                                | the `splice adopt` command to review, or why there is none |
+
+Each piece item has the keys `piece`, `name`, `from`, `to`, `reason` and `unsure`, in that order,
+all strings except `unsure`, which is a string (the question for the owner) or null when sure;
+`name` is the last segment of `to`. Every field is always present. The `schema` string changes
+on any breaking change (a removed, renamed or retyped field); otherwise fields are only added.
 
 ## What clashes
 

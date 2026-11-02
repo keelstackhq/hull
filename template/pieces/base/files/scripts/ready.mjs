@@ -550,6 +550,10 @@ export const DETECT = [
 ];
 const SKIP = new Set(["node_modules", ".git", "target", "dist", "src-tauri"]);
 
+/** Schema id of `--assess --json`; the suffix changes on any breaking change (docs/adopt.md). */
+export const ASSESS_SCHEMA = "hull.assess/1";
+const STACKS = { template: "ts-pnpm", "template-rust": "rust" };
+
 /** Read-only look at an existing repo: signals, the template and pieces that fit, clashes. */
 export function assess(root) {
   // Regular files up to 1 MB only (never a FIFO, device or symlink), each read once.
@@ -638,7 +642,7 @@ export function assess(root) {
       const to = `${rust ? "crates" : "apps"}/${nameOf(from, rust)}`;
       const reason = `${r.signal} (${at(from, rust ? "Cargo.toml" : "package.json")})`;
       const name = to.split("/").pop();
-      const piece = { piece: r.piece, from, to, reason };
+      const piece = { piece: r.piece, name, from, to, reason, unsure: null };
       if (!NAME_RE.test(name))
         piece.unsure = `name ${JSON.stringify(name)} is not a valid piece name: ask the owner for one`;
       else if (r.piece === "preact-app" && from.startsWith("packages/")) {
@@ -679,13 +683,25 @@ export function assess(root) {
   if (npm.length && !has("pnpm-lock.yaml") && (has("package-lock.json") || has("yarn.lock"))) {
     unsure.push("uses npm or yarn: template/ moves the repo to pnpm 12; ask the owner");
   }
-  for (const p of pieces.filter((x) => x.unsure)) unsure.push(`${p.piece} ${p.from}: ${p.unsure}`);
-  const named = pieces.filter((p) => !p.unsure).map((p) => `${p.piece}:${p.to.split("/").pop()}`);
+  for (const p of pieces.filter((x) => x.unsure !== null))
+    unsure.push(`${p.piece} ${p.from}: ${p.unsure}`);
+  const named = pieces.filter((p) => p.unsure === null).map((p) => `${p.piece}:${p.name}`);
   const next = template
     ? adoptNext(adoptCommand(template, [...new Set(named)]))
     : "no package.json or Cargo.toml: channels only (decisions, bosun init), no template";
   const confidence = unsure.length ? "low" : "high";
-  return { template, confidence, unsure, signals, pieces, clashes, next };
+  const stack = template ? STACKS[template] : null;
+  return {
+    schema: ASSESS_SCHEMA,
+    template,
+    stack,
+    confidence,
+    unsure,
+    pieces,
+    signals,
+    clashes,
+    next,
+  };
 }
 
 /** Text report and exit code. */

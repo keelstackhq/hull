@@ -5,17 +5,19 @@ import { fileURLToPath } from "node:url";
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(`../${rel}`, import.meta.url)), "utf8");
 const DOC = read("docs/adopt.md");
-const { CLASH, DETECT } = await import(
+const { ASSESS_SCHEMA, CLASH, DETECT, assess } = await import(
   fileURLToPath(new URL("../template/pieces/base/files/scripts/ready.mjs", import.meta.url))
 );
 
 /** Detection table rows: | `id` | signal | template/piece | */
 const rows = () =>
-  [...DOC.matchAll(/^\| `([a-z-]+)` +\| ([^|]+) \| ([^|]+) \|$/gm)].map((m) => ({
-    id: m[1],
-    signal: m[2].trim(),
-    gives: m[3].trim(),
-  }));
+  [...DOC.split("\n## Output of")[0].matchAll(/^\| `([a-z-]+)` +\| ([^|]+) \| ([^|]+) \|$/gm)].map(
+    (m) => ({
+      id: m[1],
+      signal: m[2].trim(),
+      gives: m[3].trim(),
+    }),
+  );
 
 test("adopt.md's detection table lists DETECT in order, with the same signal and result", () => {
   assert.deepEqual(
@@ -88,4 +90,18 @@ test("adopt.md's sha256 check is the real sha256 of ready.mjs (once filled in)",
   if (m[1] === "ASSESS_SHA256") return;
   const file = read("template/pieces/base/files/scripts/ready.mjs");
   assert.equal(m[1], createHash("sha256").update(file).digest("hex"));
+});
+
+test("adopt.md documents the --assess --json fields in order and names the schema", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "adopt-doc-"));
+  writeFileSync(join(dir, "package.json"), "{}");
+  const section = /^## Output of --assess --json$([\s\S]*?)(?=^## )/m.exec(DOC);
+  assert.ok(section, "the section");
+  const fields = [...section[1].matchAll(/^\| `([a-z]+)` +\|/gm)].map((m) => m[1]);
+  assert.deepEqual(fields, Object.keys(assess(dir)));
+  assert.ok(section[1].includes(ASSESS_SCHEMA));
+  assert.ok(DOC.includes("hull.assess/1"));
 });
