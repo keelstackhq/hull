@@ -17,7 +17,7 @@ follows [the start checklist](start-checklist.md) instead. This file is versione
 
 ## What `ready --assess` looks for
 
-`ready.mjs` runs alone. keelstack.dev hosts a pinned copy per hull tag (hull itself is private);
+`ready.mjs` runs alone. keelstack.dev hosts a copy per hull tag, pinned and checksummed;
 check its sha256 before running it, from the repo root:
 
 ```bash
