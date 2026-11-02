@@ -7,6 +7,12 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.6.1 — unreleased
+
+- `ready --assess --json` has a fixed, versioned output schema (`hull.assess/1`): `schema`, `stack`
+  and per-piece `name` and `unsure` (null when sure) are always present, documented in
+  `docs/adopt.md` for bosun's intake.
+
 ## v0.6.0 — 2026-11-02
 
 - splice 0.4.0 (`splice adopt`) is pinned: `keelstackhq/splice/action@a3564c7` (v0.4.0) in hull's

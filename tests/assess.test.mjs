@@ -11,7 +11,7 @@ import { renderNew } from "../scripts/render.mjs";
 const SCRIPT = fileURLToPath(
   new URL("../template/pieces/base/files/scripts/ready.mjs", import.meta.url),
 );
-const { CLASH, DETECT, assess, classOf, runChecks } = await import(SCRIPT);
+const { ASSESS_SCHEMA, CLASH, DETECT, assess, classOf, runChecks } = await import(SCRIPT);
 const TEMPLATE = (t) => fileURLToPath(new URL(`../${t}`, import.meta.url));
 
 const repo = async (files) => {
@@ -275,4 +275,90 @@ test("mixed signals are unsure with low confidence, never forced", async () => {
 test("next says splice adopt needs splice >= 0.4.0", async () => {
   const a = assess(await repo({ "package.json": pkg({ astro: "7" }) }));
   assert.match(a.next, /needs splice >= 0\.4\.0/);
+});
+
+const TOP = [
+  "schema",
+  "template",
+  "stack",
+  "confidence",
+  "unsure",
+  "pieces",
+  "signals",
+  "clashes",
+  "next",
+];
+const PIECE = ["piece", "name", "from", "to", "reason", "unsure"];
+const SIGNAL = ["id", "signal", "evidence"];
+const CLASHES = ["owned", "shared", "seed", "targets"];
+
+const checkShape = (a) => {
+  assert.deepEqual(Object.keys(a), TOP);
+  assert.equal(a.schema, "hull.assess/1");
+  assert.equal(ASSESS_SCHEMA, "hull.assess/1");
+  assert.ok(a.template === null || typeof a.template === "string");
+  assert.ok(["high", "low"].includes(a.confidence));
+  assert.ok(Array.isArray(a.unsure) && a.unsure.every((u) => typeof u === "string"));
+  assert.equal(typeof a.next, "string");
+  assert.deepEqual(Object.keys(a.clashes), CLASHES);
+  for (const k of CLASHES)
+    assert.ok(
+      a.clashes[k].every((f) => typeof f === "string"),
+      k,
+    );
+  for (const s of a.signals) {
+    assert.deepEqual(Object.keys(s), SIGNAL);
+    assert.ok(typeof s.id === "string" && typeof s.signal === "string");
+    assert.ok(Array.isArray(s.evidence) && s.evidence.every((e) => typeof e === "string"));
+  }
+  for (const p of a.pieces) {
+    assert.deepEqual(Object.keys(p), PIECE);
+    for (const k of PIECE.slice(0, 5)) assert.equal(typeof p[k], "string", k);
+    assert.ok(p.unsure === null || typeof p.unsure === "string");
+    assert.equal(p.name, p.to.split("/").pop());
+  }
+};
+
+test("the --assess --json schema is fixed: key order, types and stack mapping", async () => {
+  const ts = assess(
+    await repo({
+      "package.json": pkg({}),
+      "apps/web/package.json": pkg({ preact: "10.0.0" }),
+      "README.md": "# x\n",
+    }),
+  );
+  checkShape(ts);
+  assert.equal(ts.stack, "ts-pnpm");
+  assert.equal(ts.pieces[0].unsure, null);
+  assert.equal(ts.pieces[0].name, "web");
+
+  const rust = assess(
+    await repo({ "Cargo.toml": '[package]\nname = "tool"\n', "src/main.rs": "fn main() {}\n" }),
+  );
+  checkShape(rust);
+  assert.equal(rust.stack, "rust");
+
+  const none = assess(await repo({ "README.md": "# docs\n" }));
+  checkShape(none);
+  assert.equal(none.template, null);
+  assert.equal(none.stack, null);
+  assert.deepEqual(none.pieces, []);
+
+  const unsure = assess(
+    await repo({ "package.json": pkg({}), "packages/ui/package.json": pkg({ preact: "10" }) }),
+  );
+  checkShape(unsure);
+  assert.equal(typeof unsure.pieces[0].unsure, "string");
+});
+
+test("the CLI prints the same schema", async () => {
+  const root = await repo({ "package.json": pkg({ astro: "7.0.0" }) });
+  const r = spawnSync(process.execPath, [SCRIPT, "--assess", "--json"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const a = JSON.parse(r.stdout);
+  checkShape(a);
+  assert.equal(a.stack, "ts-pnpm");
 });

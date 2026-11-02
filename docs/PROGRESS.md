@@ -83,6 +83,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-11-02 · adopt A · `feat(ready): --assess for existing repos` · DETECT signals, CLASH table tested against fresh renders, pieces with moves, render `ask` without a lock; `splice adopt` flags pending splice.
 - 2026-11-02 · adopt B · `docs: adopt.md for existing repos` · detection table tied to DETECT, clashes by class with splice adopt's dry-run actions, 11-step order; start checklist links it.
 - 2026-11-02 · release · `release: v0.6.0 — existing repos` · CHANGELOG dated; adopt.md's pinned assess URL carries the sha256 of ready.mjs (tested equal).
+- 2026-11-02 · ZX T1 · `feat(ready): fixed --assess --json schema (hull.assess/1)` · `--assess --json` now has schema, stack and per-piece name/unsure (null when sure) in a fixed key order; documented in adopt.md; hosted copy bumped to v0.6.1.
 
 ## Measurements
 
