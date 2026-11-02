@@ -9,7 +9,14 @@
 //   node scripts/ready.mjs --assess [--json]  read-only: which template and pieces fit an existing
 //                                             repo, and what would clash (works copied alone)
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -235,10 +242,17 @@ const ASK_FIX = "Run the `ready` skill: it asks via `node scripts/ready.mjs --qu
  * The `splice adopt` command for an existing repo (hull docs/adopt.md): `adopt <src> [--ref R]
  * [--piece ID[:N]]… [--data K=V]… [--dry-run] [--force] [--allow-dirty] [--no-post] [--json]`.
  */
+const shq = (s) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`);
 const adoptCommand = (template, pieces = []) =>
-  `splice adopt gh:keelstackhq/hull//${template}${pieces.map((p) => ` --piece ${p}`).join("")}` +
-  " --dry-run --json";
-const ADOPT = `on a branch: ${adoptCommand("<template>")}; review, then run it without --dry-run (hull docs/adopt.md)`;
+  ["splice", "adopt", `gh:keelstackhq/hull//${template}`, ...pieces.flatMap((p) => ["--piece", p])]
+    .concat("--dry-run", "--json")
+    .map(shq)
+    .join(" ");
+const adoptNext = (cmd) =>
+  `on a branch: ${cmd}; review, then run it without --dry-run (needs splice >= 0.4.0)`;
+const ADOPT = adoptNext(adoptCommand("<template>"));
+/** splice's instance-name rule (piece.toml `name.pattern`). */
+const NAME_RE = /^[a-z][a-z0-9-]*$/;
 
 /** Run every item. ctx: { root, run(cmd, args) → { ok, out, err }, node: version string }. */
 export function runChecks({ root, run, node, today = new Date().toISOString().slice(0, 10) }) {
@@ -538,12 +552,18 @@ const SKIP = new Set(["node_modules", ".git", "target", "dist", "src-tauri"]);
 
 /** Read-only look at an existing repo: signals, the template and pieces that fit, clashes. */
 export function assess(root) {
+  // Regular files up to 1 MB only (never a FIFO, device or symlink), each read once.
+  const cache = new Map();
   const read = (rel) => {
-    try {
-      return readFileSync(join(root, rel), "utf8");
-    } catch {
-      return null;
+    if (!cache.has(rel)) {
+      let text = null;
+      try {
+        const st = lstatSync(join(root, rel));
+        if (st.isFile() && st.size <= 1_000_000) text = readFileSync(join(root, rel), "utf8");
+      } catch {}
+      cache.set(rel, text);
     }
+    return cache.get(rel);
   };
   const list = (rel) => {
     try {
@@ -617,7 +637,15 @@ export function assess(root) {
     for (const from of hits[r.id]) {
       const to = `${rust ? "crates" : "apps"}/${nameOf(from, rust)}`;
       const reason = `${r.signal} (${at(from, rust ? "Cargo.toml" : "package.json")})`;
-      pieces.push({ piece: r.piece, from, to, reason });
+      const name = to.split("/").pop();
+      const piece = { piece: r.piece, from, to, reason };
+      if (!NAME_RE.test(name))
+        piece.unsure = `name ${JSON.stringify(name)} is not a valid piece name: ask the owner for one`;
+      else if (r.piece === "preact-app" && from.startsWith("packages/")) {
+        piece.unsure =
+          "preact under packages/: a UI library (ui-storybook) or an app? ask the owner";
+      }
+      pieces.push(piece);
     }
   }
   // Clashes with the base (exact paths, and only the `dir/**` prefixes are walked); pieces add
@@ -640,11 +668,24 @@ export function assess(root) {
   clashes.targets = [
     ...new Set(pieces.filter((p) => p.to !== p.from && has(p.to)).map((p) => p.to)),
   ];
-  const named = pieces.map((p) => `${p.piece}:${p.to.split("/").pop()}`);
+  // Mixed signals: say so and lower the confidence; the owner decides.
+  const unsure = [];
+  const jsDirs = npm.filter((d) => !(d === "." && workspaceRoot));
+  if (cargo.length && npm.length && jsDirs.length <= 1) {
+    unsure.push(
+      "Cargo crates with a small JS part: template/ if the JS stays, template-rust if it is tooling only; ask the owner",
+    );
+  }
+  if (npm.length && !has("pnpm-lock.yaml") && (has("package-lock.json") || has("yarn.lock"))) {
+    unsure.push("uses npm or yarn: template/ moves the repo to pnpm 12; ask the owner");
+  }
+  for (const p of pieces.filter((x) => x.unsure)) unsure.push(`${p.piece} ${p.from}: ${p.unsure}`);
+  const named = pieces.filter((p) => !p.unsure).map((p) => `${p.piece}:${p.to.split("/").pop()}`);
   const next = template
-    ? `on a branch: ${adoptCommand(template, [...new Set(named)])}; review, then run it without --dry-run (hull docs/adopt.md)`
+    ? adoptNext(adoptCommand(template, [...new Set(named)]))
     : "no package.json or Cargo.toml: channels only (decisions, bosun init), no template";
-  return { template, signals, pieces, clashes, next };
+  const confidence = unsure.length ? "low" : "high";
+  return { template, confidence, unsure, signals, pieces, clashes, next };
 }
 
 /** Text report and exit code. */
@@ -689,7 +730,8 @@ if (isMain()) {
     const a = assess(root);
     if (rest.includes("--json")) process.stdout.write(`${JSON.stringify(a, null, 2)}\n`);
     else {
-      const lines = [`template: ${a.template ?? "none"}`];
+      const lines = [`template: ${a.template ?? "none"}`, `confidence: ${a.confidence}`];
+      for (const n of a.unsure) lines.push(`unsure ${n}`);
       for (const s of a.signals) lines.push(`signal ${s.id.padEnd(10)} ${s.evidence.join(", ")}`);
       for (const p of a.pieces)
         lines.push(`piece  ${p.piece.padEnd(11)} ${p.from} -> ${p.to}: ${p.reason}`);

@@ -73,7 +73,7 @@ test("a pnpm repo: template/, pieces with reasons, moves for off-layout code, cl
     a.next,
     "on a branch: splice adopt gh:keelstackhq/hull//template --piece preact-app:web " +
       "--piece hono-worker:api --piece rust-tool:tool --dry-run --json; review, then run it " +
-      "without --dry-run (hull docs/adopt.md)",
+      "without --dry-run (needs splice >= 0.4.0)",
   );
 });
 
@@ -207,4 +207,72 @@ test("files under .github/ or .claude/ that the template does not write are no c
     ".claude/agents/mine.md": "x\n",
   });
   assert.deepEqual(assess(root).clashes.owned, [".github/workflows/ci.yml"]);
+});
+
+test("hostile names never reach `next`: unsure, ask the owner; every argument is shell-quoted", async () => {
+  for (const bad of ["x;touch PWNED", "$(touch PWNED)", "Web App"]) {
+    const root = await repo({
+      "package.json": pkg({}),
+      [`${bad}/package.json`]: pkg({ astro: "7" }),
+    });
+    const a = assess(root);
+    const p = a.pieces.find((x) => x.piece === "astro-site");
+    assert.match(p.unsure, /ask the owner/, bad);
+    assert.ok(!a.next.includes(bad) && !a.next.includes("PWNED"), `${bad}: ${a.next}`);
+  }
+  const named = await repo({
+    "package.json": JSON.stringify({ name: "../..", dependencies: { astro: "7" } }),
+  });
+  assert.match(assess(named).pieces[0].unsure, /ask the owner/);
+  const ok = await repo({ "package.json": pkg({}), "site/package.json": pkg({ astro: "7" }) });
+  assert.match(assess(ok).next, / --piece astro-site:site /);
+});
+
+test("only regular files up to 1 MB are read: no FIFOs, symlinks or huge files", async () => {
+  const root = await repo({ "site/package.json": pkg({ astro: "7" }) });
+  spawnSync("mkfifo", [join(root, "package.json")]);
+  mkdirSync(join(root, "big"));
+  writeFileSync(
+    join(root, "big/package.json"),
+    `{"dependencies":{"preact":"10"},"x":"${"a".repeat(1_100_000)}"}`,
+  );
+  mkdirSync(join(root, "link"));
+  spawnSync("ln", ["-s", "/dev/zero", join(root, "link/package.json")]);
+  const a = assess(root);
+  assert.deepEqual(
+    a.pieces.map((p) => p.piece),
+    ["astro-site"],
+  );
+});
+
+test("mixed signals are unsure with low confidence, never forced", async () => {
+  const mixed = await repo({
+    "Cargo.toml": '[package]\nname = "tool"\n',
+    "src/main.rs": "",
+    "docs/package.json": pkg({ astro: "7" }),
+  });
+  let a = assess(mixed);
+  assert.equal(a.confidence, "low");
+  assert.ok(a.unsure.some((n) => /Cargo.*small JS/.test(n)));
+  const yarn = await repo({ "package.json": pkg({}), "yarn.lock": "" });
+  a = assess(yarn);
+  assert.ok(a.unsure.some((n) => /npm or yarn/.test(n)));
+  const ui = await repo({
+    "package.json": pkg({}),
+    "packages/ui/package.json": pkg({ preact: "10" }),
+  });
+  a = assess(ui);
+  assert.match(a.pieces[0].unsure, /ui-storybook/);
+  assert.ok(!a.next.includes("preact-app"));
+  const clean = await repo({
+    "package.json": pkg({}),
+    "pnpm-lock.yaml": "",
+    "site/package.json": pkg({ astro: "7" }),
+  });
+  assert.equal(assess(clean).confidence, "high");
+});
+
+test("next says splice adopt needs splice >= 0.4.0", async () => {
+  const a = assess(await repo({ "package.json": pkg({ astro: "7" }) }));
+  assert.match(a.next, /needs splice >= 0\.4\.0/);
 });
