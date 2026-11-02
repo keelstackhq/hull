@@ -22,13 +22,13 @@ check its sha256 before running it, from the repo root:
 
 ```bash
 curl -fsSL https://keelstack.dev/assess/v0.6.0.mjs -o /tmp/assess.mjs
-echo "ASSESS_SHA256  /tmp/assess.mjs" | sha256sum -c
+echo "c425300387529849b84c04bcb3fb6a38aba4de920c84fdf7fe792e7e2fb4691d  /tmp/assess.mjs" | sha256sum -c
 node /tmp/assess.mjs --assess --json
 ```
 
-`ASSESS_SHA256` is the sha256 of hull v0.6.0's `template/pieces/base/files/scripts/ready.mjs`
-(filled in by the release; never use an unpinned latest URL). With a hull clone, run that file
-directly. It reads files (regular files up to 1 MB, never symlinks) and writes nothing.
+The sha256 is that of hull v0.6.0's `template/pieces/base/files/scripts/ready.mjs` (a hull test
+keeps it equal); never use an unpinned latest URL. With a hull clone, run that file directly. It
+reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 
 | Signal       | Looks for                                           | Gives            |
 | ------------ | --------------------------------------------------- | ---------------- |
