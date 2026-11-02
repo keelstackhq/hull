@@ -7,6 +7,12 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.6.0 — unreleased
+
+- `ready --assess [--json]`: a read-only look at an existing repo (signals, the template and
+  pieces that fit, with moves, and the files that would clash by class); works copied alone.
+  Without a lock, `render` is `ask` ("not adopted") and points at `splice adopt`.
+
 ## v0.5.2 — 2026-11-01
 
 - Start checklist targets bosun 0.4.0 (`@keelstackhq/bosun@0.4.0`, tag `v0.4.0` = `7eb2fa4`):

@@ -80,6 +80,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-31 · docspack age · `chore: drop the docspack 0.1.1 release-age exclude` · `npm view` 2026-10-31T07:02Z: 0.1.1 published 2026-10-28T06:32Z, past the 3-day gate; base `pnpm-workspace.yaml` has no `minimumReleaseAgeExclude` now.
 - 2026-11-01 · first-user feedback B5 · `feat(ready): template-rust ships ready; release question` · `scripts/sync-shared.mjs` generates template-rust's ready files (tested in sync); profile from the lock's source; template-rust `release` question (release-tags stays required everywhere, spec §0 P2); Routines hourly. F9 (guard refusals) belongs to bosun's guard, not hull's.
 - 2026-11-01 · release · `release: v0.5.2 — ready in template-rust` · CHANGELOG dated.
+- 2026-11-02 · adopt A · `feat(ready): --assess for existing repos` · DETECT signals, CLASH table tested against fresh renders, pieces with moves, render `ask` without a lock; `splice adopt` flags pending splice.
 
 ## Measurements
 

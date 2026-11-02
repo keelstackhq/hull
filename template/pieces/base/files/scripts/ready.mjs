@@ -6,8 +6,17 @@
 //   node scripts/ready.mjs                    check
 //   node scripts/ready.mjs --questions        the onboarding questions as JSON, with answers
 //   node scripts/ready.mjs --answer id=v[,v]  record answers in docs/agents/onboarding.toml
+//   node scripts/ready.mjs --assess [--json]  read-only: which template and pieces fit an existing
+//                                             repo, and what would clash (works copied alone)
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -228,6 +237,22 @@ const pass = (note) => ({ status: "pass", note });
 const fail = (note) => ({ status: "fail", note });
 const manual = (note) => ({ status: "manual", note });
 const ASK_FIX = "Run the `ready` skill: it asks via `node scripts/ready.mjs --questions`.";
+/** How an existing repo takes the template (docs/adopt.md); flags follow splice's `adopt`. */
+/**
+ * The `splice adopt` command for an existing repo (hull docs/adopt.md): `adopt <src> [--ref R]
+ * [--piece ID[:N]]… [--data K=V]… [--dry-run] [--force] [--allow-dirty] [--no-post] [--json]`.
+ */
+const shq = (s) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`);
+const adoptCommand = (template, pieces = []) =>
+  ["splice", "adopt", `gh:keelstackhq/hull//${template}`, ...pieces.flatMap((p) => ["--piece", p])]
+    .concat("--dry-run", "--json")
+    .map(shq)
+    .join(" ");
+const adoptNext = (cmd) =>
+  `on a branch: ${cmd}; review, then run it without --dry-run (needs splice >= 0.4.0)`;
+const ADOPT = adoptNext(adoptCommand("<template>"));
+/** splice's instance-name rule (piece.toml `name.pattern`). */
+const NAME_RE = /^[a-z][a-z0-9-]*$/;
 
 /** Run every item. ctx: { root, run(cmd, args) → { ok, out, err }, node: version string }. */
 export function runChecks({ root, run, node, today = new Date().toISOString().slice(0, 10) }) {
@@ -433,6 +458,9 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
 
   return ITEMS.map((item) => {
     try {
+      if (item.id === "render" && !file(".splice/lock.toml")) {
+        return { ...item, status: "ask", note: "not adopted: no .splice/lock.toml", fix: ADOPT };
+      }
       return { ...item, ...(gate(item.id) ?? checks[item.id]()) };
     } catch (e) {
       return { ...item, ...(e.manual ? manual(e.message) : fail(e.message)) };
@@ -460,6 +488,204 @@ export function questions(
       })),
     };
   });
+}
+
+/**
+ * Files each template's base writes, by class (owned also covers files matching no glob). A hull
+ * test keeps this equal to a fresh render. Space-separated; `dir/**` is a prefix.
+ */
+export const CLASH = {
+  template: {
+    owned:
+      ".claude/hooks/guard.mjs .claude/hooks/session-start.sh .claude/hooks/stop-checks.sh " +
+      ".claude/loop.md .claude/settings.json .claude/skills/add-piece/SKILL.md " +
+      ".claude/skills/docs-lookup/SKILL.md .claude/skills/ready/SKILL.md " +
+      ".claude/skills/verify/SKILL.md .claude/statusline.sh .github/scripts/affected.mjs " +
+      ".github/scripts/preview.mjs .github/scripts/release-plan.mjs .github/scripts/rust-affected.mjs " +
+      ".github/workflows/ci.yml .github/workflows/desktop.yml .github/workflows/preview-deploy.yml " +
+      ".github/workflows/preview.yml .github/workflows/release.yml .github/workflows/splice.yml " +
+      ".gitattributes .gitignore .node-version CLAUDE.md Cargo.toml renovate.json rust-toolchain.toml " +
+      "scripts/agents-index.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
+      "packages/shared/tsconfig.json packages/shared/vite.config.ts",
+    shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
+    seed:
+      "AGENTS.md README.md docs/agents/onboarding.toml docs/agents/project.md " +
+      "scripts/ci-extra.sh packages/shared/src/**",
+  },
+  "template-rust": {
+    owned:
+      ".claude/hooks/guard.mjs .claude/hooks/session-start.sh .claude/hooks/stop-checks.sh " +
+      ".claude/loop.md .claude/settings.json .claude/skills/add-piece/SKILL.md " +
+      ".claude/skills/ready/SKILL.md .claude/skills/verify/SKILL.md .claude/statusline.sh " +
+      ".config/nextest.toml .github/scripts/docs-only.mjs .github/scripts/release-pending.mjs " +
+      ".github/workflows/ci.yml .github/workflows/release.yml .github/workflows/splice.yml " +
+      ".gitattributes .gitignore CLAUDE.md deny.toml renovate.json rust-toolchain.toml rustfmt.toml " +
+      "scripts/agents-index.mjs scripts/ready.mjs",
+    shared: "Cargo.toml crates/common/Cargo.toml",
+    seed:
+      "AGENTS.md README.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
+      "scripts/ci-extra.sh crates/common/src/**",
+  },
+};
+const globMatch = (p, path) => (p.endsWith("/**") ? path.startsWith(p.slice(0, -2)) : p === path);
+/** The class a template's base gives `path`, or null when it writes no such file. */
+export function classOf(template, path) {
+  for (const [cls, patterns] of Object.entries(CLASH[template])) {
+    if (patterns.split(" ").some((p) => globMatch(p, path))) return cls;
+  }
+  return null;
+}
+
+/** Signals `--assess` looks for; docs/adopt.md's table is tested against these. */
+export const DETECT = [
+  { id: "pnpm", signal: "pnpm-workspace.yaml or a package.json", template: "template" },
+  { id: "cargo-only", signal: "Cargo.toml and no package.json", template: "template-rust" },
+  { id: "preact", signal: "a package.json depending on preact", piece: "preact-app" },
+  { id: "astro", signal: "a package.json depending on astro", piece: "astro-site" },
+  { id: "hono", signal: "hono dependency next to a wrangler config", piece: "hono-worker" },
+  { id: "tauri", signal: "an @tauri-apps/* dependency or a src-tauri/ dir", piece: "tauri-app" },
+  { id: "rust-bin", signal: "a Cargo crate with [[bin]] or src/main.rs", piece: "rust-cli" },
+  { id: "rust-lib", signal: "a Cargo crate with src/lib.rs and no binary", piece: "rust-tool" },
+  { id: "layout", signal: "apps/, packages/ and crates/ dirs (where pieces go)", info: true },
+];
+const SKIP = new Set(["node_modules", ".git", "target", "dist", "src-tauri"]);
+
+/** Read-only look at an existing repo: signals, the template and pieces that fit, clashes. */
+export function assess(root) {
+  // Regular files up to 1 MB only (never a FIFO, device or symlink), each read once.
+  const cache = new Map();
+  const read = (rel) => {
+    if (!cache.has(rel)) {
+      let text = null;
+      try {
+        const st = lstatSync(join(root, rel));
+        if (st.isFile() && st.size <= 1_000_000) text = readFileSync(join(root, rel), "utf8");
+      } catch {}
+      cache.set(rel, text);
+    }
+    return cache.get(rel);
+  };
+  const list = (rel) => {
+    try {
+      return readdirSync(join(root, rel), { withFileTypes: true });
+    } catch {
+      return []; // unreadable: skip it
+    }
+  };
+  const has = (rel) => existsSync(join(root, rel));
+  const at = (dir, rel) => (dir === "." ? rel : `${dir}/${rel}`);
+  const dirs = ["."];
+  for (const d of list("")) {
+    if (!d.isDirectory() || SKIP.has(d.name) || d.name.startsWith(".")) continue;
+    dirs.push(d.name);
+    for (const e of list(d.name))
+      if (e.isDirectory() && !SKIP.has(e.name)) dirs.push(`${d.name}/${e.name}`);
+  }
+  const json = (d) => {
+    try {
+      return JSON.parse(read(at(d, "package.json")));
+    } catch {
+      return null;
+    }
+  };
+  const npm = dirs.filter((d) => json(d));
+  const cargo = dirs.filter((d) => read(at(d, "Cargo.toml")) !== null);
+  const deps = (d) => Object.keys({ ...json(d)?.dependencies, ...json(d)?.devDependencies });
+  // A workspace root holds the packages; it is not an app itself.
+  const workspaceRoot = has("pnpm-workspace.yaml") || Boolean(json(".")?.workspaces);
+  const apps = npm.filter((d) => !(d === "." && workspaceRoot));
+  const isBin = (d) => /^\[\[bin\]\]/m.test(read(at(d, "Cargo.toml"))) || has(at(d, "src/main.rs"));
+  const tauri = apps.filter(
+    (d) => deps(d).some((n) => n.startsWith("@tauri-apps/")) || has(at(d, "src-tauri")),
+  );
+  const hits = {
+    pnpm: [
+      ...(has("pnpm-workspace.yaml") ? ["pnpm-workspace.yaml"] : []),
+      ...npm.map((d) => at(d, "package.json")),
+    ],
+    "cargo-only": cargo.length && !npm.length ? cargo.map((d) => at(d, "Cargo.toml")) : [],
+    preact: apps.filter((d) => deps(d).includes("preact") && !tauri.includes(d)),
+    astro: apps.filter((d) => deps(d).includes("astro") && !tauri.includes(d)),
+    hono: apps.filter(
+      (d) =>
+        deps(d).includes("hono") && list(d).some((e) => /^wrangler\.(jsonc?|toml)$/.test(e.name)),
+    ),
+    tauri,
+    "rust-bin": cargo.filter(isBin),
+    "rust-lib": cargo.filter((d) => !isBin(d) && has(at(d, "src/lib.rs"))),
+    layout: ["apps", "packages", "crates"].filter(has),
+  };
+  const signals = DETECT.filter((r) => hits[r.id].length).map((r) => ({
+    id: r.id,
+    signal: r.signal,
+    evidence: hits[r.id],
+  }));
+  const template = hits.pnpm.length
+    ? "template"
+    : hits["cargo-only"].length
+      ? "template-rust"
+      : null;
+  const nameOf = (from, rust) => {
+    if (from !== ".") return from.split("/").pop();
+    const n = rust ? /^name\s*=\s*"([^"]+)"/m.exec(read("Cargo.toml") ?? "")?.[1] : json(".")?.name;
+    return (n ?? "app").replace(/^@[^/]+\//, "");
+  };
+  const pieces = [];
+  for (const r of DETECT.filter((x) => x.piece && template)) {
+    if (template === "template-rust" && r.id === "rust-lib") continue; // base holds library crates
+    const rust = r.id.startsWith("rust");
+    for (const from of hits[r.id]) {
+      const to = `${rust ? "crates" : "apps"}/${nameOf(from, rust)}`;
+      const reason = `${r.signal} (${at(from, rust ? "Cargo.toml" : "package.json")})`;
+      const name = to.split("/").pop();
+      const piece = { piece: r.piece, from, to, reason };
+      if (!NAME_RE.test(name))
+        piece.unsure = `name ${JSON.stringify(name)} is not a valid piece name: ask the owner for one`;
+      else if (r.piece === "preact-app" && from.startsWith("packages/")) {
+        piece.unsure =
+          "preact under packages/: a UI library (ui-storybook) or an app? ask the owner";
+      }
+      pieces.push(piece);
+    }
+  }
+  // Clashes with the base (exact paths, and only the `dir/**` prefixes are walked); pieces add
+  // files under their target, so an existing target that is not the source clashes too.
+  const clashes = { owned: [], shared: [], seed: [], targets: [] };
+  const walk = (rel, out) => {
+    for (const e of list(rel)) {
+      const p = `${rel}/${e.name}`;
+      if (e.isDirectory() && !SKIP.has(e.name)) walk(p, out);
+      else if (e.isFile()) out.push(p);
+    }
+  };
+  for (const [cls, patterns] of Object.entries(template ? CLASH[template] : {})) {
+    for (const pat of patterns.split(" ")) {
+      if (pat.endsWith("/**")) walk(pat.slice(0, -3), clashes[cls]);
+      else if (has(pat)) clashes[cls].push(pat);
+    }
+    clashes[cls].sort();
+  }
+  clashes.targets = [
+    ...new Set(pieces.filter((p) => p.to !== p.from && has(p.to)).map((p) => p.to)),
+  ];
+  // Mixed signals: say so and lower the confidence; the owner decides.
+  const unsure = [];
+  const jsDirs = npm.filter((d) => !(d === "." && workspaceRoot));
+  if (cargo.length && npm.length && jsDirs.length <= 1) {
+    unsure.push(
+      "Cargo crates with a small JS part: template/ if the JS stays, template-rust if it is tooling only; ask the owner",
+    );
+  }
+  if (npm.length && !has("pnpm-lock.yaml") && (has("package-lock.json") || has("yarn.lock"))) {
+    unsure.push("uses npm or yarn: template/ moves the repo to pnpm 12; ask the owner");
+  }
+  for (const p of pieces.filter((x) => x.unsure)) unsure.push(`${p.piece} ${p.from}: ${p.unsure}`);
+  const named = pieces.filter((p) => !p.unsure).map((p) => `${p.piece}:${p.to.split("/").pop()}`);
+  const next = template
+    ? adoptNext(adoptCommand(template, [...new Set(named)]))
+    : "no package.json or Cargo.toml: channels only (decisions, bosun init), no template";
+  const confidence = unsure.length ? "low" : "high";
+  return { template, confidence, unsure, signals, pieces, clashes, next };
 }
 
 /** Text report and exit code. */
@@ -500,6 +726,23 @@ if (isMain()) {
   };
   const root = process.cwd();
   const [flag, ...rest] = process.argv.slice(2);
+  if (flag === "--assess") {
+    const a = assess(root);
+    if (rest.includes("--json")) process.stdout.write(`${JSON.stringify(a, null, 2)}\n`);
+    else {
+      const lines = [`template: ${a.template ?? "none"}`, `confidence: ${a.confidence}`];
+      for (const n of a.unsure) lines.push(`unsure ${n}`);
+      for (const s of a.signals) lines.push(`signal ${s.id.padEnd(10)} ${s.evidence.join(", ")}`);
+      for (const p of a.pieces)
+        lines.push(`piece  ${p.piece.padEnd(11)} ${p.from} -> ${p.to}: ${p.reason}`);
+      for (const [cls, list] of Object.entries(a.clashes)) {
+        for (const f of list) lines.push(`clash ${cls.padEnd(6)} ${f}`);
+      }
+      lines.push(`next: ${a.next}`);
+      process.stdout.write(`${lines.join("\n")}\n`);
+    }
+    process.exit(0);
+  }
   if (flag === "--questions") {
     const qs = questions(readAnswers(root), undefined, profileOf(root));
     process.stdout.write(`${JSON.stringify(qs, null, 2)}\n`);
