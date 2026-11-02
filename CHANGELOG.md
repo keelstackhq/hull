@@ -12,6 +12,9 @@ Keep `unreleased` while changes accumulate.
 - `ready --assess [--json]`: a read-only look at an existing repo (signals, the template and
   pieces that fit, with moves, and the files that would clash by class); works copied alone.
   Without a lock, `render` is `ask` ("not adopted") and points at `splice adopt`.
+- `docs/adopt.md`: how an existing repo takes the template (or only the channels): the detection
+  table (tested against `DETECT`), clashes by class, and the order assess → … → hoist apply.
+  The start checklist sends existing repos there.
 
 ## v0.5.2 — 2026-11-01
 
