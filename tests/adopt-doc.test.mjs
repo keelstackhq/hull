@@ -57,7 +57,8 @@ test("adopt.md names every CLASH class and the flow steps in order", () => {
     "channels",
     "hoist",
   ]);
-  assert.match(DOC, /node ready\.mjs --assess --json/);
+  assert.match(DOC, /node \/tmp\/assess\.mjs --assess --json/);
+  assert.match(DOC, /sha256sum -c/);
   assert.match(DOC, /needs splice >= 0\.4\.0/);
   assert.match(DOC, /--allow-dirty/);
   assert.match(DOC, /`splice check` fails until/);
@@ -65,4 +66,15 @@ test("adopt.md names every CLASH class and the flow steps in order", () => {
 
 test("the start checklist sends existing repos to adopt.md", () => {
   assert.match(read("docs/start-checklist.md"), /existing repo.*\(adopt\.md\)/i);
+});
+
+test("adopt.md's fetch URL is pinned to the CHANGELOG's top version, with a sha256 once it is dated", () => {
+  const top = /^## v(\d+\.\d+\.\d+) — (\S+)/m.exec(read("CHANGELOG.md"));
+  assert.match(
+    DOC,
+    new RegExp(`https://keelstack\\.dev/assess/v${top[1].replaceAll(".", "\\.")}\\.mjs`),
+  );
+  assert.doesNotMatch(DOC, /keelstack\.dev\/assess(\.mjs|\/latest)/, "never an unpinned URL");
+  if (top[2] !== "unreleased")
+    assert.doesNotMatch(DOC, /ASSESS_SHA256/, "the release fills in the sha256");
 });

@@ -10,15 +10,25 @@ follows [the start checklist](start-checklist.md) instead. This file is versione
   Preact apps, Astro sites, Hono workers, Tauri apps, TS libraries, Rust crates next to them.
 - **template-rust/**: the repo is Cargo only, with no package.json: Rust CLIs and library crates.
 - **Channels only** (no template): the repo keeps its own stack, CI and layout and takes only the
-  org decisions channel and, if wanted, bosun. `ready --assess` says so when it finds neither a
-  package.json nor a Cargo.toml; the owner may also pick it for any repo whose CI should stay.
+  org decisions channel and, if wanted, bosun (`bosun init --stack rust|ts-pnpm` only: other
+  stacks, such as Python or Go, take the decisions channel only). `ready --assess` says so when it
+  finds neither a package.json nor a Cargo.toml; the owner may also pick it for any repo whose CI
+  should stay.
 
 ## What `ready --assess` looks for
 
-`ready.mjs` runs alone: copy it out of a hull clone (`template/pieces/base/files/scripts/ready.mjs`)
-into any directory and run `node ready.mjs --assess --json` from the repo root. It reads files
-(regular files up to 1 MB, never symlinks) and writes nothing. TODO(owner): a fetch URL for it,
-once hull's visibility for raw downloads is settled.
+`ready.mjs` runs alone. keelstack.dev hosts a pinned copy per hull tag (hull itself is private);
+check its sha256 before running it, from the repo root:
+
+```bash
+curl -fsSL https://keelstack.dev/assess/v0.6.0.mjs -o /tmp/assess.mjs
+echo "ASSESS_SHA256  /tmp/assess.mjs" | sha256sum -c
+node /tmp/assess.mjs --assess --json
+```
+
+`ASSESS_SHA256` is the sha256 of hull v0.6.0's `template/pieces/base/files/scripts/ready.mjs`
+(filled in by the release; never use an unpinned latest URL). With a hull clone, run that file
+directly. It reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 
 | Signal       | Looks for                                           | Gives            |
 | ------------ | --------------------------------------------------- | ---------------- |
@@ -51,8 +61,9 @@ move; code elsewhere is moved by hand on the branch, before `splice adopt`.
 `--assess` lists the repo's files that the template's base would write, by class (the lists are
 `CLASH` in `ready.mjs`; a test keeps them equal here and to a fresh render):
 
-- **owned**: refused while it exists (dry-run action `conflict`, message "refuse: `<path>`");
-  `--force` would replace it (`update`, "replace: `<path>`").
+- **owned**: refused when it exists and differs from the template's (dry-run action `conflict`,
+  message "refuse: `<path>`"; an identical file is `skip`); `--force` would replace it (`update`,
+  "replace: `<path>`").
   - `template/`: `.claude/hooks/guard.mjs`, `.claude/hooks/session-start.sh`, `.claude/hooks/stop-checks.sh`, `.claude/loop.md`, `.claude/settings.json`, `.claude/skills/add-piece/SKILL.md`, `.claude/skills/docs-lookup/SKILL.md`, `.claude/skills/ready/SKILL.md`, `.claude/skills/verify/SKILL.md`, `.claude/statusline.sh`, `.github/scripts/affected.mjs`, `.github/scripts/preview.mjs`, `.github/scripts/release-plan.mjs`, `.github/scripts/rust-affected.mjs`, `.github/workflows/ci.yml`, `.github/workflows/desktop.yml`, `.github/workflows/preview-deploy.yml`, `.github/workflows/preview.yml`, `.github/workflows/release.yml`, `.github/workflows/splice.yml`, `.gitattributes`, `.gitignore`, `.node-version`, `CLAUDE.md`, `Cargo.toml`, `renovate.json`, `rust-toolchain.toml`, `scripts/agents-index.mjs`, `scripts/ready.mjs`, `tsconfig.base.json`, `vite.config.ts`, `packages/shared/tsconfig.json`, `packages/shared/vite.config.ts`
   - `template-rust/`: `.claude/hooks/guard.mjs`, `.claude/hooks/session-start.sh`, `.claude/hooks/stop-checks.sh`, `.claude/loop.md`, `.claude/settings.json`, `.claude/skills/add-piece/SKILL.md`, `.claude/skills/ready/SKILL.md`, `.claude/skills/verify/SKILL.md`, `.claude/statusline.sh`, `.config/nextest.toml`, `.github/scripts/docs-only.mjs`, `.github/scripts/release-pending.mjs`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/splice.yml`, `.gitattributes`, `.gitignore`, `CLAUDE.md`, `deny.toml`, `renovate.json`, `rust-toolchain.toml`, `rustfmt.toml`, `scripts/agents-index.mjs`, `scripts/ready.mjs`
 - **shared**: merged (dry-run action `merge`, or `conflict` when both sides changed).
@@ -89,9 +100,11 @@ Every other file the template writes is new (`create`). Pieces add more files un
 9. **pr**: open the PR with the change list and the owner's choices; it merges like any gated PR.
 10. **channels**: after the merge, add the org decisions channel
     (`splice channel add gh:keelstackhq/decisions//channel --track main --piece import-project`,
-    D-004) and, if wanted, bosun (`bosun init`, start checklist item 8).
-11. **hoist**: `hoist apply` sets the rulesets, environments and Actions settings (start checklist
-    items 4-6); `hoist check` exits 0 when done.
+    D-004) and, if wanted, bosun (`bosun init --stack rust|ts-pnpm`, start checklist item 8;
+    other stacks take the decisions channel only).
+11. **hoist**: `hoist apply` sets the `ci-ok` ruleset, the environments with branch policies and
+    the Actions settings (start checklist items 4-6); `hoist check` exits 0 when done. It does not
+    set the `release-tags` ruleset (item 5) or the `release` reviewer (item 6): those stay manual.
 
 Channels-only repos skip steps 4-9 and start at step 10.
 
