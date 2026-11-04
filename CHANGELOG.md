@@ -7,6 +7,13 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.6.2 — unreleased
+
+- Seeded `scripts/ci-pre.sh` (both templates, no-op): generated CI runs it right after the
+  affected check and before install and build, so a repo can free disk early. Updates never touch it.
+- `template-rust`: `[profile.dev] debug = "line-tables-only"` in the root `Cargo.toml` cuts the disk
+  linking tests uses.
+
 ## v0.6.1 — 2026-11-02
 
 - `ready --assess --json` has a fixed, versioned output schema (`hull.assess/1`): `schema`, `stack`

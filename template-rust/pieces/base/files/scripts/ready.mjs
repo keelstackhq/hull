@@ -510,7 +510,7 @@ export const CLASH = {
     shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
     seed:
       "AGENTS.md README.md docs/agents/onboarding.toml docs/agents/project.md " +
-      "scripts/ci-extra.sh packages/shared/src/**",
+      "scripts/ci-pre.sh scripts/ci-extra.sh packages/shared/src/**",
   },
   "template-rust": {
     owned:
@@ -524,7 +524,7 @@ export const CLASH = {
     shared: "Cargo.toml crates/common/Cargo.toml",
     seed:
       "AGENTS.md README.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
-      "scripts/ci-extra.sh crates/common/src/**",
+      "scripts/ci-pre.sh scripts/ci-extra.sh crates/common/src/**",
   },
 };
 const globMatch = (p, path) => (p.endsWith("/**") ? path.startsWith(p.slice(0, -2)) : p === path);

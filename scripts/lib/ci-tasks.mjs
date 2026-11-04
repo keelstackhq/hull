@@ -5,6 +5,8 @@ const yml = (...lines) => `${lines.join("\n")}\n`;
 const tasks = CI_TASKS.join(" ");
 const notSkipped = "steps.affected.outputs.skip != 'true'";
 const extraRun = "if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi";
+const preRun = "if [ -f scripts/ci-pre.sh ]; then bash scripts/ci-pre.sh; fi";
+const preName = "Repo CI prelude (scripts/ci-pre.sh)";
 const extraName = "Repo CI extras (scripts/ci-extra.sh)";
 const ifRust = `${notSkipped} && steps.rust.outputs.rust == 'true'`;
 
@@ -58,6 +60,10 @@ const GITHUB_STEPS = [
       '            echo "skip=false" >> "$GITHUB_OUTPUT"',
       "          fi",
     ),
+  },
+  {
+    id: "ci-pre",
+    github: yml(`      - name: ${preName}`, `        if: ${notSkipped}`, `        run: ${preRun}`),
   },
   {
     id: "setup-pnpm-node",
@@ -226,6 +232,7 @@ const CIRCLECI = {
     '          echo "turbo query affected failed (exit $code); running everything"',
     "        fi",
   ),
+  "ci-pre": yml("  - run:", `      name: ${preName}`, `      command: ${preRun}`),
   "setup-pnpm-node": yml(
     "  - run:",
     "      name: pnpm (corepack, version from packageManager)",
@@ -453,6 +460,11 @@ export const RUST_CI_PLAN = Object.freeze(
           '        { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key',
         ),
       ),
+    },
+    {
+      id: "ci-pre",
+      github: yml(`      - name: ${preName}`, `        if: ${NOT_DOCS}`, `        run: ${preRun}`),
+      circleci: CIRCLECI["ci-pre"],
     },
     {
       id: "rust-toolchain",

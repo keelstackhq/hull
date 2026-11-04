@@ -39,6 +39,10 @@ jobs:
       - name: Docs only?
         id: affected
         run: node .github/scripts/docs-only.mjs >> "$GITHUB_OUTPUT"
+      # step: ci-pre
+      - name: Repo CI prelude (scripts/ci-pre.sh)
+        if: steps.affected.outputs.skip != 'true'
+        run: if [ -f scripts/ci-pre.sh ]; then bash scripts/ci-pre.sh; fi
       # step: rust-toolchain
       - name: Rust toolchain (from rust-toolchain.toml)
         if: steps.affected.outputs.skip != 'true'
