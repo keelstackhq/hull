@@ -32,8 +32,8 @@ Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
 - Releases are made by the release workflow (hoist) after a human merges the release PR; never
   publish, tag or push tags yourself.
 - At most 2-3 parallel agents, on files that barely overlap.
-- Before a long task write the next steps to `docs/agents/project.md`; start fresh rather than
-  compacting.
+- Before a long task write the next steps to `docs/agents/project.md`; compact or start fresh,
+  whichever fits; tell the owner which.
 - A hook `ask` becomes a denial in `-p`/unattended runs: do the change by hand or run interactively.
 
 ## Crates
