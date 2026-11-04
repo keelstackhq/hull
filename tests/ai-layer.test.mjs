@@ -260,15 +260,12 @@ test("settings.json is valid and wires hooks", async () => {
     'node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs"',
   );
   assert.equal(s.hooks.PreToolUse[0].hooks[0].timeout, 10);
-  assert.equal(s.enabledPlugins["superpowers@superpowers-marketplace"], true);
-  assert.equal(s.enabledPlugins["caveman@akramsystems-plugins"], true);
-  assert.deepEqual(s.extraKnownMarketplaces["superpowers-marketplace"].source, {
+  assert.equal(s.enabledPlugins["superpowers@keelstack"], true);
+  assert.equal(s.enabledPlugins["caveman@keelstack"], true);
+  assert.deepEqual(s.extraKnownMarketplaces.keelstack.source, {
     source: "github",
-    repo: "obra/superpowers-marketplace",
-  });
-  assert.deepEqual(s.extraKnownMarketplaces["akramsystems-plugins"].source, {
-    source: "github",
-    repo: "akramsystems/caveman",
+    repo: "keelstackhq/bosun",
+    ref: "main",
   });
   assert.ok(s.permissions.deny.some((d) => /push \*?--force/.test(d)));
   assert.ok(s.permissions.deny.some((d) => d.includes(".env")));
