@@ -21,12 +21,12 @@ follows [the start checklist](start-checklist.md) instead. This file is versione
 check its sha256 before running it, from the repo root:
 
 ```bash
-curl -fsSL https://keelstack.dev/assess/v0.6.1.mjs -o /tmp/assess.mjs
-echo "77f7f697a6b066444215b529d0aba753bffd43b38595a05d5b928e42e841ed47  /tmp/assess.mjs" | sha256sum -c
+curl -fsSL https://keelstack.dev/assess/v0.6.2.mjs -o /tmp/assess.mjs
+echo "ASSESS_SHA256  /tmp/assess.mjs" | sha256sum -c
 node /tmp/assess.mjs --assess --json
 ```
 
-The sha256 is that of hull v0.6.1's `template/pieces/base/files/scripts/ready.mjs` (a hull test
+The sha256 is that of hull v0.6.2's `template/pieces/base/files/scripts/ready.mjs` (a hull test
 keeps it equal); never use an unpinned latest URL. With a hull clone, run that file directly. It
 reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 
@@ -89,8 +89,8 @@ on any breaking change (a removed, renamed or retyped field); otherwise fields a
   - `template/`: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `packages/shared/package.json`
   - `template-rust/`: `Cargo.toml`, `crates/common/Cargo.toml`
 - **seed**: kept as they are (dry-run action `skip`).
-  - `template/`: `AGENTS.md`, `README.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `scripts/ci-extra.sh`, `packages/shared/src/**`
-  - `template-rust/`: `AGENTS.md`, `README.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `hoist.toml`, `scripts/ci-extra.sh`, `crates/common/src/**`
+  - `template/`: `AGENTS.md`, `README.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `packages/shared/src/**`
+  - `template-rust/`: `AGENTS.md`, `README.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `hoist.toml`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `crates/common/src/**`
 - **targets**: a piece's target directory that already exists and is not the piece's source.
 
 Every other file the template writes is new (`create`). Pieces add more files under their target.

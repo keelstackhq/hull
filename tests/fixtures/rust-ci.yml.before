@@ -35,6 +35,9 @@ jobs:
       - name: Docs only?
         id: affected
         run: node .github/scripts/docs-only.mjs >> "$GITHUB_OUTPUT"
+      - name: Repo CI prelude (scripts/ci-pre.sh)
+        if: steps.affected.outputs.skip != 'true'
+        run: if [ -f scripts/ci-pre.sh ]; then bash scripts/ci-pre.sh; fi
       - name: Rust toolchain (from rust-toolchain.toml)
         if: steps.affected.outputs.skip != 'true'
         run: rustup toolchain install

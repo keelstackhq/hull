@@ -80,6 +80,7 @@ Files (seed):
 
 - `AGENTS.md`
 - `docs/agents/onboarding.toml`
+- `scripts/ci-pre.sh`
 - `scripts/ci-extra.sh`
 - `README.md`
 - `docs/agents/project.md`

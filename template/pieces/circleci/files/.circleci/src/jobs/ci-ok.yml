@@ -38,6 +38,10 @@ steps:
         else
           echo "turbo query affected failed (exit $code); running everything"
         fi
+  # step: ci-pre
+  - run:
+      name: Repo CI prelude (scripts/ci-pre.sh)
+      command: if [ -f scripts/ci-pre.sh ]; then bash scripts/ci-pre.sh; fi
   # step: setup-pnpm-node
   - run:
       name: pnpm (corepack, version from packageManager)
