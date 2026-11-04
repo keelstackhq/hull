@@ -8,4 +8,4 @@ description: Write the state of the current task down so a fresh session can con
    and what is blocked on a human (the exact action they must take).
 3. Name the commands that prove the current state (tests, checks) and their last result.
 4. Do not commit unless the task says so. Then tell the user that a fresh session can continue
-   from these notes; start fresh rather than compacting.
+   from these notes; compact or start fresh, whichever fits; tell the owner which.
