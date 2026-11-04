@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -48,7 +49,36 @@ const DENY = [
   "git --git-dir=.git push -f",
   "git push --tags",
   "git push --follow-tags",
-  "git push origin cli-v1.2.0",
+  "git push origin refs/tags/cli-v1.2.0",
+  "git push origin tag cli-v1.2.0",
+  "git push origin HEAD:refs/tags/x",
+  "git tag v1.0.0",
+  "git tag -a v1.0.0 -m x",
+  "git tag -d v1.0.0",
+  "bash <<EOF\nnpm publish\nEOF",
+  "cat <<EOF > x\nhi\nEOF\nnpm publish",
+  "cat .env <<EOF\nx\nEOF",
+  'cat ".env"',
+  "git update-ref refs/tags/v1 HEAD",
+  "git update-ref -d refs/tags/v1",
+  "git update-ref --stdin",
+  "gh api -X POST repos/o/r/pulls/5/merge",
+  "gh api repos/o/r/pulls/5/merge --method PUT",
+  "gh api --method=DELETE repos/o/r/git/refs/tags/v1",
+  "gh api -XPATCH repos/o/r/pulls/5",
+  "gh api repos/o/r/issues -f title=x",
+  "gh api repos/o/r/issues -F body=@f",
+  "gh api repos/o/r/issues --field a=b",
+  "gh api repos/o/r/issues --raw-field a=b",
+  "gh api repos/o/r/issues --input body.json",
+  "gh api repos/o/r/pulls/5 -X put",
+  "gh api graphql -f query='mutation { x }'",
+  "gh api graphql --input q.json",
+  "python3 <<EOF\nprint(open('.env').read())\nEOF",
+  "node <<'EOF'\nrequire('fs').readFileSync('apps/api/.dev.vars')\nEOF",
+  "ruby <<EOF\nFile.read('.env.local')\nEOF",
+  "perl <<EOF\nopen(F, '<.env')\nEOF",
+  'bash -c "cat .env"',
   "git push origin refs/tags/x",
   "cat .env",
   "cat apps/api/.env.local",
@@ -99,6 +129,26 @@ const ALLOW = [
   "git push origin :feature",
   "git push --delete origin feature",
   "env -u FOO pnpm test",
+  "git push origin m16-t10-policy-v2",
+  "git push -u origin feat/x-v2",
+  "git push origin HEAD:refs/heads/m16-v3",
+  "git tag",
+  "gh api repos/o/r/pulls/5 --jq '.title'",
+  "gh api -X get repos/o/r/pulls/5",
+  "gh api graphql",
+  "python3 <<EOF\nprint('see .env.example')\nEOF",
+  "python3 <<EOF\nprint(1)\nEOF",
+  "git update-ref refs/heads/x HEAD",
+  "git tag -l 'v*'",
+  "git tag --list",
+  "gh api repos/o/r/pulls/5 --jq '.auto_merge'",
+  "gh api repos/o/r/pulls/5 -X GET --jq '.auto_merge'",
+  "echo 'state: .env needs review'",
+  'gh pr create --body "mentions .env and .dev.vars files"',
+  "git commit -m 'docs: explain .env.local handling'",
+  "cat <<'EOF' > notes.md\nsee .env and .dev.vars\nnpm publish\nEOF",
+  "cat <<-EOF\n\t.env\n\tEOF\necho done",
+  "git commit -F - <<EOF\nlabel .env\nEOF",
 ];
 for (const c of DENY) {
   test(`deny: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
@@ -232,4 +282,34 @@ test("rendered base tree contains .github/workflows/release.yml, the file the gu
   const c = result.changes.find((x) => x.path === `.github/workflows/${named}`);
   assert.equal(c?.class, "owned");
   assert.match(readFileSync(join(dir, ".github/workflows", named), "utf8"), /^name: release$/m);
+});
+
+test("bare tag destination refused when the tag exists in refs/tags or packed-refs", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-tags-"));
+  mkdirSync(join(dir, ".git/refs/tags/sub"), { recursive: true });
+  writeFileSync(join(dir, ".git/refs/tags/web-v1.0.0"), "x\n");
+  writeFileSync(join(dir, ".git/refs/tags/sub/api-v2"), "x\n");
+  writeFileSync(
+    join(dir, ".git/packed-refs"),
+    "# pack-refs\nabc refs/tags/cli-v3.0.0\nabc refs/heads/m1-v2\n",
+  );
+  const c = { projectDir: dir };
+  for (const cmd of [
+    "git push origin web-v1.0.0",
+    "git push origin sub/api-v2",
+    "git push origin cli-v3.0.0",
+    "git push origin HEAD:web-v1.0.0",
+    "git push origin web-v1.0.0:web-v1.0.0",
+    "git push origin tmp:web-v1.0.0",
+    "git push origin web-v1.0.0:newname",
+    "git push origin refs/tags/web-v1.0.0:newname",
+  ])
+    assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
+  for (const cmd of [
+    "git push origin m1-v2",
+    "git push origin m16-t10-policy-v2",
+    "git push origin HEAD:m1-v2",
+    "git push origin tmp:m1-v2",
+  ])
+    assert.equal(decide(bash(cmd), c), null, cmd);
 });
