@@ -1,18 +1,20 @@
 // PreToolUse guard: denies releases, force/tag pushes, deleting main/master on the remote, secret
 // reads and lock edits; asks before editing files the template owns. A guard rail, not a sandbox.
-// Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell
+// `gh api` writes (non-GET, -f/-F/--input, mutations) and `git update-ref refs/tags/` deny; a bare push
+// dst is a tag when it exists in refs/tags or packed-refs. Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell
 // heredoc is still scanned). Tag pushes mean refs/tags/, `tag <name>`, --tags; `git tag` writes deny.
 // Known gaps: `eval`, `$(...)` and backticks, scripts that publish, editing owned files through
 // Bash, and a default branch not named main or master. Node built-ins only.
 // Any internal error allows the call and prints one stderr line; settings deny rules stay as the
 // second layer.
-import { readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template", ".dev.vars.example"]);
 const MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const SHELLS = new Set(["bash", "sh", "zsh"]);
+const INTERPRETERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
 const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", ...EDIT_TOOLS]);
@@ -32,6 +34,8 @@ const REASON = {
     "never delete the default branch on the remote: delete feature branches only, or ask the human.",
   secret:
     "Secret files are off limits: read .env.example for the variable names, or ask the human.",
+  ghApi:
+    "gh api writes are blocked: use plain GET reads, or ask the human for the change (a PR merges by its owner).",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
   owned:
     "owned by the template: `splice update` overwrites it; put local changes in seed files or docs/agents/project.md",
@@ -201,6 +205,14 @@ export function commands(cmd) {
     const t = stripPrefixes(seg);
     if (!t.length) continue;
     out.push(t);
+    if (INTERPRETERS.test(base(t[0]))) {
+      // Heredoc code is not scanned like a shell, only for reads of secret files.
+      for (const body of seg.docs ?? []) {
+        for (const m of body.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
+          if (secretLike(m[0])) out.push(["cat", m[0]]);
+        }
+      }
+    }
     if (SHELLS.has(base(t[0]))) {
       for (const body of seg.docs ?? []) {
         for (const inner of commands(body)) out.push(inner);
@@ -250,7 +262,44 @@ function gitSub(t) {
   return { sub: t[i], args: t.slice(i + 1) };
 }
 
-function pushRule(args) {
+/** Directories that hold refs: the repo's .git (or a worktree's gitdir and its common dir). */
+function gitDirs(projectDir) {
+  const dirs = [];
+  try {
+    const dot = resolve(projectDir, ".git");
+    if (statSync(dot).isDirectory()) dirs.push(dot);
+    else {
+      const gd = /^gitdir:\s*(.+)$/m.exec(readFileSync(dot, "utf8"))?.[1];
+      if (gd) {
+        const dir = resolve(projectDir, gd.trim());
+        dirs.push(dir);
+        const cd = resolve(dir, readFileSync(resolve(dir, "commondir"), "utf8").trim());
+        dirs.push(cd);
+      }
+    }
+  } catch {
+    // not a git checkout, or unreadable: no known tags
+  }
+  return dirs;
+}
+
+/** True when `name` is an existing tag (loose ref or packed-refs); a bare push dst can be one. */
+function isTagName(name, projectDir) {
+  if (!name || name.includes("..") || name.startsWith("/")) return false;
+  const short = name.replace(/^refs\/tags\//, "");
+  for (const dir of gitDirs(projectDir)) {
+    if (existsSync(resolve(dir, "refs/tags", short))) return true;
+    try {
+      const packed = readFileSync(resolve(dir, "packed-refs"), "utf8");
+      if (packed.split("\n").some((l) => l.endsWith(` refs/tags/${short}`))) return true;
+    } catch {
+      // no packed-refs
+    }
+  }
+  return false;
+}
+
+function pushRule(args, projectDir) {
   let tag = false;
   let del = false;
   const refs = [];
@@ -266,7 +315,7 @@ function pushRule(args) {
       refs.push(a);
       const dst = a.slice(a.lastIndexOf(":") + 1);
       if (a.startsWith(":") && DEFAULT_BRANCH_RE.test(dst)) return "deleteDefault";
-      if (dst.startsWith("refs/tags/")) tag = true;
+      if (dst.startsWith("refs/tags/") || isTagName(dst, projectDir)) tag = true;
     }
   }
   if (del && refs.some((r) => DEFAULT_BRANCH_RE.test(r))) return "deleteDefault";
@@ -284,7 +333,21 @@ function writesLock(t, i) {
   );
 }
 
-function bashRule(t) {
+/** `gh api` that writes: a non-GET method, a body/field flag (these imply POST) or a mutation. */
+function ghApiWrites(args) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    let method;
+    if (a === "-X" || a === "--method") method = args[i + 1];
+    else if (a.startsWith("--method=")) method = a.slice(9);
+    else if (/^-X./.test(a)) method = a.slice(2);
+    if (method !== undefined && method.toUpperCase() !== "GET") return true;
+    if (/^(-[fF]|--field|--raw-field|--input)(=|$)/.test(a) || /^-[fF][^-]/.test(a)) return true;
+  }
+  return args.includes("graphql") && args.some((a) => /\bmutation\b/i.test(a));
+}
+
+function bashRule(t, projectDir) {
   const prog = base(t[0]);
   const args = t.slice(1);
   if (
@@ -294,11 +357,13 @@ function bashRule(t) {
     return "publish";
   if (prog === "cargo" && args.includes("publish")) return "publish";
   if (prog === "changeset" && args.includes("publish")) return "publish";
+  if (prog === "gh" && args[0] === "api" && ghApiWrites(args.slice(1))) return "ghApi";
   if (prog === "gh" && args[0] === "release" && ["create", "upload"].includes(args[1]))
     return "publish";
   if (prog === "git") {
     const { sub, args: rest } = gitSub(t);
-    if (sub === "push") return pushRule(rest);
+    if (sub === "push") return pushRule(rest, projectDir);
+    if (sub === "update-ref" && rest.some((a) => a.startsWith("refs/tags/"))) return "tag";
     if (sub === "tag" && rest.length && !TAG_READ_RE.test(rest[0])) return "tag";
   }
   // A token with whitespace is prose (a quoted message or label), not a file name.
@@ -327,7 +392,7 @@ export function decide(input, ctx) {
   const deny = (key) => ({ decision: "deny", reason: REASON[key] });
   if (name === "Bash") {
     for (const t of commands(ti.command)) {
-      const rule = bashRule(t);
+      const rule = bashRule(t, ctx.projectDir);
       if (rule) return deny(rule);
     }
     return null;
