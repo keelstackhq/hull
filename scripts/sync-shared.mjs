@@ -10,6 +10,7 @@ const FROM = join(ROOT, "template/pieces/base/files");
 const TO = join(ROOT, "template-rust/pieces/base/files");
 export const SHARED = [
   "scripts/ready.mjs",
+  ".claude/hooks/guard.mjs",
   ".claude/skills/ready/SKILL.md",
   "docs/agents/onboarding.toml",
 ];

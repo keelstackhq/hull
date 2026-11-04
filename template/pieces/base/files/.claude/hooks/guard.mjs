@@ -1,5 +1,7 @@
 // PreToolUse guard: denies releases, force/tag pushes, deleting main/master on the remote, secret
 // reads and lock edits; asks before editing files the template owns. A guard rail, not a sandbox.
+// Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell
+// heredoc is still scanned). Tag pushes mean refs/tags/, `tag <name>`, --tags; `git tag` writes deny.
 // Known gaps: `eval`, `$(...)` and backticks, scripts that publish, editing owned files through
 // Bash, and a default branch not named main or master. Node built-ins only.
 // Any internal error allows the call and prints one stderr line; settings deny rules stay as the
@@ -14,6 +16,8 @@ const SHELLS = new Set(["bash", "sh", "zsh"]);
 const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", ...EDIT_TOOLS]);
+const TAG_READ_RE =
+  /^(-l|-n\d*|-v|--(list|verify|contains|no-contains|points-at|merged|no-merged|sort|format|column)(=.*)?)$/;
 const DEFAULT_BRANCH_RE = /^(refs\/heads\/)?(main|master)$/;
 
 /** Program name without its directory: `/usr/bin/npm` → `npm`. */
@@ -23,7 +27,7 @@ const REASON = {
   publish: "Releases run in CI from a tag a human pushes (release.yml); do not publish from here.",
   force:
     "Push without --force or +refspec; rebase onto the remote branch, or ask the human to rewrite history.",
-  tag: "a tag push publishes: push branches only and ask the human to push release tags.",
+  tag: "a tag push publishes: push branches only and ask the human to create and push release tags.",
   deleteDefault:
     "never delete the default branch on the remote: delete feature branches only, or ask the human.",
   secret:
@@ -62,6 +66,8 @@ function split(cmd) {
   let cur = "";
   let has = false;
   let quote = "";
+  let pending = [];
+  let docs = [];
   const endToken = () => {
     if (has) tokens.push(cur);
     cur = "";
@@ -69,8 +75,12 @@ function split(cmd) {
   };
   const endSegment = () => {
     endToken();
-    if (tokens.length) segments.push(tokens);
+    if (tokens.length) {
+      if (docs.length) tokens.docs = docs;
+      segments.push(tokens);
+    }
     tokens = [];
+    docs = [];
   };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
@@ -84,6 +94,34 @@ function split(cmd) {
     } else if (c === "\\" && i + 1 < cmd.length) {
       cur += cmd[++i];
       has = true;
+    } else if (c === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
+      const m = /^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|([^\s;&|<>()]+))/.exec(cmd.slice(i));
+      if (m) {
+        endToken();
+        pending.push({ strip: m[1] === "-", word: m[2] ?? m[3] ?? m[4] });
+        i += m[0].length - 1;
+      } else {
+        cur += c;
+        has = true;
+      }
+    } else if (c === "\n" && pending.length) {
+      // Heredoc bodies are data, not commands; keep them only for a shell that reads them.
+      let at = i + 1;
+      for (const { strip, word } of pending) {
+        let body = "";
+        while (at < cmd.length) {
+          let end = cmd.indexOf("\n", at);
+          if (end < 0) end = cmd.length;
+          const line = cmd.slice(at, end);
+          at = end + 1;
+          if ((strip ? line.replace(/^\t+/, "") : line) === word) break;
+          body += `${line}\n`;
+        }
+        docs.push(body);
+      }
+      pending = [];
+      i = at - 1;
+      endSegment();
     } else if (c === ";" || c === "|" || c === "\n") {
       endSegment();
     } else if (c === "&" && !cur.endsWith(">") && !cur.endsWith("<")) {
@@ -164,6 +202,9 @@ export function commands(cmd) {
     if (!t.length) continue;
     out.push(t);
     if (SHELLS.has(base(t[0]))) {
+      for (const body of seg.docs ?? []) {
+        for (const inner of commands(body)) out.push(inner);
+      }
       const i = t.findIndex((x, n) => n > 0 && /^-[a-z]*c$/.test(x));
       if (i > 0 && t[i + 1] !== undefined) {
         for (const inner of split(t[i + 1])) {
@@ -219,12 +260,13 @@ function pushRule(args) {
     if (/^-[A-Za-z]*f[A-Za-z]*$/.test(a)) return "force";
     if (a.startsWith("+")) return "force";
     if (a === "--tags" || a === "--follow-tags") tag = true;
+    if (a === "tag" && refs.length === 1) tag = true; // `git push <remote> tag <name>`
     if (a === "--delete" || /^-[A-Za-z]*d[A-Za-z]*$/.test(a)) del = true;
     if (!a.startsWith("-")) {
       refs.push(a);
       const dst = a.slice(a.lastIndexOf(":") + 1);
       if (a.startsWith(":") && DEFAULT_BRANCH_RE.test(dst)) return "deleteDefault";
-      if (dst.startsWith("refs/tags/") || /^[^/\s]*-v\d/.test(dst)) tag = true;
+      if (dst.startsWith("refs/tags/")) tag = true;
     }
   }
   if (del && refs.some((r) => DEFAULT_BRANCH_RE.test(r))) return "deleteDefault";
@@ -257,8 +299,10 @@ function bashRule(t) {
   if (prog === "git") {
     const { sub, args: rest } = gitSub(t);
     if (sub === "push") return pushRule(rest);
+    if (sub === "tag" && rest.length && !TAG_READ_RE.test(rest[0])) return "tag";
   }
-  if (t.some(secretLike)) return "secret";
+  // A token with whitespace is prose (a quoted message or label), not a file name.
+  if (t.some((x) => !/\s/.test(x) && secretLike(x))) return "secret";
   const li = t.findIndex((x) => LOCK_RE.test(x.replace(/^\d*[>&]*/, "").replace(/^\.\//, "")));
   if (li >= 0 && writesLock(t, li)) return "lock";
   return null;
