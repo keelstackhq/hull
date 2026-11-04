@@ -490,8 +490,9 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   command -v bosun >/dev/null 2>&1; then exec bosun hook …; fi`: exit 0 and silent unless the repo
   uses bosun, and `exec` passes bosun's stdin and exit code (a block) through; timeout 120;
   `tests/bosun-hooks.test.mjs` runs the guard with and without bosun; `extraKnownMarketplaces` + `enabledPlugins` for superpowers
-  (`superpowers@superpowers-marketplace`, repo `obra/superpowers-marketplace`) and caveman
-  (`caveman@akramsystems-plugins`, repo `akramsystems/caveman`). Shape checked against
+  (`superpowers@keelstack`) and caveman (`caveman@keelstack`), both from the one `keelstack`
+  marketplace, repo `keelstackhq/bosun` at `ref: main`; bosun's `marketplace.json` pins each
+  plugin by sha. Shape checked against
   code.claude.com/docs (settings, hooks, statusline) on 2026-10-14: `enabledPlugins` keys are
   `<plugin>@<marketplace-key>`; repo-level `extraKnownMarketplaces` apply only after the user
   accepts the workspace trust dialog. The marketplace names inside those repos' manifests were not
