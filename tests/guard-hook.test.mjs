@@ -61,6 +61,7 @@ const DENY = [
   'cat ".env"',
   "git update-ref refs/tags/v1 HEAD",
   "git update-ref -d refs/tags/v1",
+  "git update-ref --stdin",
   "gh api -X POST repos/o/r/pulls/5/merge",
   "gh api repos/o/r/pulls/5/merge --method PUT",
   "gh api --method=DELETE repos/o/r/git/refs/tags/v1",
@@ -299,12 +300,16 @@ test("bare tag destination refused when the tag exists in refs/tags or packed-re
     "git push origin cli-v3.0.0",
     "git push origin HEAD:web-v1.0.0",
     "git push origin web-v1.0.0:web-v1.0.0",
+    "git push origin tmp:web-v1.0.0",
+    "git push origin web-v1.0.0:newname",
+    "git push origin refs/tags/web-v1.0.0:newname",
   ])
     assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
   for (const cmd of [
     "git push origin m1-v2",
     "git push origin m16-t10-policy-v2",
     "git push origin HEAD:m1-v2",
+    "git push origin tmp:m1-v2",
   ])
     assert.equal(decide(bash(cmd), c), null, cmd);
 });

@@ -316,6 +316,9 @@ function pushRule(args, projectDir) {
       const dst = a.slice(a.lastIndexOf(":") + 1);
       if (a.startsWith(":") && DEFAULT_BRANCH_RE.test(dst)) return "deleteDefault";
       if (dst.startsWith("refs/tags/") || isTagName(dst, projectDir)) tag = true;
+      // A tag src with an unqualified dst (`tmp:name`) still pushes a tag.
+      const src = a.includes(":") ? a.slice(0, a.indexOf(":")).replace(/^\+/, "") : "";
+      if (src && (src.startsWith("refs/tags/") || isTagName(src, projectDir))) tag = true;
     }
   }
   if (del && refs.some((r) => DEFAULT_BRANCH_RE.test(r))) return "deleteDefault";
@@ -363,7 +366,8 @@ function bashRule(t, projectDir) {
   if (prog === "git") {
     const { sub, args: rest } = gitSub(t);
     if (sub === "push") return pushRule(rest, projectDir);
-    if (sub === "update-ref" && rest.some((a) => a.startsWith("refs/tags/"))) return "tag";
+    if (sub === "update-ref" && rest.some((a) => a === "--stdin" || a.startsWith("refs/tags/")))
+      return "tag";
     if (sub === "tag" && rest.length && !TAG_READ_RE.test(rest[0])) return "tag";
   }
   // A token with whitespace is prose (a quoted message or label), not a file name.
