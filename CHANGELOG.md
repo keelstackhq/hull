@@ -7,12 +7,19 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.6.2 — unreleased
+## v0.6.2 — 2026-11-05
 
 - Seeded `scripts/ci-pre.sh` (both templates, no-op): generated CI runs it right after the
   affected check and before install and build, so a repo can free disk early. Updates never touch it.
 - `template-rust`: `[profile.dev] debug = "line-tables-only"` in the root `Cargo.toml` cuts the disk
   linking tests uses.
+- The `guard` hook matches tag refs, executables and mutating `gh api` calls only, so read-only
+  commands that merely mention them pass.
+- Agents compact or start fresh, whichever fits, and tell the owner which (`AGENTS.md` in both
+  templates and the rigging `handoff` skill).
+- The three `.claude/settings.json` files (hull, `template`, `template-rust`) enable
+  `superpowers@keelstack` and `caveman@keelstack` from the keelstack plugin marketplace
+  (`keelstackhq/bosun`), which pins each plugin by sha.
 
 ## v0.6.1 — 2026-11-02
 
