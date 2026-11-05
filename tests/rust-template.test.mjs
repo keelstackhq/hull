@@ -123,7 +123,12 @@ test("ci.yml: one job + ci-ok, every later step checks skip, no Node setup, no p
   const wf = YAML.parse(await ciText());
   assert.deepEqual(Object.keys(wf.jobs), ["ci", "ci-ok"]);
   assert.deepEqual(Object.keys(wf.on).sort(), ["merge_group", "pull_request", "push"]);
-  assert.equal(wf.on.pull_request, null);
+  assert.deepEqual(wf.on.pull_request.types, [
+    "opened",
+    "synchronize",
+    "reopened",
+    "ready_for_review",
+  ]);
   const steps = wf.jobs.ci.steps;
   const checkout = steps.find((s) => s.uses?.startsWith("actions/checkout"));
   assert.equal(checkout.with["fetch-depth"], 0);
@@ -138,7 +143,7 @@ test("ci.yml: one job + ci-ok, every later step checks skip, no Node setup, no p
   const tools = steps.find((s) => s.uses?.startsWith("taiki-e/install-action")).with.tool;
   assert.equal(tools, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
   assert.equal(wf.jobs["ci-ok"].needs[0], "ci");
-  assert.equal(wf.jobs["ci-ok"].if, "always()");
+  assert.equal(wf.jobs["ci-ok"].if, "always() && github.event.pull_request.draft != true");
 });
 
 test("docs-only: only root markdown, docs/, .claude/ and LICENSE skip; crates/ never", () => {

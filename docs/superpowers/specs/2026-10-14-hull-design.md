@@ -636,7 +636,7 @@ upstream.
 
 ### 8.1 `ci.yml` (one job + `ci-ok`)
 
-- `on: pull_request`, `merge_group`, and `push` to the default branch (only so caches exist on the
+- `on: pull_request` (`types: [opened, synchronize, reopened, ready_for_review]`), `merge_group`, and `push` to the default branch (only so caches exist on the
   default branch; PR caches are not shared between PRs). No workflow-level `paths` filters.
 - `concurrency: { group: ci-${{ github.event.pull_request.number || github.ref }},
   cancel-in-progress: ${{ github.event_name == 'pull_request' }} }`; `permissions: contents: read`.
@@ -671,7 +671,8 @@ upstream.
   7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
   8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
      step summary, timed from a first `Start timer` step.
-- Job `ci-ok`: `needs: [ci]`, `if: always()`, fails unless `needs.ci.result == 'success'`. It is
+- Drafts: every job of every PR-triggered workflow (`ci`, `ci-ok`, `preview`; also `template-rust` and hull's own `ci.yml`) has `if: github.event.pull_request.draft != true` (`ci-ok`: `always() && …`), so a draft PR uses no CI minutes and the run starts on `ready_for_review`. A skipped required check does not block a draft, which cannot merge anyway. Every PR workflow cancels superseded runs (`tests/draft-skip.test.mjs`).
+- Job `ci-ok`: `needs: [ci]`, `if: always() && draft != true`, fails unless `needs.ci.result == 'success'`. It is
   the only required check.
 - Actions are pinned by tag in the template; Renovate pins digests (§8.6).
 - Not on the PR path: Playwright, Storybook build and visual tests, Tauri builds.

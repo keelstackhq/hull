@@ -27,6 +27,7 @@ const header = `name: ci
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   push:
     branches: [main]
@@ -40,6 +41,7 @@ permissions:
 
 jobs:
   ci:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -51,7 +53,7 @@ jobs:
 const footer = `
   ci-ok:
     needs: [ci]
-    if: always()
+    if: always() && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - name: Require ci success
@@ -87,6 +89,7 @@ const rustHeader = `name: ci
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   push:
     branches: [main]
@@ -103,6 +106,7 @@ env:
 
 jobs:
   ci:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

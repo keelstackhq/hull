@@ -1,26 +1,26 @@
 {
   "web": {
-    "ci.yml": "ee5b24755149cc38f1d3efd97adf54dcdf0406ff39c2d9f5acf1a2adff7c8a0c",
+    "ci.yml": "b4036bb1a9aef13866d680be89f37ea10cbe201601773a3f12bfd622208207f1",
     "preview-deploy.yml": "7049e2e38d8c2b9f100c050da5515c986622e3f75da784ba304434ca2f8e9491",
-    "preview.yml": "666ee6b97902053a9dbc50d52384cc1341d6c1333edebf7a698ab6d9893055c9",
+    "preview.yml": "2effa921e46d8c405c9866d61a42f03b3d53e4913c94f8ff0f05f5ba6d632874",
     "release.yml": "42f914e678e7b4d83c9ab5d282ae89edca956ad12821bb14439543cdf8375776",
     "splice.yml": "dbcdb9f8bd25a87cedafbdd03e44096a54544af93d5f411191f756bbfcb70ac0"
   },
   "desktop": {
-    "ci.yml": "ee5b24755149cc38f1d3efd97adf54dcdf0406ff39c2d9f5acf1a2adff7c8a0c",
+    "ci.yml": "b4036bb1a9aef13866d680be89f37ea10cbe201601773a3f12bfd622208207f1",
     "desktop.yml": "8f79080b4f12f4ec1b872c30a59487ce90358c6482e70e1c58944e5e3afce3ed",
     "preview-deploy.yml": "7049e2e38d8c2b9f100c050da5515c986622e3f75da784ba304434ca2f8e9491",
-    "preview.yml": "666ee6b97902053a9dbc50d52384cc1341d6c1333edebf7a698ab6d9893055c9",
+    "preview.yml": "2effa921e46d8c405c9866d61a42f03b3d53e4913c94f8ff0f05f5ba6d632874",
     "release.yml": "42f914e678e7b4d83c9ab5d282ae89edca956ad12821bb14439543cdf8375776",
     "splice.yml": "dbcdb9f8bd25a87cedafbdd03e44096a54544af93d5f411191f756bbfcb70ac0"
   },
   "rust": {
-    "ci.yml": "7ecfb8dd17e395dc8a68e0306ba8af562dab947e655244a2f08e618e676c7d71",
+    "ci.yml": "5b56ecc490a0b29be737fc882f1fc630a74dc3d4386542829e62f24d7d84af0e",
     "release.yml": "a39ddb75fbba035a3d137256f12cf64a08c1d69435886fdcb0246b4c1fb68875",
     "splice.yml": "54850a170729125cfe74c7dbf64f0fa55d61ea620a0474a5d1f9189637aaca53"
   },
   "rust-circleci": {
-    "ci.yml": "7ecfb8dd17e395dc8a68e0306ba8af562dab947e655244a2f08e618e676c7d71",
+    "ci.yml": "5b56ecc490a0b29be737fc882f1fc630a74dc3d4386542829e62f24d7d84af0e",
     "release.yml": "a39ddb75fbba035a3d137256f12cf64a08c1d69435886fdcb0246b4c1fb68875",
     "splice.yml": "54850a170729125cfe74c7dbf64f0fa55d61ea620a0474a5d1f9189637aaca53"
   }
