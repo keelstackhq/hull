@@ -53,11 +53,15 @@ jobs:
 const footer = `
   ci-ok:
     needs: [ci]
-    if: always() && github.event.pull_request.draft != true
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Require ci success
         run: |
+          if [ "\${{ github.event.pull_request.draft }}" = "true" ]; then
+            echo "draft: CI not run, mark ready for review"
+            exit 1
+          fi
           if [ "\${{ needs.ci.result }}" != "success" ]; then
             echo "ci result: \${{ needs.ci.result }}"
             exit 1

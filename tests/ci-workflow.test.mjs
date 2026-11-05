@@ -39,7 +39,7 @@ test("exactly jobs ci and ci-ok; ci-ok needs ci and runs always", () => {
   assert.deepEqual(Object.keys(wf.jobs), ["ci", "ci-ok"]);
   const ok = wf.jobs["ci-ok"];
   assert.deepEqual([].concat(ok.needs), ["ci"]);
-  assert.equal(ok.if, "always() && github.event.pull_request.draft != true");
+  assert.equal(ok.if, "always()");
   const text = JSON.stringify(ok.steps);
   assert.match(text, /needs\.ci\.result/);
   assert.equal(wf.jobs.ci["timeout-minutes"], 15);

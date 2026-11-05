@@ -195,7 +195,7 @@ node scripts/ci-timing.mjs --repo <owner/repo> --budget 45                    # 
 
 All timings are from this cloud container, not GitHub runners; they are not evidence for the GitHub budgets.
 
-- 2026-11-05 ci: PR workflows skip drafts (`ready_for_review` trigger, job `if`), draft-skip test, spec §8.1
+- 2026-11-05 ci: PR workflows skip drafts (`ready_for_review` trigger, job `if`; `ci-ok` fails on drafts), draft-skip test, spec §8.1
 
 **Blocked — needs you or an upstream repo** (full actions in the Blocked section above)
 

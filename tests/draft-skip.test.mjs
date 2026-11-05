@@ -55,14 +55,28 @@ test("every PR workflow runs on ready_for_review", () => {
     assert.deepEqual(wf.on.pull_request?.types, TYPES, `${rel}: pull_request.types`);
 });
 
-test("every job of a PR workflow skips drafts", () => {
+test("every job except ci-ok skips drafts", () => {
   for (const { rel, wf } of all)
     for (const [id, job] of Object.entries(wf.jobs))
-      assert.match(
-        String(job.if),
-        /github\.event\.pull_request\.draft != true/,
-        `${rel} job ${id} must skip drafts`,
-      );
+      if (id !== "ci-ok")
+        assert.match(
+          String(job.if),
+          /github\.event\.pull_request\.draft != true/,
+          `${rel} job ${id} must skip drafts`,
+        );
+});
+
+test("ci-ok runs on drafts and fails there, so a skipped check never reads as green", () => {
+  const withOk = all.filter(({ wf }) => wf.jobs["ci-ok"]);
+  assert.ok(withOk.length >= 3);
+  for (const { rel, wf } of withOk) {
+    const ok = wf.jobs["ci-ok"];
+    assert.equal(ok.if, "always()", `${rel}: ci-ok must always run`);
+    const run = ok.steps.map((x) => x.run ?? "").join("\n");
+    assert.match(run, /github\.event\.pull_request\.draft/, rel);
+    assert.match(run, /draft: CI not run, mark ready for review/, rel);
+    assert.ok(run.indexOf("draft: CI") < run.indexOf("needs.ci.result"), rel);
+  }
 });
 
 test("every PR workflow cancels superseded PR runs", () => {

@@ -143,7 +143,7 @@ test("ci.yml: one job + ci-ok, every later step checks skip, no Node setup, no p
   const tools = steps.find((s) => s.uses?.startsWith("taiki-e/install-action")).with.tool;
   assert.equal(tools, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
   assert.equal(wf.jobs["ci-ok"].needs[0], "ci");
-  assert.equal(wf.jobs["ci-ok"].if, "always() && github.event.pull_request.draft != true");
+  assert.equal(wf.jobs["ci-ok"].if, "always()");
 });
 
 test("docs-only: only root markdown, docs/, .claude/ and LICENSE skip; crates/ never", () => {
