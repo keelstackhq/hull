@@ -123,7 +123,12 @@ test("ci.yml: one job + ci-ok, every later step checks skip, no Node setup, no p
   const wf = YAML.parse(await ciText());
   assert.deepEqual(Object.keys(wf.jobs), ["ci", "ci-ok"]);
   assert.deepEqual(Object.keys(wf.on).sort(), ["merge_group", "pull_request", "push"]);
-  assert.equal(wf.on.pull_request, null);
+  assert.deepEqual(wf.on.pull_request.types, [
+    "opened",
+    "synchronize",
+    "reopened",
+    "ready_for_review",
+  ]);
   const steps = wf.jobs.ci.steps;
   const checkout = steps.find((s) => s.uses?.startsWith("actions/checkout"));
   assert.equal(checkout.with["fetch-depth"], 0);

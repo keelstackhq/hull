@@ -3,6 +3,7 @@ name: preview
 # Build only: no secrets, no environment. preview-deploy.yml deploys the artifact.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: preview-${{ github.event.pull_request.number }}
@@ -13,6 +14,7 @@ permissions:
 
 jobs:
   preview:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

@@ -27,6 +27,7 @@ const header = `name: ci
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   push:
     branches: [main]
@@ -40,6 +41,7 @@ permissions:
 
 jobs:
   ci:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -56,6 +58,10 @@ const footer = `
     steps:
       - name: Require ci success
         run: |
+          if [ "\${{ github.event.pull_request.draft }}" = "true" ]; then
+            echo "draft: CI not run, mark ready for review"
+            exit 1
+          fi
           if [ "\${{ needs.ci.result }}" != "success" ]; then
             echo "ci result: \${{ needs.ci.result }}"
             exit 1
@@ -87,6 +93,7 @@ const rustHeader = `name: ci
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   push:
     branches: [main]
@@ -103,6 +110,7 @@ env:
 
 jobs:
   ci:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
