@@ -6,6 +6,7 @@ on:
   push:
     tags: ["*-v[0-9]*"]
 
+# ci-minutes: allow concurrency a release run is never cancelled, the next one waits for it
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
