@@ -7,6 +7,12 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.7.0 — 2026-11-06
+
+- Generated CI skips draft PRs: `ci.yml` and `preview.yml` trigger on `ready_for_review` and skip
+  `ci` and `preview` while a PR is a draft. `ci-ok` still runs and fails on a draft
+  ("draft: CI not run"), so a draft is never green. A test covers every PR workflow.
+
 ## v0.6.2 — 2026-11-05
 
 - Seeded `scripts/ci-pre.sh` (both templates, no-op): generated CI runs it right after the
