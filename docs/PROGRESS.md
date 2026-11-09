@@ -80,6 +80,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-31 · docspack age · `chore: drop the docspack 0.1.1 release-age exclude` · `npm view` 2026-10-31T07:02Z: 0.1.1 published 2026-10-28T06:32Z, past the 3-day gate; base `pnpm-workspace.yaml` has no `minimumReleaseAgeExclude` now.
 - 2026-11-09 · deps · `chore(deps): react, react-dom 19.3.1` · dogfood web ok
 - 2026-11-09 · deps · `chore(deps): storybook 10.6.6` · dogfood web ok (Storybook build not part of dogfood)
+- 2026-11-09 · deps · `chore(deps): astro 7.4.7, @astrojs/preact 6.1.2` · 7.4.8 <3 days, waits; dogfood site ok
 - 2026-11-09 · deps · `chore(deps): @tauri-apps/cli, api 2.12.4` · dogfood desktop ok (JS side only; Rust build needs webkit2gtk). Skipped: crates tauri 2.12.5, tauri-build 2.7.4 (crates.io 2026-10-21): cannot compile Tauri here; bump in desktop.yml-verified PR.
 - 2026-11-01 · first-user feedback B5 · `feat(ready): template-rust ships ready; release question` · `scripts/sync-shared.mjs` generates template-rust's ready files (tested in sync); profile from the lock's source; template-rust `release` question (release-tags stays required everywhere, spec §0 P2); Routines hourly. F9 (guard refusals) belongs to bosun's guard, not hull's.
 - 2026-11-01 · release · `release: v0.5.2 — ready in template-rust` · CHANGELOG dated.

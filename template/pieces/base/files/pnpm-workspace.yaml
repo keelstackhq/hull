@@ -5,7 +5,7 @@ packages:
 
 catalog:
   "@arethetypeswrong/cli": 0.18.5
-  "@astrojs/preact": 6.0.6
+  "@astrojs/preact": 6.1.2
   "@cascivo/react": 1.9.0
   "@cascivo/themes": 1.0.3
   "@cloudflare/workers-types": 5.20261014.1
@@ -17,7 +17,7 @@ catalog:
   "@tauri-apps/api": 2.12.4
   "@tauri-apps/cli": 2.12.4
   "@types/node": 24.19.2
-  astro: 7.3.8
+  astro: 7.4.7
   docspack: 1.5.0
   happy-dom: 20.14.6
   hono: 4.13.13
