@@ -79,6 +79,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-29 · bosun 0.3.0 · `fix: start checklist matches bosun 0.3.0` · item 8 order and `bosun init --stack --plan`, keelstack greenfield-bosun link; item 10 and `ready` want `plans/<name>.md` with bosun; CHANGELOG v0.5.1.
 - 2026-10-31 · docspack age · `chore: drop the docspack 0.1.1 release-age exclude` · `npm view` 2026-10-31T07:02Z: 0.1.1 published 2026-10-28T06:32Z, past the 3-day gate; base `pnpm-workspace.yaml` has no `minimumReleaseAgeExclude` now.
 - 2026-11-09 · deps · `chore(deps): turbo 2.11.10` · catalog + TURBO_VERSION in generated ci.yml, circleci ci-ok, ci-tasks.mjs; goldens (ci.yml.before, workflow sha256) updated; dogfood base web site rust ok
+- 2026-11-09 · deps · `chore(deps): @tauri-apps/cli, api 2.12.4` · dogfood desktop ok (JS side only; Rust build needs webkit2gtk). Skipped: crates tauri 2.12.5, tauri-build 2.7.4 (crates.io 2026-10-21): cannot compile Tauri here; bump in desktop.yml-verified PR.
 - 2026-11-01 · first-user feedback B5 · `feat(ready): template-rust ships ready; release question` · `scripts/sync-shared.mjs` generates template-rust's ready files (tested in sync); profile from the lock's source; template-rust `release` question (release-tags stays required everywhere, spec §0 P2); Routines hourly. F9 (guard refusals) belongs to bosun's guard, not hull's.
 - 2026-11-01 · release · `release: v0.5.2 — ready in template-rust` · CHANGELOG dated.
 - 2026-11-02 · adopt A · `feat(ready): --assess for existing repos` · DETECT signals, CLASH table tested against fresh renders, pieces with moves, render `ask` without a lock; `splice adopt` flags pending splice.
@@ -86,6 +87,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-11-02 · release · `release: v0.6.0 — existing repos` · CHANGELOG dated; adopt.md's pinned assess URL carries the sha256 of ready.mjs (tested equal).
 - 2026-11-02 · ZX T1 · `feat(ready): fixed --assess --json schema (hull.assess/1)` · `--assess --json` now has schema, stack and per-piece name/unsure (null when sure) in a fixed key order; documented in adopt.md; hosted copy bumped to v0.6.1.
 - 2026-11-06 · release · `release: hull v0.7.0` · CHANGELOG dated (#79 no CI on drafts); adopt.md URL v0.7.0, sha256 unchanged (ready.mjs untouched since v0.6.2). Bosun 0.7.0: hull pins none (plugin ref is `main`), no bump. Human: host assess/v0.7.0.mjs on keelstack.dev; release.yml tags v0.7.0 and creates the GitHub release after the owner approves the `release` environment (as 0.6.2).
+- 2026-11-09 · deps · `chore(deps): vite-plus 1.5.0` · npm view 2026-11-09 (1.5.1 is <3 days old, waits); dogfood base web site docs lib cli rust ok. Container note: put `/usr/bin` first on PATH, else turbo hits ENOEXEC on pnpm 12 shim.
 
 ## Measurements
 
