@@ -592,8 +592,8 @@ Checked with `npm view` on 2026-10-14.
 | `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |
 | `preact` | 10.29.8 | 11.0.1 exists, but `@astrojs/preact` peers `^10.6.5` |
 | `@preact/preset-vite` | 2.10.6 | |
-| `astro` | 7.3.8 | depends on `vite ^8.3.1` |
-| `@astrojs/preact` | 6.0.6 | |
+| `astro` | 7.4.7 | depends on `vite ^8.3.1` |
+| `@astrojs/preact` | 6.1.2 | |
 | `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.2 | |
 | `hono` | 4.13.13 | |
 | `wrangler` | 4.151.0 | |
