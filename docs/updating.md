@@ -64,5 +64,7 @@ An existing repo that never had a lock uses `splice adopt` (see `docs/adopt.md`)
 
 Read these before merging the update PR. Run `vp fmt` and `pnpm run ci` afterwards.
 
+Also read the CHANGELOG v0.8.0 consumer notes (preact 11, happy-dom 21, hono, wrangler, astro, sentry).
+
 - **vite-plus 1.5 (from 1.1):** newer oxlint/oxfmt may flag code, so run `vp fmt`; the vitest
   browser port is 23315; mistyped task settings now error.
