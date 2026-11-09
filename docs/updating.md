@@ -66,12 +66,3 @@ Read these before merging the update PR. Run `vp fmt` and `pnpm run ci` afterwar
 
 - **vite-plus 1.5 (from 1.1):** newer oxlint/oxfmt may flag code, so run `vp fmt`; the vitest
   browser port is 23315; mistyped task settings now error.
-- **astro 7.4.7:** `astro check` now exits 1 instead of skipping; invalid tag names throw; minimum
-  Node is 22.23.4.
-- **hono 4.13.16:** security release with route pattern changes; re-test routes with params.
-- **wrangler 4.152–4.158:** dotenv values expand `$`; `MINIFLARE_REGISTRY_PATH` is now
-  `CLOUDFLARE_DEV_REGISTRY_PATH`.
-- **@sentry/cloudflare 11.11:** `ignoreStaticAssets` is on by default.
-- **happy-dom 21:** CSS-file and iframe loading are off by default; set `enableCSSFileLoading` /
-  `enableIframePageLoading` to opt in.
-- **preact 11:** see the upgrade guide, https://preactjs.com/guide/v11/upgrade-guide
