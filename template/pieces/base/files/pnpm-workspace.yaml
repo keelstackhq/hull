@@ -12,8 +12,8 @@ catalog:
   "@preact/preset-vite": 2.10.6
   "@preact/signals-react": 3.12.0
   "@sentry/cloudflare": 11.7.0
-  "@storybook/addon-docs": 10.6.2
-  "@storybook/preact-vite": 10.6.2
+  "@storybook/addon-docs": 10.6.6
+  "@storybook/preact-vite": 10.6.6
   "@tauri-apps/api": 2.12.3
   "@tauri-apps/cli": 2.12.2
   "@types/node": 24.19.2
@@ -25,7 +25,7 @@ catalog:
   publint: 0.3.25
   react: 19.3.0
   react-dom: 19.3.0
-  storybook: 10.6.2
+  storybook: 10.6.6
   turbo: 2.11.8
   typescript: 7.0.2
   vite-plus: 1.1.0
