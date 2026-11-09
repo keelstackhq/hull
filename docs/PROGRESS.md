@@ -78,7 +78,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-29 · release · `release: v0.5.0 — start checklist, ready and onboarding` · CHANGELOG dated; after D-012's end date `owner` is the recommended approvals answer.
 - 2026-10-29 · bosun 0.3.0 · `fix: start checklist matches bosun 0.3.0` · item 8 order and `bosun init --stack --plan`, keelstack greenfield-bosun link; item 10 and `ready` want `plans/<name>.md` with bosun; CHANGELOG v0.5.1.
 - 2026-10-31 · docspack age · `chore: drop the docspack 0.1.1 release-age exclude` · `npm view` 2026-10-31T07:02Z: 0.1.1 published 2026-10-28T06:32Z, past the 3-day gate; base `pnpm-workspace.yaml` has no `minimumReleaseAgeExclude` now.
-- 2026-11-09 · docs · `docs: update an existing repo to the latest hull` · docs/updating.md, README line, AGENTS.md pointer; always-loaded ceiling 4216 -> 4320. Checked splice 0.4.0 help only (a scratch splice run was denied by the sandbox), conflict rules from contract §5.
+- 2026-11-09 · docs · `docs: update an existing repo to the latest hull` · docs/updating.md, README line, AGENTS.md pointer; ceiling unchanged (pointer fits by trimming AGENTS.md wording). Checked splice 0.4.0 help only (a scratch splice run was denied by the sandbox), conflict rules from contract §5.
 - 2026-11-01 · first-user feedback B5 · `feat(ready): template-rust ships ready; release question` · `scripts/sync-shared.mjs` generates template-rust's ready files (tested in sync); profile from the lock's source; template-rust `release` question (release-tags stays required everywhere, spec §0 P2); Routines hourly. F9 (guard refusals) belongs to bosun's guard, not hull's.
 - 2026-11-01 · release · `release: v0.5.2 — ready in template-rust` · CHANGELOG dated.
 - 2026-11-02 · adopt A · `feat(ready): --assess for existing repos` · DETECT signals, CLASH table tested against fresh renders, pieces with moves, render `ask` without a lock; `splice adopt` flags pending splice.
@@ -107,6 +107,8 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-10-17 · dogfood base+web+site+docs+cli+lib, same `--cache-dir` · cold turbo / warm turbo · base 2.0/0.6 s, web 11.6/1.7 s, site 8.8/1.8 s, docs 1.9/1.0 s, cli 48.9/1.6 s, lib 4.7/0.8 s · cloud container, warm pnpm store, cargo-deny 0.20.2
 
 ## Blocked
+
+- Next step 2026-11-12: bump `vite-plus` to 1.5.1 (security release, published 2026-11-09; waits for `minimumReleaseAge`). Also then: astro 7.4.8, wrangler 4.159.0, hono 4.13.17, workers-types 5.20261109.1.
 
 - First real release of a keelstackhq tool (needs a public npm scope + repo settings): verify `npm publish <pnpm-pack tgz> --provenance`, private-repo behaviour (npm generates no provenance for private repos; artifact attestations need a public repo or GitHub Enterprise Cloud), `ubuntu-24.04-arm`, `macos-latest` cross-building `x86_64-apple-darwin`, and that the `npm view <name>@<version> || npm publish` skip works with setup-node's placeholder `NODE_AUTH_TOKEN` (a 401 on the read would make a re-run try to republish). Before it, per repo: create the GitHub environment `release` with a tag rule `*-v*` and required reviewers (npm and github-release run in parallel, so the reviewers are the only gate before publishing); publish each new npm name once by hand; add an npm trusted publisher (repo, `release.yml`, environment `release`) to the launcher and all five platform packages, or the library, then release within 2 days.
 
