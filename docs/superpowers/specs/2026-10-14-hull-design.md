@@ -359,7 +359,7 @@ webkit2gtk, so the Rust build runs only in `desktop.yml`. `src-tauri/Cargo.toml`
 `src-tauri/build.rs` [owned], `src-tauri/src/{main,lib}.rs` [seed], `src-tauri/capabilities/default.json`
 [seed], `src-tauri/icons/*` [owned, binary]. `src-tauri/Cargo.toml` pins `tauri = "2.12.4"` and
 `tauri-build = "2.7.3"` (`cargo info`, 2026-10-15; `latest` is already 3.0.0-alpha) so the crates
-match `@tauri-apps/cli` 2.12.2; Renovate's `tauri` group covers them. Bundle `targets: ["deb"]`
+match `@tauri-apps/cli` 2.12.4; Renovate's `tauri` group covers them. Bundle `targets: ["deb"]`
 (AppImage downloads linuxdeploy at build time, which is flaky in scheduled CI). No workspace lints
 (`unsafe_code = "forbid"` could break Tauri's macros) and no `[[post]]` (`tauri build` writes the
 lockfile). `rust-toolchain.toml` lists only `rustfmt` when rust-tool is absent, so the PR-path
@@ -599,7 +599,7 @@ Checked with `npm view` on 2026-10-14.
 | `wrangler` | 4.151.0 | |
 | `@cloudflare/workers-types` | 5.20261014.1 | |
 | `@sentry/cloudflare` | 11.7.0 | |
-| `@tauri-apps/cli` | 2.12.2 | `@tauri-apps/api` 2.12.3; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7) |
+| `@tauri-apps/cli` | 2.12.4 | `@tauri-apps/api` 2.12.4; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7) |
 | `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
 | `@preact/signals-react` | 3.12.0 | cascivo peer |
 | `react`, `react-dom` | 19.3.0 | dev-only cascivo peers, aliased to `preact/compat`; published 2026-09-09 |
