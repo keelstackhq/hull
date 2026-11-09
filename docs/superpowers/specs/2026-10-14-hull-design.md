@@ -603,7 +603,7 @@ Checked with `npm view` on 2026-10-14.
 | `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
 | `@preact/signals-react` | 3.12.0 | cascivo peer |
 | `react`, `react-dom` | 19.3.0 | dev-only cascivo peers, aliased to `preact/compat`; published 2026-09-09 |
-| `happy-dom` | 20.14.6 | DOM environment for component tests; published 2026-10-08 |
+| `happy-dom` | 21.0.4 | DOM environment for component tests; published 2026-10-20 |
 | `docspack` | 1.5.0 | |
 | `publint` | 0.3.25 | ts-lib `build`; checked with `npm view` 2026-10-17 |
 | `@arethetypeswrong/cli` | 0.18.5 | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17 |

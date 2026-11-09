@@ -19,7 +19,7 @@ catalog:
   "@types/node": 24.19.2
   astro: 7.3.8
   docspack: 1.5.0
-  happy-dom: 20.14.6
+  happy-dom: 21.0.4
   hono: 4.13.13
   preact: 10.29.8
   publint: 0.3.25
