@@ -13,6 +13,14 @@ Keep `unreleased` while changes accumulate.
   accepts it. Upgrade guide: https://preactjs.com/guide/v11/upgrade-guide
 - `happy-dom` 21: CSS-file and iframe loading are off by default in component tests; set
   `enableCSSFileLoading` / `enableIframePageLoading` to opt in.
+- `astro` 7.4.7 (`@astrojs/preact` 6.1.2): `astro check` now exits 1 instead of skipping, invalid
+  tag names throw, minimum Node is 22.23.4.
+- `hono` 4.13.16 (security): `/assets*`-style routes and duplicate param names now throw; custom
+  patterns that match empty throw `UnsupportedPathError`; regenerate PreparedRegExpRouter data.
+- `wrangler` 4.158.0 (from 4.151): dotenv values expand `$`; `MINIFLARE_REGISTRY_PATH` is now
+  `CLOUDFLARE_DEV_REGISTRY_PATH`; a Workflow's jurisdiction is fixed at creation.
+- `@sentry/cloudflare` 11.11: `ignoreStaticAssets` is on by default.
+- `storybook` 10.6.6, `turbo` 2.11.10 (also the pinned `TURBO_SHA256` in the CircleCI mirror).
 
 ## v0.7.0 — 2026-11-06
 
