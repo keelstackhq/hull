@@ -5,31 +5,31 @@ packages:
 
 catalog:
   "@arethetypeswrong/cli": 0.18.5
-  "@astrojs/preact": 6.0.6
+  "@astrojs/preact": 6.1.2
   "@cascivo/react": 1.9.0
   "@cascivo/themes": 1.0.3
-  "@cloudflare/workers-types": 5.20261014.1
+  "@cloudflare/workers-types": 5.20261106.1
   "@preact/preset-vite": 2.10.6
   "@preact/signals-react": 3.12.0
-  "@sentry/cloudflare": 11.7.0
-  "@storybook/addon-docs": 10.6.2
-  "@storybook/preact-vite": 10.6.2
+  "@sentry/cloudflare": 11.11.0
+  "@storybook/addon-docs": 10.6.6
+  "@storybook/preact-vite": 10.6.6
   "@tauri-apps/api": 2.12.4
   "@tauri-apps/cli": 2.12.4
   "@types/node": 24.19.2
-  astro: 7.3.8
+  astro: 7.4.7
   docspack: 1.5.0
-  happy-dom: 20.14.6
-  hono: 4.13.13
-  preact: 10.29.8
+  happy-dom: 21.0.4
+  hono: 4.13.16
+  preact: 11.2.0
   publint: 0.3.25
   react: 19.3.1
   react-dom: 19.3.1
-  storybook: 10.6.2
-  turbo: 2.11.8
+  storybook: 10.6.6
+  turbo: 2.11.10
   typescript: 7.0.2
   vite-plus: 1.5.0
-  wrangler: 4.151.0
+  wrangler: 4.158.0
 
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@1.5.0

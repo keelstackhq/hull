@@ -587,23 +587,23 @@ Checked with `npm view` on 2026-10-14.
 |---|---|---|
 | `vite-plus` | 1.5.0 | 1.5.1 published 2026-11-09; waits for `minimumReleaseAge` |
 | `@voidzero-dev/vite-plus-core` | 1.5.0 | via the `vite` override; always the same version as vite-plus |
-| `turbo` | 2.11.8 | |
+| `turbo` | 2.11.10 | |
 | `typescript` | 7.0.2 | native compiler, binary `tsc` |
 | `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |
-| `preact` | 10.29.8 | 11.0.1 exists, but `@astrojs/preact` peers `^10.6.5` |
+| `preact` | 11.2.0 | 11.2.0 published 2026-11-06; `@astrojs/preact` 6.1.2 peers `^10.6.5 || ^11.0.0` |
 | `@preact/preset-vite` | 2.10.6 | |
-| `astro` | 7.3.8 | depends on `vite ^8.3.1` |
-| `@astrojs/preact` | 6.0.6 | |
-| `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.2 | |
-| `hono` | 4.13.13 | |
-| `wrangler` | 4.151.0 | |
-| `@cloudflare/workers-types` | 5.20261014.1 | |
-| `@sentry/cloudflare` | 11.7.0 | |
+| `astro` | 7.4.7 | depends on `vite ^8.3.1` |
+| `@astrojs/preact` | 6.1.2 | |
+| `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.6 | |
+| `hono` | 4.13.16 | |
+| `wrangler` | 4.158.0 | |
+| `@cloudflare/workers-types` | 5.20261106.1 | |
+| `@sentry/cloudflare` | 11.11.0 | |
 | `@tauri-apps/cli` | 2.12.4 | `@tauri-apps/api` 2.12.4; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7) |
 | `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
 | `@preact/signals-react` | 3.12.0 | cascivo peer |
 | `react`, `react-dom` | 19.3.1 | dev-only cascivo peers, aliased to `preact/compat`; 19.3.1 published 2026-10-14 |
-| `happy-dom` | 20.14.6 | DOM environment for component tests; published 2026-10-08 |
+| `happy-dom` | 21.0.4 | DOM environment for component tests; published 2026-10-20 |
 | `docspack` | 1.5.0 | |
 | `publint` | 0.3.25 | ts-lib `build`; checked with `npm view` 2026-10-17 |
 | `@arethetypeswrong/cli` | 0.18.5 | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17 |
