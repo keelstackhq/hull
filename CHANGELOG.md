@@ -7,6 +7,13 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.8.0 — unreleased
+
+- `preact` 11 (from 10.29): generated apps and Storybook move to Preact 11; `@astrojs/preact` 6.1.2
+  accepts it. Upgrade guide: https://preactjs.com/guide/v11/upgrade-guide
+- `happy-dom` 21: CSS-file and iframe loading are off by default in component tests; set
+  `enableCSSFileLoading` / `enableIframePageLoading` to opt in.
+
 ## v0.7.0 — 2026-11-06
 
 - Generated CI skips draft PRs: `ci.yml` and `preview.yml` trigger on `ready_for_review` and skip
