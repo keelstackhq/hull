@@ -595,10 +595,10 @@ Checked with `npm view` on 2026-10-14.
 | `astro` | 7.3.8 | depends on `vite ^8.3.1` |
 | `@astrojs/preact` | 6.0.6 | |
 | `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.2 | |
-| `hono` | 4.13.13 | |
-| `wrangler` | 4.151.0 | |
-| `@cloudflare/workers-types` | 5.20261014.1 | |
-| `@sentry/cloudflare` | 11.7.0 | |
+| `hono` | 4.13.16 | |
+| `wrangler` | 4.158.0 | |
+| `@cloudflare/workers-types` | 5.20261106.1 | |
+| `@sentry/cloudflare` | 11.11.0 | |
 | `@tauri-apps/cli` | 2.12.2 | `@tauri-apps/api` 2.12.3; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7) |
 | `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
 | `@preact/signals-react` | 3.12.0 | cascivo peer |
