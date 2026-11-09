@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { chmod, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -45,6 +46,14 @@ async function scenario({ bosun, toml }) {
   const root = await mkdtemp(join(tmpdir(), "hull-bosun-"));
   const bin = join(root, "bin");
   await mkdir(bin);
+  // Hermetic PATH: only the shell tools the fake bosun needs, so a real bosun on the machine's
+  // PATH cannot change the result.
+  const tools = join(root, "tools");
+  await mkdir(tools);
+  for (const t of ["sh", "bash", "cat"]) {
+    const found = ["/usr/bin", "/bin"].map((d) => join(d, t)).find((f) => existsSync(f));
+    await symlink(found, join(tools, t));
+  }
   const log = join(root, "called.log");
   if (bosun) {
     // a fake bosun: records its args and stdin, exits 2 (a block) so the exit code must pass through
@@ -63,7 +72,7 @@ async function scenario({ bosun, toml }) {
       cwd: root,
       input: '{"hook_event_name":"PreToolUse"}',
       encoding: "utf8",
-      env: { PATH: `${bin}:/usr/bin:/bin`, CLAUDE_PROJECT_DIR: root },
+      env: { PATH: `${bin}:${tools}`, CLAUDE_PROJECT_DIR: root },
     });
   const read = () => readFile(log, "utf8").catch(() => null);
   return { run, read };
