@@ -18,6 +18,7 @@ cd my-repo && pnpm install && pnpm run ci
 ```
 
 Update an existing repo: `splice check`, then `splice update --all` (`docs/updating.md`).
+
 hull v0.4.0 and later need splice 0.3.0 or later for every command. Later, `splice add <piece>`
 adds a piece, `splice update` moves to a newer hull (owned files replaced, shared files merged,
 your source never touched) and `splice check` runs in CI. An existing repo switches to

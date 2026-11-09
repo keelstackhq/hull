@@ -9,7 +9,7 @@ machine output (exit codes: 0 ok, 1 drift, conflict or update available, 2 usage
 ```bash
 git switch -c chore/splice-update          # clean working tree on a branch
 splice check --json                        # exit 1 = update available, owned drift or leftover markers
-splice diff                                # preview, writes nothing (--to vX.Y.Z for a pinned target)
+splice diff                                # preview, writes nothing (--to X.Y.Z for a pinned target)
 splice update --all                        # main template + channels (decisions, rigging)
 pnpm install && pnpm run ci                # lockfile and checks
 git add -A && git commit -m "chore: splice update to hull vX.Y.Z"
@@ -38,7 +38,7 @@ on `splice/update`. Run it by hand to update now or to fix a PR with conflicts. 
   (`json`, `yaml`, `toml`) report the key; text files get diff3 markers (`<<<<<<< ours`,
   `||||||| base`, `=======`, `>>>>>>> template`). Find them with `splice check` or
   `git grep -n '<<<<<<<'`. Resolve each by hand, keep exact catalog pins from the template unless
-  you pinned on purpose, then rerun `splice check` (exit 0 means none left).
+  you pinned on purpose, then rerun `splice check` (exit 0 means no markers, drift or pending update are left).
 - **Dirty tree.** Commit or stash first; `--allow-dirty` only if you know why.
 - **Removed pieces/files.** Owned files the new hull no longer ships are deleted only if unedited;
   edited ones are reported, delete them yourself.
