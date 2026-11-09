@@ -590,7 +590,7 @@ Checked with `npm view` on 2026-10-14.
 | `turbo` | 2.11.8 | |
 | `typescript` | 7.0.2 | native compiler, binary `tsc` |
 | `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |
-| `preact` | 10.29.8 | 11.0.1 exists, but `@astrojs/preact` peers `^10.6.5` |
+| `preact` | 11.2.0 | 11.2.0 published 2026-11-06; `@astrojs/preact` 6.1.2 peers `^10.6.5 || ^11.0.0` |
 | `@preact/preset-vite` | 2.10.6 | |
 | `astro` | 7.3.8 | depends on `vite ^8.3.1` |
 | `@astrojs/preact` | 6.0.6 | |
