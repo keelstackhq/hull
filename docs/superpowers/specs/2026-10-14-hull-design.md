@@ -593,7 +593,7 @@ Checked with `npm view` on 2026-10-14.
 | `preact` | 11.2.0 | 11.2.0 published 2026-11-06; `@astrojs/preact` 6.1.2 peers `^10.6.5 || ^11.0.0` |
 | `@preact/preset-vite` | 2.10.6 | |
 | `astro` | 7.3.8 | depends on `vite ^8.3.1` |
-| `@astrojs/preact` | 6.0.6 | |
+| `@astrojs/preact` | 6.1.2 | |
 | `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.2 | |
 | `hono` | 4.13.13 | |
 | `wrangler` | 4.151.0 | |
