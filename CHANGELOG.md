@@ -11,6 +11,8 @@ Keep `unreleased` while changes accumulate.
 
 - `preact` 11 (from 10.29): generated apps and Storybook move to Preact 11; `@astrojs/preact` 6.1.2
   accepts it. Upgrade guide: https://preactjs.com/guide/v11/upgrade-guide
+- `happy-dom` 21: CSS-file and iframe loading are off by default in component tests; set
+  `enableCSSFileLoading` / `enableIframePageLoading` to opt in.
 
 ## v0.7.0 — 2026-11-06
 
