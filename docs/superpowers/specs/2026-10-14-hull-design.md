@@ -594,7 +594,7 @@ Checked with `npm view` on 2026-10-14.
 | `@preact/preset-vite` | 2.10.6 | |
 | `astro` | 7.3.8 | depends on `vite ^8.3.1` |
 | `@astrojs/preact` | 6.0.6 | |
-| `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.2 | |
+| `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.6 | |
 | `hono` | 4.13.13 | |
 | `wrangler` | 4.151.0 | |
 | `@cloudflare/workers-types` | 5.20261014.1 | |
