@@ -22,7 +22,7 @@ check its sha256 before running it, from the repo root:
 
 ```bash
 curl -fsSL https://keelstack.dev/assess/v0.8.0.mjs -o /tmp/assess.mjs
-echo "ASSESS_SHA256  /tmp/assess.mjs" | sha256sum -c
+echo "cfb3ee4a11d17ec817c55d73f3aaf8cbb97c40822555a75c2576b9bac3274f87  /tmp/assess.mjs" | sha256sum -c
 node /tmp/assess.mjs --assess --json
 ```
 
