@@ -587,7 +587,7 @@ Checked with `npm view` on 2026-10-14.
 |---|---|---|
 | `vite-plus` | 1.1.0 | 1.2.0 published 2026-10-14 09:21 UTC; Renovate bumps it after `minimumReleaseAge` |
 | `@voidzero-dev/vite-plus-core` | 1.1.0 | via the `vite` override; always the same version as vite-plus |
-| `turbo` | 2.11.8 | |
+| `turbo` | 2.11.10 | |
 | `typescript` | 7.0.2 | native compiler, binary `tsc` |
 | `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |
 | `preact` | 10.29.8 | 11.0.1 exists, but `@astrojs/preact` peers `^10.6.5` |

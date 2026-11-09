@@ -34,7 +34,7 @@ jobs:
       - name: Anything affected?
         id: affected
         env:
-          TURBO_VERSION: 2.11.8
+          TURBO_VERSION: 2.11.10
         run: |
           set +e
           curl -fsSL "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz" \

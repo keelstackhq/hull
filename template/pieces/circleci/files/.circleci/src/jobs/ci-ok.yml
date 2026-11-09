@@ -20,7 +20,7 @@ steps:
   - run:
       name: Anything affected?
       environment:
-        TURBO_VERSION: 2.11.8
+        TURBO_VERSION: 2.11.10
         # sha256 of the registry tarball linux-64-2.11.8.tgz, computed 2026-10-28
         TURBO_SHA256: 8ddaeded8c2b85a65da10b8214593f255a9c963dc71588b48a1faca0b0eb63db
       command: |
