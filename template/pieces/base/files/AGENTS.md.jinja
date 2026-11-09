@@ -6,7 +6,7 @@ TypeScript, Vite+. Packages live in `apps/*`, `packages/*`, `crates/*`.
 ## Commands
 
 ```bash
-pnpm install        # install, also runs in the SessionStart hook
+pnpm install        # install (SessionStart runs it too)
 pnpm check          # lint, format:check, typecheck, test (all packages)
 pnpm run ci         # the CI task list on changed packages (--affected)
 pnpm format         # vp fmt
@@ -20,16 +20,16 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 
 - Run `ready` first: no autonomous work until it passes and the owner confirms its manual items.
 - Test first: write the failing test, watch it fail, implement, watch it pass.
-- Verify with real output before saying a task is done or fixed.
-- Keep files small and focused; one task per change; no drive-by refactors.
+- Verify with real output before calling a task done.
+- Keep files small, focused; one task per change; no drive-by refactors.
 - Versions live in the catalog in `pnpm-workspace.yaml` as exact pins; use `catalog:` in packages.
-- Template-owned files (configs, workflows, `.claude/`) change only via `splice update`; put
+- Template-owned files (configs, workflows, `.claude/`) change only via `splice update --all`
+  (guide: keelstackhq/hull docs/updating.md); put
   local changes in seed files, `docs/agents/project.md` or a package's `AGENTS.md`.
 - Never print or commit secrets; never read `.env*` or `.dev.vars`.
 - Releases are tag pushes made by a human; never publish or push tags yourself.
 - At most 2-3 parallel agents, on files that barely overlap.
-- Before a long task, note next steps in `docs/agents/project.md`; compact or start fresh, whichever
-  fits; tell the owner which.
+- Before a long task, note next steps in `docs/agents/project.md`; compact or start fresh; tell the owner which.
 - A hook `ask` becomes a denial in `-p`/unattended runs: do the change by hand or run interactively.
 {# One line per piece kind goes here, each in its own if on its piece id. #}{# same-branches #}{% if "preact-app" in pieces %}
 ## Pieces
