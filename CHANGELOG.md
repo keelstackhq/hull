@@ -7,11 +7,6 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.8.0 — unreleased
-
-- Dependency bumps. `vite-plus` 1.5: after `splice update`, run `vp fmt` (newer oxlint/oxfmt may
-  flag code); the vitest browser port is 23315; mistyped task settings now error.
-
 ## v0.7.0 — 2026-11-06
 
 - Generated CI skips draft PRs: `ci.yml` and `preview.yml` trigger on `ready_for_review` and skip

@@ -59,3 +59,8 @@ on `splice/update`. Run it by hand to update now or to fix a PR with conflicts. 
 
 `splice add <piece>` adds one (for example `splice add circleci`), then the same commit steps.
 An existing repo that never had a lock uses `splice adopt` (see `docs/adopt.md`).
+
+## Notes for specific updates
+
+- **vite-plus 1.5 (from 1.1):** run `vp fmt` after updating (newer oxlint/oxfmt may flag code); the
+  vitest browser port is 23315; mistyped task settings now error.
