@@ -7,6 +7,11 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## unreleased
+
+- `vite-plus` 1.5.1 (security release): generated repos get it, and the `vite` override
+  (`@voidzero-dev/vite-plus-core`) follows at the same version.
+
 ## v0.8.0 — 2026-11-09
 
 - `preact` 11 (from 10.29): generated apps and Storybook move to Preact 11; `@astrojs/preact` 6.1.2

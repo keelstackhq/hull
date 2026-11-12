@@ -31,11 +31,11 @@ test("base renders the expected classes", async () => {
 test("catalog pins exact versions from the spec", async () => {
   const { dir } = await renderCombo(["base"]);
   const ws = YAML.parse(await read(dir, "pnpm-workspace.yaml"));
-  assert.equal(ws.catalog["vite-plus"], "1.5.0");
+  assert.equal(ws.catalog["vite-plus"], "1.5.1");
   assert.equal(ws.catalog.turbo, "2.11.10");
   assert.equal(ws.catalog.typescript, "7.0.2");
   assert.equal(ws.catalog["@types/node"], "24.19.2");
-  assert.equal(ws.overrides.vite, "npm:@voidzero-dev/vite-plus-core@1.5.0");
+  assert.equal(ws.overrides.vite, "npm:@voidzero-dev/vite-plus-core@1.5.1");
   for (const [k, v] of Object.entries(ws.catalog)) assert.match(v, /^\d+\.\d+\.\d+$/, k);
   assert.deepEqual(ws.packages, ["apps/*", "packages/*", "crates/*"]);
   assert.equal(ws.minimumReleaseAge, 4320);
