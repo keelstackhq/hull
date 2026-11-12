@@ -4,7 +4,7 @@ Recipe for a docspack package of the Vite+ docs.
 
 - Source: the docs folder shipped in the `vite-plus` npm package (`node_modules/vite-plus/docs`),
   upstream <https://github.com/voidzero-dev/vite-plus> (guide at <https://viteplus.dev/guide>).
-- Package version: the `vite-plus` version it was built from (hull pins 1.5.0).
+- Package version: the `vite-plus` version it was built from (hull pins 1.5.1).
 
 Build (docspack 1.5.0), from the hull repo after `pnpm install`:
 
@@ -12,7 +12,7 @@ Build (docspack 1.5.0), from the hull repo after `pnpm install`:
 pnpm dlx docspack@1.5.0 build \
   --from node_modules/vite-plus/docs \
   --name @docspack-community/vite-plus \
-  --pkg-version 1.5.0 \
+  --pkg-version 1.5.1 \
   --min-chunk-tokens 120 \
   --out /tmp/vite-plus-docspack
 cd /tmp/vite-plus-docspack && pnpm dlx docspack@1.5.0 doctor

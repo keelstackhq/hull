@@ -585,8 +585,8 @@ Checked with `npm view` on 2026-10-14.
 
 | Package | Pin | Note |
 |---|---|---|
-| `vite-plus` | 1.5.0 | 1.5.1 published 2026-11-09; waits for `minimumReleaseAge` |
-| `@voidzero-dev/vite-plus-core` | 1.5.0 | via the `vite` override; always the same version as vite-plus |
+| `vite-plus` | 1.5.1 | security release, published 2026-11-09 (checked 2026-11-12); 1.6.0 (2026-11-11) waits for `minimumReleaseAge` |
+| `@voidzero-dev/vite-plus-core` | 1.5.1 | via the `vite` override; always the same version as vite-plus |
 | `turbo` | 2.11.10 | |
 | `typescript` | 7.0.2 | native compiler, binary `tsc` |
 | `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |

@@ -96,6 +96,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-11-02 · ZX T1 · `feat(ready): fixed --assess --json schema (hull.assess/1)` · `--assess --json` now has schema, stack and per-piece name/unsure (null when sure) in a fixed key order; documented in adopt.md; hosted copy bumped to v0.6.1.
 - 2026-11-06 · release · `release: hull v0.7.0` · CHANGELOG dated (#79 no CI on drafts); adopt.md URL v0.7.0, sha256 unchanged (ready.mjs untouched since v0.6.2). Bosun 0.7.0: hull pins none (plugin ref is `main`), no bump. Human: host assess/v0.7.0.mjs on keelstack.dev; release.yml tags v0.7.0 and creates the GitHub release after the owner approves the `release` environment (as 0.6.2).
 - 2026-11-09 · deps · `chore(deps): vite-plus 1.5.0` · npm view 2026-11-09 (1.5.1 is <3 days old, waits); dogfood base web site docs lib cli rust ok. Container note: put `/usr/bin` first on PATH, else turbo hits ENOEXEC on pnpm 12 shim.
+- 2026-11-12 · deps · `chore(deps): vite-plus 1.5.1` · security release, npm view 2026-11-12 (published 2026-11-09T14:00:53Z, 3 days old at 14:01Z); 1.6.0 (2026-11-11) waits; 1066 tests pass, lint+fmt clean; dogfood base cli docs lib rust rust-circleci rust-circleci-only site web web-circleci web-circleci-only web-secrets ok.
 
 ## Measurements
 
