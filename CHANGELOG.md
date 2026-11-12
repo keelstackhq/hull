@@ -7,6 +7,14 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.9.0 — 2026-11-12
+
+- `vite-plus` 1.5.1 (with the vite override `@voidzero-dev/vite-plus-core` 1.5.1; security): fixes
+  two high-severity issues (GHSA-5qr3-w62x-jmwx: package-manager downloads are checked against the
+  `packageManager` integrity hash; GHSA-p79r-mf8q-r78h: `vp env use` accepts only a valid semver).
+  Each pinned package-manager version gets its own cache dir, so a pinned project re-downloads
+  once after the upgrade. `postcss` 8.5.32 follows.
+
 ## v0.8.0 — 2026-11-09
 
 - `preact` 11 (from 10.29): generated apps and Storybook move to Preact 11; `@astrojs/preact` 6.1.2

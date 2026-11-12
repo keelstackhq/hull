@@ -96,6 +96,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-11-02 · ZX T1 · `feat(ready): fixed --assess --json schema (hull.assess/1)` · `--assess --json` now has schema, stack and per-piece name/unsure (null when sure) in a fixed key order; documented in adopt.md; hosted copy bumped to v0.6.1.
 - 2026-11-06 · release · `release: hull v0.7.0` · CHANGELOG dated (#79 no CI on drafts); adopt.md URL v0.7.0, sha256 unchanged (ready.mjs untouched since v0.6.2). Bosun 0.7.0: hull pins none (plugin ref is `main`), no bump. Human: host assess/v0.7.0.mjs on keelstack.dev; release.yml tags v0.7.0 and creates the GitHub release after the owner approves the `release` environment (as 0.6.2).
 - 2026-11-09 · deps · `chore(deps): vite-plus 1.5.0` · npm view 2026-11-09 (1.5.1 is <3 days old, waits); dogfood base web site docs lib cli rust ok. Container note: put `/usr/bin` first on PATH, else turbo hits ENOEXEC on pnpm 12 shim.
+- 2026-11-12 · release · `docs: release v0.9.0` · CHANGELOG dated (vite-plus 1.5.1, #95); release.yml tags v0.9.0 after the owner approves the `release` environment.
 - 2026-11-12 · deps · `chore(deps): vite-plus 1.5.1` · security release, npm view 2026-11-12 (published 2026-11-09T14:00:53Z, 3 days old at 14:01Z); 1.6.0 (2026-11-11) waits; 1066 tests pass, lint+fmt clean; dogfood base cli docs lib rust rust-circleci rust-circleci-only site web web-circleci web-circleci-only web-secrets ok.
 
 ## Measurements
@@ -119,7 +120,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 
 ## Blocked
 
-- Next step 2026-11-12: bump `vite-plus` to 1.5.1 (security release, published 2026-11-09; waits for `minimumReleaseAge`). Also then: astro 7.4.8, wrangler 4.159.0, hono 4.13.17, workers-types 5.20261109.1.
+- Next step 2026-11-12: bump astro 7.4.8, wrangler 4.159.0, hono 4.13.17, workers-types 5.20261109.1.
 
 - First real release of a keelstackhq tool (needs a public npm scope + repo settings): verify `npm publish <pnpm-pack tgz> --provenance`, private-repo behaviour (npm generates no provenance for private repos; artifact attestations need a public repo or GitHub Enterprise Cloud), `ubuntu-24.04-arm`, `macos-latest` cross-building `x86_64-apple-darwin`, and that the `npm view <name>@<version> || npm publish` skip works with setup-node's placeholder `NODE_AUTH_TOKEN` (a 401 on the read would make a re-run try to republish). Before it, per repo: create the GitHub environment `release` with a tag rule `*-v*` and required reviewers (npm and github-release run in parallel, so the reviewers are the only gate before publishing); publish each new npm name once by hand; add an npm trusted publisher (repo, `release.yml`, environment `release`) to the launcher and all five platform packages, or the library, then release within 2 days.
 
