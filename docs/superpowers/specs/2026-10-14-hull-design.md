@@ -241,6 +241,7 @@ Root files (class in brackets):
   duplicated per branch (the subset has no `or`), so it renders for either piece.
 - `packages/shared/` [configs owned, `package.json` shared json, `src/**` seed]: a tiny library built with `vp pack`, so a
   base-only repo runs every CI task.
+- The base `README.md` stays at most 40 lines (tested): agents read it. `docs/PROGRESS.md` keeps one short line per task.
 - `README.md.jinja` [seed], `docs/agents/project.md.jinja` [seed]: with npm-cli or ts-lib (a
   marked `npm-cli`/`ts-lib` chain) it adds a `## Blocked` section with the human release steps of
   §8.7. A seed renders only on `new`, so the owned npm-cli and ts-lib `AGENTS.md` files carry the

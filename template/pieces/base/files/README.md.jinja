@@ -26,29 +26,15 @@ every PR workflow could read.
 
 ## Update bot
 
-`splice.yml` runs the weekly `splice update` on GitHub in every CI mode. Create the environment
-`splice-bot` first (Deployment branches = Selected, `main`); a first run would auto-create an
-unprotected one. Store its credentials only as secrets of that environment, never as repository
-secrets: any pull request that edits a workflow could read those.
+`splice.yml` runs the weekly `splice update` in every CI mode. Create the environment `splice-bot`
+first (Deployment branches = Selected, `main`) and keep its credentials only there, never as
+repository secrets. It also refreshes `pnpm-lock.yaml`; after resolving a conflict PR run
+`pnpm install --lockfile-only` and push.
 
-The bot also refreshes `pnpm-lock.yaml` (lockfile only, no install scripts) so catalog bumps
-pass `pnpm install --frozen-lockfile`. splice skips that step when a merge conflicts: after
-resolving the conflict PR, run `pnpm install --lockfile-only` and push.
+A PR opened with `github.token` gets no CI and cannot change workflows. Pick a token, in order:
 
-### Update bot: pick a token mode
-
-A PR opened with `github.token` gets no CI (events by `GITHUB_TOKEN` trigger no workflows), cannot
-push changes to `.github/workflows/*` (needs the `workflows` permission), and so cannot merge when
-a ruleset requires `ci-ok`. Pick one:
-
-1. GitHub App (no personal token): install an App with Contents, Pull requests and Workflows write
-   (required: `splice.yml` requests it, and the token step fails without it). In environment
-   `splice-bot`, set the variable `SPLICE_APP_CLIENT_ID` (the App's Client ID) and the secret
-   `SPLICE_APP_KEY` (its private key).
-2. PAT: `SPLICE_BOT_TOKEN` as an environment secret (Contents, Pull requests and Workflows write).
-3. Session mode: set the repository variable `SPLICE_BOT=off`. The job is skipped (scheduled and
-   manual runs); an agent session runs `splice update --all` on a branch and opens the PR itself.
-   Its push is not by `GITHUB_TOKEN`, so CI runs; pushing changes to workflow files needs a
-   credential with the workflow scope.
-
-Order: App, then PAT, then `github.token`.
+1. GitHub App with Contents, Pull requests and Workflows write: variable `SPLICE_APP_CLIENT_ID`,
+   secret `SPLICE_APP_KEY` (in `splice-bot`).
+2. PAT (same permissions): environment secret `SPLICE_BOT_TOKEN`.
+3. Session mode: repository variable `SPLICE_BOT=off` skips the job; an agent runs
+   `splice update --all` on a branch and opens the PR (workflow files need the workflow scope).
