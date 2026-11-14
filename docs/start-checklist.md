@@ -7,6 +7,11 @@ repo, the `ready` skill (`node scripts/ready.mjs`) runs the automatable checks a
 here, at the hull tag the repo was rendered from. `ready` is advisory and never blocks work: agents
 start at once, print every `manual` item once as one checklist (D-009) and keep going. `TODO(owner)` marks facts not yet written down.
 
+Agent rail (no human step): the guard hook denies publish, force and tag pushes, secret reads and edits
+to `.claude/hooks`, `.claude/settings*.json`, release workflows and `.bosun/`. Agents use paths from the
+repo root; `cd`, `-C`, `--chdir`, `--work-tree` or a glob into those dirs is denied, and a patch is
+applied from a file in the repo (or one `git diff > f` just wrote in the same command).
+
 An existing repo? Start with [Adopt an existing repo](adopt.md): it ends with `ready` and the
 items below.
 

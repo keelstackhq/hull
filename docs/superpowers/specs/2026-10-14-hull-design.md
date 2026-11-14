@@ -473,9 +473,12 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `git config core.hooksPath|alias.*`). Indirection (`eval`, `sh` or an interpreter fed from a pipe,
   `-c`/`-e` bodies, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies when the text mentions
   push, publish or release; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
-  `cd`/`pushd`/`git -C` into `.claude`, `.claude/hooks`, `.bosun` or `.github/workflows` denies, and
-  relative paths resolve against the hook's `cwd`; `patch` and `git apply` are read (file, `<` or
-  heredoc) and deny when the diff names a protected path or cannot be read (piped).
+  `cd`/`pushd` and any `-C`/`--chdir`/`--directory`/`--work-tree`/`--prefix` flag (`env`, `tar`,
+  `make`, `git`) into `.claude`, `.claude/hooks`, `.bosun` or `.github/workflows` deny, also through a
+  glob (`cd .cla*`); relative paths resolve against the hook's `cwd`; `patch` and `git apply` are read
+  (file, `<` or heredoc) and deny when the diff names a protected path or cannot be read (piped, or a
+  file another command of the same chain wrote). Exception: a file made earlier in the chain by
+  `git diff|show|format-patch|stash ... > f` (or `--output=f`) is the repo's own change and applies.
   Every deny names the allowed alternative. Asks the human before Edit/Write on a file the lock
   lists as `owned` (the reason names `scripts/ci-extra.sh` for `ci.yml`, else
   `docs/agents/project.md`). A tokenizer, not a sandbox: the real fix is a server-side branch

@@ -17,6 +17,7 @@ import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template", ".dev.vars.example"]);
+const DIFF_SUBS = new Set(["diff", "show", "format-patch", "stash"]);
 const MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh", "ash", "fish"]);
 const INTERPRETERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
@@ -73,7 +74,7 @@ const REASON = {
     "Hidden or indirect push, publish or release is blocked: run the command directly (git push -u origin <feature-branch>) so the guard can see it.",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
   protected:
-    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md.",
+    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md. Use paths from the repo root (no cd, -C, --chdir or --work-tree into guarded dirs) and apply patches from a file in the repo.",
   failClosed:
     "The guard hit an internal error on a push, publish, release or secret call: retry the call; if it keeps failing, ask the human.",
 };
@@ -298,6 +299,7 @@ export function commands(cmd) {
       continue;
     }
     if (seg.docs) t.docs = seg.docs;
+    for (const d of chdirs(seg)) out.push(["@chdir", d]);
     out.push(t);
     const prog = base(t[0]);
     const segText = seg.join(" ");
@@ -548,13 +550,36 @@ function ghApiWrites(args) {
 const ADMIN_API_RE =
   /\/(branches\/[^/\s]+\/protection|rulesets?|environments|actions\/(secrets|variables|permissions)|hooks|keys|collaborators|transfer|rename)\b/;
 
-function bashRule(t, projectDir, cwd = projectDir) {
+const CHDIR_FLAG_RE =
+  /^(?:-C|--chdir|--directory|--work-tree|--prefix|--cwd|--dir)(?:=(.*)|(?!-)(.+))?$/;
+
+/** Directories a command changes into with a flag (`env -C`, `tar -C`, `make -C`, `--work-tree=`). */
+function chdirs(tokens) {
+  const out = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const m = CHDIR_FLAG_RE.exec(tokens[i]);
+    if (!m) continue;
+    const v = m[1] ?? m[2] ?? tokens[++i];
+    if (v) out.push(v);
+  }
+  return out;
+}
+
+const dirOf = (cwd, x) => resolve(cwd, stripTok(x));
+
+function bashRule(
+  t,
+  projectDir,
+  cwd = projectDir,
+  chain = { made: new Set(), tainted: new Set() },
+) {
   const prog = base(t[0]);
   const args = t.slice(1);
   if (prog === "@evade") return RISKY_RE.test(t[1]) ? "evasion" : null;
   if (prog === "@evade-exec") return EXEC_RE.test(t[1]) ? "evasion" : null;
-  if (["cd", "pushd"].includes(prog) || (prog === "git" && t.includes("-C"))) {
-    const dirs = prog === "git" ? [t[t.indexOf("-C") + 1]] : args.filter((a) => !a.startsWith("-"));
+  if (prog === "@chdir") return guardedDir(t[1], projectDir, cwd) ? "protected" : null;
+  if (["cd", "pushd"].includes(prog)) {
+    const dirs = args.filter((a) => !a.startsWith("-"));
     if (dirs.some((d) => d && guardedDir(d, projectDir, cwd))) return "protected";
   }
   if (prog === "patch" || (prog === "git" && gitSub(t).sub === "apply")) {
@@ -563,6 +588,12 @@ function bashRule(t, projectDir, cwd = projectDir) {
     const texts = [...(t.docs ?? [])];
     let read = texts.length > 0;
     for (const f of args.map((x) => x.replace(/^<+/, "")).filter((x) => x && !x.startsWith("-"))) {
+      const abs = dirOf(cwd, f);
+      if (chain.made.has(abs)) {
+        read = true; // written earlier in this chain by git diff: the repo's own changes
+        continue;
+      }
+      if (chain.tainted.has(abs)) return "protected"; // content made by the chain cannot be read
       try {
         texts.push(readFileSync(resolve(cwd, f), "utf8"));
         read = true;
@@ -721,9 +752,51 @@ const GUARDED_DIR_RE = /^(\.claude(\/hooks)?|\.bosun(\/.*)?|\.github\/workflows)
 /** `cd`/`git -C` into a guarded dir would turn later relative writes into unguarded names. */
 function guardedDir(d, projectDir, cwd) {
   const x = stripTok(d);
+  if (/[*?[{]/.test(x) && globHitsGuarded(x, projectDir, cwd)) return true;
   return [x, realRel(x, projectDir, cwd)].some(
     (r) => r && (GUARDED_DIR_RE.test(r) || isProtected(r) || LOCK_RE.test(r)),
   );
+}
+
+const GUARDED_DIRS = [".claude", ".claude/hooks", ".bosun", ".github/workflows"];
+
+/** True when a glob (`.cla*`, `.?laude`, `.claud{e,x}`) could expand to a guarded dir. */
+function globHitsGuarded(glob, projectDir, cwd) {
+  const rel = relPath(glob, projectDir, cwd).replace(/\/+$/, "");
+  const re = (g) => {
+    let out = "";
+    for (let i = 0; i < g.length; i++) {
+      const c = g[i];
+      if (c === "*") out += g[i + 1] === "*" ? (i++, ".*") : "[^/]*";
+      else if (c === "?") out += "[^/]";
+      else if (c === "[") {
+        const e = g.indexOf("]", i + 2);
+        if (e < 0) out += "\\[";
+        else {
+          out += `[${g.slice(i + 1, e).replace(/^!/, "^")}]`;
+          i = e;
+        }
+      } else if (c === "{") {
+        // stripPrefixes may have cut a trailing `}`: read to the end then
+        const e = g.indexOf("}", i) < 0 ? g.length : g.indexOf("}", i);
+        {
+          out += `(?:${g
+            .slice(i + 1, e)
+            .split(",")
+            .map((a) => a.replace(/[.+^$()|\\]/g, "\\$&"))
+            .join("|")})`;
+          i = e;
+        }
+      } else out += c.replace(/[.+^$()|\\]/g, "\\$&");
+    }
+    return out;
+  };
+  try {
+    const r = new RegExp(`^${re(rel)}$`, "i");
+    return GUARDED_DIRS.some((g) => r.test(g));
+  } catch {
+    return true; // unreadable glob: refuse
+  }
 }
 
 /** True when a unified diff or patch writes a protected path (any `-p` strip level). */
@@ -776,9 +849,11 @@ export function decide(input, ctx) {
   const deny = (key) => ({ decision: "deny", reason: REASON[key] });
   const cwd = [ctx.cwd, input?.cwd].find((x) => typeof x === "string" && x) ?? ctx.projectDir;
   if (name === "Bash") {
+    const chain = { made: new Set(), tainted: new Set() };
     for (const t of commands(ti.command)) {
-      const rule = bashRule(t, ctx.projectDir, cwd);
+      const rule = bashRule(t, ctx.projectDir, cwd, chain);
       if (rule) return deny(rule);
+      noteWrites(t, cwd, chain);
     }
     return null;
   }
@@ -799,6 +874,31 @@ export function decide(input, ctx) {
     return { decision: "ask", reason: ownedReason(rel) };
   }
   return null;
+}
+
+/** Track files written earlier in a chain: `git diff > f` makes a patch of the repo's own changes;
+ * any other write leaves content the guard cannot read. */
+function noteWrites(t, cwd, chain) {
+  const prog = base(t[0]);
+  const diffLike = prog === "diff" || (prog === "git" && DIFF_SUBS.has(gitSub(t).sub));
+  for (let i = 0; i < t.length; i++) {
+    let name = "";
+    if (/^--output=/.test(t[i])) name = t[i].slice(9);
+    else if (writesTarget(t, i) && !t[i].startsWith("-")) name = stripTok(t[i]);
+    else continue;
+    if (!name || /^\d+$/.test(name)) continue;
+    const abs = dirOf(cwd, name);
+    const viaRedirect =
+      /^\d*>/.test(t[i]) || /^\d*>[>|]?$/.test(t[i - 1] ?? "") || t[i].startsWith("--output=");
+    const append = />>/.test(t[i]) || />>$/.test(t[i - 1] ?? "");
+    if (diffLike && viaRedirect && !append) {
+      chain.made.add(abs);
+      chain.tainted.delete(abs);
+    } else {
+      chain.made.delete(abs);
+      chain.tainted.add(abs);
+    }
+  }
 }
 
 /** True when a call that failed inside the guard still looks like push, publish, release or secrets. */

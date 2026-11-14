@@ -753,3 +753,74 @@ test("cd into a guarded dir, a persisted cwd there, patch and git apply do not h
   ])
     assert.equal(decide(bash(cmd), c), null, cmd);
 });
+
+test("a patch file made earlier in the chain by git diff is applied; other chain writes stay refused", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-chain-"));
+  mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+  writeFileSync(join(dir, "fine.diff"), "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n");
+  const c = { projectDir: dir };
+  for (const cmd of [
+    "git diff > x.diff && git apply -R x.diff",
+    "git diff >x.diff; git apply --reverse x.diff",
+    "git diff -- src --output=x.diff && git apply -R x.diff",
+    "git stash show -p > x.diff && patch -p1 -R < x.diff",
+    "git diff HEAD~1 > ./x.diff && git apply -R ./x.diff",
+  ])
+    assert.equal(decide(bash(cmd), c), null, cmd);
+  for (const cmd of [
+    "echo '--- a/.claude/settings.json' > x.diff && git apply x.diff",
+    "git diff > x.diff && echo evil >> x.diff && git apply x.diff",
+    "printf evil | tee x.diff && git apply x.diff",
+    "echo evil > fine.diff && git apply fine.diff",
+    "git diff > .claude/hooks/x.diff",
+    "git apply x.diff",
+  ])
+    assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
+});
+
+test("deny reason for a protected path tells the agent to use paths from the repo root", () => {
+  const r = decide(bash("echo x > .claude/settings.json"), { projectDir: "/r" });
+  assert.match(r.reason, /repo root/);
+});
+
+test("chdir flags and globs into a guarded dir are treated like cd", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-chdir-"));
+  mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  mkdirSync(join(dir, ".bosun"), { recursive: true });
+  mkdirSync(join(dir, "src"), { recursive: true });
+  const c = { projectDir: dir };
+  for (const cmd of [
+    "env -C .claude sh -c 'echo x > settings.json'",
+    "env --chdir=.claude/hooks rm guard.mjs",
+    "env --chdir .bosun touch x",
+    "tar -C .claude -xf a.tar",
+    "tar -C.claude -xf a.tar",
+    "tar --directory=.claude/hooks -xf a.tar",
+    "tar xf a.tar --directory .github/workflows",
+    "make -C .claude",
+    "make --directory=.bosun all",
+    "git --work-tree=.claude checkout -- .",
+    "git --work-tree .claude restore .",
+    "cd .cla*",
+    "cd .?laude/hooks",
+    "cd .[c]laude",
+    "cd .claud{e,x}",
+    "cd .git*/workflows",
+    "cd .bos*",
+    "pnpm --prefix .claude exec sh",
+    "git -C .cla* checkout -- settings.json",
+  ])
+    assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
+  for (const cmd of [
+    "env -C src ls",
+    "tar -C src -xf a.tar",
+    "make -C src",
+    "git --work-tree=src status",
+    "cd s*",
+    "cd src/*",
+    "grep -C 3 foo src/a.ts",
+    "git -C src status",
+  ])
+    assert.equal(decide(bash(cmd), c), null, cmd);
+});
