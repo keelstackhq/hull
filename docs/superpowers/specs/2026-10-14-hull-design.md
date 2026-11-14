@@ -473,6 +473,9 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `git config core.hooksPath|alias.*`). Indirection (`eval`, `sh` or an interpreter fed from a pipe,
   `-c`/`-e` bodies, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies when the text mentions
   push, publish or release; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
+  `cd`/`pushd`/`git -C` into `.claude`, `.claude/hooks`, `.bosun` or `.github/workflows` denies, and
+  relative paths resolve against the hook's `cwd`; `patch` and `git apply` are read (file, `<` or
+  heredoc) and deny when the diff names a protected path or cannot be read (piped).
   Every deny names the allowed alternative. Asks the human before Edit/Write on a file the lock
   lists as `owned` (the reason names `scripts/ci-extra.sh` for `ci.yml`, else
   `docs/agents/project.md`). A tokenizer, not a sandbox: the real fix is a server-side branch

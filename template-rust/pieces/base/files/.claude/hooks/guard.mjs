@@ -297,6 +297,7 @@ export function commands(cmd) {
       if (base(seg[0].replace(/^[({]+/, "")) === "env") out.push(["printenv"]);
       continue;
     }
+    if (seg.docs) t.docs = seg.docs;
     out.push(t);
     const prog = base(t[0]);
     const segText = seg.join(" ");
@@ -308,6 +309,9 @@ export function commands(cmd) {
         const end = t.findIndex((x, n) => n > e && (x === ";" || x === "+"));
         const inner = stripPrefixes(t.slice(e + 1, end < 0 ? undefined : end));
         if (inner.length) out.push(inner);
+        const ci = inner.findIndex((x, n) => n > 0 && /^-[a-z]*c$/.test(x));
+        if (SHELLS.has(base(inner[0] ?? "")) && ci > 0 && inner[ci + 1] !== undefined)
+          for (const x of commands(inner[ci + 1])) out.push(x);
       }
     }
     if (/^[$`]|\$\(/.test(t[0])) out.push(["@evade", segText]);
@@ -544,11 +548,30 @@ function ghApiWrites(args) {
 const ADMIN_API_RE =
   /\/(branches\/[^/\s]+\/protection|rulesets?|environments|actions\/(secrets|variables|permissions)|hooks|keys|collaborators|transfer|rename)\b/;
 
-function bashRule(t, projectDir) {
+function bashRule(t, projectDir, cwd = projectDir) {
   const prog = base(t[0]);
   const args = t.slice(1);
   if (prog === "@evade") return RISKY_RE.test(t[1]) ? "evasion" : null;
   if (prog === "@evade-exec") return EXEC_RE.test(t[1]) ? "evasion" : null;
+  if (["cd", "pushd"].includes(prog) || (prog === "git" && t.includes("-C"))) {
+    const dirs = prog === "git" ? [t[t.indexOf("-C") + 1]] : args.filter((a) => !a.startsWith("-"));
+    if (dirs.some((d) => d && guardedDir(d, projectDir, cwd))) return "protected";
+  }
+  if (prog === "patch" || (prog === "git" && gitSub(t).sub === "apply")) {
+    // The diff names the files it writes: read it (file operand, <redirect or heredoc). Piped or
+    // unreadable input cannot be checked, so it is refused; apply it from a file in the repo.
+    const texts = [...(t.docs ?? [])];
+    let read = texts.length > 0;
+    for (const f of args.map((x) => x.replace(/^<+/, "")).filter((x) => x && !x.startsWith("-"))) {
+      try {
+        texts.push(readFileSync(resolve(cwd, f), "utf8"));
+        read = true;
+      } catch {
+        // a value such as the 1 of `-p 1`, or a missing file
+      }
+    }
+    if (!read || texts.some(patchTouchesProtected)) return "protected";
+  }
   const run = args.findIndex((a) => a === "run" || a === "run-script");
   if (
     MANAGERS.has(prog) &&
@@ -686,17 +709,43 @@ function bashRule(t, projectDir) {
     if (LOCK_RE.test(x) && writesTarget(t, i)) return "lock";
     if (!writesTarget(t, i)) continue;
     if (isProtected(x)) return "protected";
-    const real = realRel(x, projectDir);
+    const real = realRel(x, projectDir, cwd);
     if (real && LOCK_RE.test(real)) return "lock";
     if (real && isProtected(real)) return "protected";
   }
   return null;
 }
 
+const GUARDED_DIR_RE = /^(\.claude(\/hooks)?|\.bosun(\/.*)?|\.github\/workflows)\/?$/i;
+
+/** `cd`/`git -C` into a guarded dir would turn later relative writes into unguarded names. */
+function guardedDir(d, projectDir, cwd) {
+  const x = stripTok(d);
+  return [x, realRel(x, projectDir, cwd)].some(
+    (r) => r && (GUARDED_DIR_RE.test(r) || isProtected(r) || LOCK_RE.test(r)),
+  );
+}
+
+/** True when a unified diff or patch writes a protected path (any `-p` strip level). */
+function patchTouchesProtected(text) {
+  for (const m of String(text).matchAll(
+    /^(?:\+\+\+|---|diff --git|rename (?:to|from)|copy (?:to|from)|\*\*\*)[ \t]+(.*)$/gm,
+  )) {
+    for (const path of m[1].split(/[ \t]+/)) {
+      const parts = path.replaceAll("\\", "/").split("/");
+      for (let i = 0; i < parts.length; i++) {
+        const sub = parts.slice(i).join("/");
+        if (isProtected(sub) || LOCK_RE.test(sub)) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** Repo-relative path with symlinks resolved through the deepest existing ancestor, or undefined. */
-function realRel(p, projectDir) {
+function realRel(p, projectDir, cwd = projectDir) {
   try {
-    let cur = resolve(projectDir, String(p));
+    let cur = resolve(cwd, String(p));
     const tail = [];
     while (!existsSync(cur) && dirname(cur) !== cur) {
       tail.unshift(basename(cur));
@@ -708,10 +757,10 @@ function realRel(p, projectDir) {
   }
 }
 
-function relPath(p, projectDir) {
+function relPath(p, projectDir, cwd = projectDir) {
   const rel = posix.relative(
     posix.resolve(projectDir),
-    posix.resolve(projectDir, String(p).replaceAll("\\", "/")),
+    posix.resolve(cwd, String(p).replaceAll("\\", "/")),
   );
   return rel;
 }
@@ -725,9 +774,10 @@ export function decide(input, ctx) {
   const name = input?.tool_name;
   const ti = input?.tool_input ?? {};
   const deny = (key) => ({ decision: "deny", reason: REASON[key] });
+  const cwd = [ctx.cwd, input?.cwd].find((x) => typeof x === "string" && x) ?? ctx.projectDir;
   if (name === "Bash") {
     for (const t of commands(ti.command)) {
-      const rule = bashRule(t, ctx.projectDir);
+      const rule = bashRule(t, ctx.projectDir, cwd);
       if (rule) return deny(rule);
     }
     return null;
@@ -739,10 +789,10 @@ export function decide(input, ctx) {
   if (!EDIT_TOOLS.has(name)) return null;
   const target = targetPath(ti);
   if (typeof target !== "string" || !target) return null;
-  const rel = relPath(target, ctx.projectDir);
+  const rel = relPath(target, ctx.projectDir, cwd);
   if (LOCK_RE.test(rel)) return deny("lock");
   if (isProtected(rel)) return deny("protected");
-  const real = realRel(target, ctx.projectDir);
+  const real = realRel(target, ctx.projectDir, cwd);
   if (real && LOCK_RE.test(real)) return deny("lock");
   if (real && isProtected(real)) return deny("protected");
   if (ctx.lockText && ownedPaths(ctx.lockText).has(rel)) {
