@@ -7,6 +7,16 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.10.1 — unreleased
+
+- `AGENTS.md` (seed) gains a "Ready for a PR" section (branch, commit prefixes, `pnpm run ci`,
+  `gh pr create`, `gh pr merge --auto`) and the `workspace:*` rule. **Existing repos do not get it
+  (seed): copy those lines from a fresh render if you want them.**
+- `ready` prints manual items that share one note (gh not logged in) as one line.
+- Upgrade note v0.10.0 to here: `splice update` adds `.claude/agents/*`, a new `guard.mjs`
+  (denies default-branch push, tag push, `gh pr merge` without `--auto`) and the seed
+  `docs/agents/index.md`; the post step `agents-index` fills it. No shared file changes.
+
 ## v0.10.0 — 2026-11-14
 
 - Docs-only CI skip: `changelog.d/**` counts as docs (`docs/progress.d/**` already did); on a pull
@@ -127,8 +137,8 @@ Keep `unreleased` while changes accumulate.
   move `SPLICE_BOT_TOKEN` / `HOIST_RELEASE_TOKEN` there and delete the repository-level secrets.**
 - **Upgrade (TypeScript repos): `template/` now ships `.github/workflows/splice.yml`, the weekly
   update bot (it also renders with `circleci-only`). Create the `splice-bot` environment first, as
-  in the bullet above.** The README sections "Update bot" and "pick a token mode" are
-  seed: existing repos do not get them.
+  in the bullet above.** The README section "Update bot" is
+  seed: existing repos do not get it.
 - Update bot and release PR token, in this order: GitHub App (variable `SPLICE_APP_CLIENT_ID` and
   secret `SPLICE_APP_KEY` in `splice-bot`; the App needs Contents, Pull requests and Workflows
   write), then PAT (`SPLICE_BOT_TOKEN`), then `github.token`. A PR opened with `github.token` gets

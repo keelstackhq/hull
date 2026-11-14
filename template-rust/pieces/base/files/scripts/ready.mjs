@@ -740,7 +740,18 @@ export function assess(root) {
 /** Text report and exit code. */
 export function report(results, url) {
   const lines = [];
+  // Manual items that share one note (gh not logged in) print once; details are behind the URL.
+  const shared = new Map();
+  for (const r of results.filter((x) => x.status === "manual")) {
+    shared.set(r.note, [...(shared.get(r.note) ?? []), r.id]);
+  }
   for (const r of results) {
+    const group = r.status === "manual" ? shared.get(r.note) : null;
+    if (group?.length > 1) {
+      if (group[0] !== r.id) continue;
+      lines.push(`manual  ${group.join(", ")}  ${r.note}`);
+      continue;
+    }
     lines.push(`${r.status.padEnd(7)} ${r.id.padEnd(12)} ${r.note}`);
     if (!["pass", "skipped"].includes(r.status)) {
       lines.push(`        fix: ${r.fix}`);

@@ -477,3 +477,14 @@ test("all pieces together: AGENTS.md + CLAUDE.md <= 80 lines, index <= 8192 byte
   );
   assert.ok(Buffer.byteLength(buildIndex(dir)) <= 8192);
 });
+
+test("AGENTS.md says how to reach a PR-ready state and how to wire workspace packages", async () => {
+  for (const pieces of [["base"], ["base", "preact-app", "ts-lib"]]) {
+    const text = await read((await renderCombo(pieces)).dir, "AGENTS.md");
+    assert.match(text, /^## Ready for a PR$/m, pieces.join());
+    assert.match(text, /feat:|fix:/, "conventional commit prefixes");
+    assert.match(text, /gh pr create/);
+    assert.match(text, /workspace:\*/);
+    assert.ok(lineCount(text) <= 60, `${pieces} AGENTS.md ${lineCount(text)}`);
+  }
+});
