@@ -68,3 +68,9 @@ Also read the CHANGELOG v0.8.0 consumer notes (preact 11, happy-dom 21, hono, wr
 
 - **vite-plus 1.5 (from 1.1):** newer oxlint/oxfmt may flag code, so run `vp fmt`; the vitest
   browser port is 23315; mistyped task settings now error.
+
+## Actions-minutes (`ci-minutes`) findings
+
+A repo on an older hull may fail bosun's `ci-minutes` gate (bosun 0.7+) in the owned workflows
+(`ci.yml`, `release.yml`, ...). Current hull renders compliant workflows, so run `splice update`;
+do not edit owned workflows by hand (that is template drift and `splice update` refuses it).

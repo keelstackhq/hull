@@ -19,6 +19,8 @@ Keep `unreleased` while changes accumulate.
   skill now call instead of `cargo deny`. Extra licenses survive `splice update`.
 - `ready` names an unanswered onboarding question, its options and the `--answer id=<value>`
   command (e.g. a `release` question added by an update).
+- Repos on an older hull that fail bosun's `ci-minutes` gate: `splice update` clears the findings in
+  the owned workflows (current renders are compliant; `docs/updating.md`).
 - Tests of the Actions-minutes rules on every rendered workflow of every combo: D-007 and a port
   of bosun's `ci-minutes` gate rules (draft guard, `ci-ok`, `ready_for_review`, concurrency, paths).
 
