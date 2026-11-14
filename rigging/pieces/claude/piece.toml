@@ -1,7 +1,4 @@
 id = "claude"
-description = "Claude Code subagents (Explore, implementer, reviewer, ci-fixer)"
+description = "Moved to hull's base: the subagents ship with template/ and template-rust/ now"
 multiple = false
 requires = ["meta"]
-
-[files]
-owned = [".claude/agents/*.md"]

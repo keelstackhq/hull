@@ -421,11 +421,13 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `@docs/agents/index.md`, line 4 `@docs/agents/docs.md` only with docs, then `## Claude Code`
   (subagent line, skills, hooks). Per-instance notes are `<target>/AGENTS.md` (loaded on demand;
   §4.3.3) with a seed `<target>/CLAUDE.md` of `@AGENTS.md`.
-- `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`). Since 0.2.0 they
-  are not in `base`: rigging's `claude` piece ships them (§14); `migrations/0.2.0.toml` removes
-  base's copies (0.2.1 also the pre-0.1.0 `explorer.md`), and the generated `CLAUDE.md` says to
-  run `splice channel add gh:keelstackhq/hull//rigging --piece claude` if `.claude/agents/` lacks
-  them:
+- `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`). `base` ships them
+  again (owned; a plain render has no manual channel step). They left `base` in 0.2.0
+  (`migrations/0.2.0.toml` removes the then-current copies, 0.2.1 also the pre-0.1.0 `explorer.md`).
+  Rigging's `claude` piece (§14) keeps its id but is empty ("moved to base"), so a repo that added it
+  has no claim conflict: update the channel first, then the template.
+  `docs/agents/index.md` is a seed stub, so the `CLAUDE.md` import resolves before
+  `agents-index.mjs` first runs:
 
 | Agent | Model | Tools | Use |
 |---|---|---|---|
@@ -435,7 +437,7 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
 | `ci-fixer` | sonnet | Read, Edit, Write, Bash, Grep, Glob | reads `gh run view --log-failed`, reproduces, fixes |
 
   Claude Code has no complexity-based routing; fixed models per agent are the convention, and
-  `"model": "opusplan"` in settings is the main-session default (Opus plans, Sonnet executes).
+  settings pin no main-session model (the session's own choice stands).
 - `.claude/skills/verify/SKILL.md`: run `pnpm turbo run lint format:check typecheck test --affected
   --output-logs=errors-only`, report ≤ 10 lines (pass/fail per task, first error per failure).
 - `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstackhq/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
@@ -460,11 +462,22 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `.claude/hooks/session-start.d/*.sh` (repo-local, not owned by the template; a failing one is
   reported and ignored), so a repo can add session-start work without editing owned files. Exits 0
   on any failure (never blocks a session), prints one status line plus whatever local hooks print.
-- `.claude/hooks/guard.mjs` (PreToolUse, Node built-ins only): denies publish commands, force and
-  tag pushes (also behind `git -C . push`), deleting `main`/`master` on the remote, reads of `.env*`/`.dev.vars` (not `.env.example`) and
-  any write to `.splice/lock.toml`; asks the human before Edit/Write/MultiEdit/NotebookEdit on a
-  file the lock lists as `owned`. A tokenizer, not a shell; any internal error allows the call.
-  Rules and known gaps: agent-layer spec §3.4.
+- `.claude/hooks/guard.mjs` (PreToolUse, Node built-ins only): denies publish commands (`release`
+  is a publish verb), force and tag pushes (also behind `git -C . push`), pushes to the default
+  branch (`main`, `master`, origin/HEAD) in every spelling and local rewrites of it, `gh pr merge`
+  without `--auto`, `gh release|secret|repo edit|delete`, branch-protection and ruleset `gh api`
+  writes, reads of secrets (`.env*`, `*.env`, `.envrc`, `*.pem`, `id_*`, `keys.txt`, `.age/`,
+  `~/.aws|.ssh|.config/gh`, `/proc/*/environ`, bare `env`/`printenv`, `echo $…KEY…`, `sops -d`,
+  `age -d`, `hoist secrets exec -- env|sh`; not `.env.example`) and writes to the guard rail itself
+  (`.splice/lock.toml`, `.claude/hooks/*`, `.claude/settings*.json`, `release*.yml`, `.bosun/*`,
+  `git config core.hooksPath|alias.*`). Indirection (`eval`, `sh` or an interpreter fed from a pipe,
+  `-c`/`-e` bodies, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies when the text mentions
+  push, publish or release; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
+  Every deny names the allowed alternative. Asks the human before Edit/Write on a file the lock
+  lists as `owned` (the reason names `scripts/ci-extra.sh` for `ci.yml`, else
+  `docs/agents/project.md`). A tokenizer, not a sandbox: the real fix is a server-side branch
+  ruleset. An internal error denies (retry) when the call mentions push, publish, release, gh or
+  secret, else allows. Rules and known gaps: agent-layer spec §3.4.
 - `.claude/hooks/stop-checks.sh` (opt-in): does nothing unless `HULL_STOP_CHECKS=1`; then runs
   `pnpm turbo run lint typecheck test --affected` and on failure exits 2 with the first error on
   stderr, which blocks stopping. Enable by setting the env var in `.claude/settings.local.json`.
@@ -473,8 +486,10 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
 - `.claude/statusline.sh` (opt-in via `statusLine` in settings.local.json): model, context %, cost,
   read from stdin `model.display_name`, `context_window.used_percentage` (may be null),
   `cost.total_cost_usd` with `jq`; prints a fixed fallback line when `jq` is missing.
-- `.claude/settings.json`: `model: "opusplan"`; `permissions.allow` for pnpm, cargo, turbo, git
-  read and commit commands, `gh run view`, `docspack`; `deny` force-push (`--force*`, `-f`, `+ref`
+- `.claude/settings.json`: no `model` pin; `permissions.allow` for pnpm, cargo, turbo, git read,
+  commit, push, branch, switch, checkout, stash and rebase commands, `gh run view`, `gh pr create|
+  view|checks`, `gh pr merge --auto`, `gh api`, `node scripts/*`, `docspack` (the guard still
+  denies the dangerous forms of each); `deny` force-push (`--force*`, `-f`, `+ref`
   anywhere after `git push`), `pnpm|npm|cargo publish` and reading `.env*` (deny rules match only
   commands starting with the literal program, so `git -C . push -f` is not caught; push is not
   allowed, so it still prompts); these deny rules are the second layer behind the guard hook
@@ -640,15 +655,16 @@ upstream.
   default branch; PR caches are not shared between PRs). No workflow-level `paths` filters.
 - `concurrency: { group: ci-${{ github.event.pull_request.number || github.ref }},
   cancel-in-progress: ${{ github.event_name == 'pull_request' }} }`; `permissions: contents: read`.
-- Job `ci`, `ubuntu-latest`, `timeout-minutes: 15`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
+- Job `ci`, `ubuntu-latest`, `timeout-minutes: 10`, env `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` from
   the PR base sha, `merge_group.base_sha`, or `github.event.before`:
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
   2. Index check: a separate step with no `if`, using the runner's `node`:
      `node scripts/agents-index.mjs --check` fails when `docs/agents/index.md` is stale (docs-only
      cost < 1 s).
   3. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
-     `TURBO_VERSION` (= the catalog pin, tracked by the Renovate preset) from the npm registry with
-     `curl` (~1 s; `npx` took ~5-7 s), then `turbo query affected --tasks lint format:check
+     `TURBO_VERSION` (= the catalog pin; the Renovate preset does not bump it alone, since the pinned `TURBO_SHA256` must move with it: `splice update` carries version and sha together) from the npm registry with
+     `curl` (~1 s; `npx` took ~5-7 s) into `$RUNNER_TEMP` and verifies it against the pinned
+     `TURBO_SHA256` before unpacking (no `curl | tar`), then `turbo query affected --tasks lint format:check
      typecheck test build` writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root
      package `//` unless `git diff BASE...HEAD` touches a root trigger (root package/workspace/lock/
      turbo/tsconfig/vite config, `.node-version`, `.npmrc`, anything under `.github/`), and sets

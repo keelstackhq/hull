@@ -5,8 +5,7 @@
 
 ## Claude Code
 
-- Subagents `Explore`, `implementer`, `reviewer`, `ci-fixer` (reports ≤ 15 lines); if `.claude/agents/`
-  lacks them: `splice channel add gh:keelstackhq/hull//rigging --piece claude`.
-- Skills: `verify`, `add-piece`{% if "docs" in pieces %}, `docs-lookup`{% endif %}. `/loop` runs `.claude/loop.md`.
-- Hooks: `guard.mjs` denies publish, force and tag pushes and secret reads, and asks before editing
+- Subagents `Explore`, `implementer`, `reviewer`, `ci-fixer` in `.claude/agents/` (reports ≤ 15 lines).
+- Skills: `ready`, `verify`, `add-piece`{% if "docs" in pieces %}, `docs-lookup`{% endif %}. `/loop` runs `.claude/loop.md`.
+- Hooks: `guard.mjs` denies publish, force, tag and default-branch pushes, `gh pr merge` without `--auto` and secret reads, and asks before editing
   template-owned files; `stop-checks.sh` is opt-in (`HULL_STOP_CHECKS=1`).

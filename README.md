@@ -90,10 +90,14 @@ pnpm dlx @keelstackhq/splice channel add gh:keelstackhq/hull//rigging --piece cl
 `channel add` refuses while base's copies are still there, so run `update` first. Delete or move
 any edited copy it reports before the `channel add`.
 
+Since hull 0.11 `base` ships the four agents again and rigging's `claude` piece is empty (same id,
+no files), so both can be installed without a claim conflict. A repo that added that piece: run
+`splice update --channel rigging` first, then `splice update` for the template.
+
 ## Built for Claude Code
 
-A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, subagents from the
-`rigging` channel (`splice channel add gh:keelstackhq/hull//rigging --piece claude`: a project
+A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, subagents
+(`.claude/agents/`, shipped in `base`; the `rigging` channel's `claude` piece is now empty: a project
 `Explore` on haiku plus `implementer` sonnet, `reviewer` opus and `ci-fixer` sonnet), skills
 (`verify`, `add-piece`, `docs-lookup`), a `/loop` default that iterates until checks pass, a
 PreToolUse guard hook (denies publish, force or tag pushes and secret reads; asks before editing

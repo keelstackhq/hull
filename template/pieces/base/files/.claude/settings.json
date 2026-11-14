@@ -1,5 +1,4 @@
 {
-  "model": "opusplan",
   "permissions": {
     "allow": [
       "Bash(pnpm:*)",
@@ -11,7 +10,19 @@
       "Bash(git show:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(git rebase:*)",
       "Bash(gh run view:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr merge --auto:*)",
+      "Bash(gh api:*)",
+      "Bash(node scripts/*)",
       "Bash(docspack:*)"
     ],
     "deny": [

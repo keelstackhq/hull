@@ -326,7 +326,7 @@ test("shared with template/: guard.mjs, statusline.sh and rust-cli src/tests are
 
 test("README names the rigging and decisions channel adds (D-004); no bosun paths are taken", async () => {
   const readme = await readFile(join(BASE, "README.md"), "utf8");
-  assert.match(readme, /splice channel add gh:keelstackhq\/hull\/\/rigging --piece claude/);
+  assert.doesNotMatch(readme, /--piece claude/, "the subagents ship in base");
   assert.match(
     readme,
     /splice channel add gh:keelstackhq\/decisions\/\/channel --track main --piece import-project/,

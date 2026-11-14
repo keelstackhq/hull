@@ -42,7 +42,7 @@ test("exactly jobs ci and ci-ok; ci-ok needs ci and runs always", () => {
   assert.equal(ok.if, "always()");
   const text = JSON.stringify(ok.steps);
   assert.match(text, /needs\.ci\.result/);
-  assert.equal(wf.jobs.ci["timeout-minutes"], 15);
+  assert.equal(wf.jobs.ci["timeout-minutes"], 10);
   assert.equal(wf.jobs.ci["runs-on"], "ubuntu-latest");
 });
 
@@ -77,6 +77,9 @@ test("early exit downloads the turbo binary without npx", () => {
     s.run.includes("https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz"),
   );
   assert.match(s.run, /"\$RUNNER_TEMP\/turbo" query affected/);
+  assert.match(s.run, /sha256sum -c/, "the tarball is verified before it is unpacked");
+  assert.match(s.env.TURBO_SHA256, /^[0-9a-f]{64}$/);
+  assert.ok(!/\|\s*tar/.test(s.run), "no curl | tar");
 });
 
 test("every step after the affected check is guarded by skip", () => {
@@ -156,18 +159,16 @@ test("renovate preset groups react, cascivo, sentry and preact", async () => {
   assert.deepEqual(names("preact"), ["preact", "@preact/**"]);
 });
 
-test("preset has a custom manager for the workflow turbo pin", async () => {
+test("preset does not bump the workflow turbo pin alone: its sha256 pin would go stale", async () => {
   const p = JSON.parse(
     await readFile(new URL("../renovate/default.json", import.meta.url), "utf8"),
   );
-  const m = p.customManagers.find((x) => x.depNameTemplate === "turbo");
-  assert.equal(m.customType, "regex");
-  assert.equal(m.datasourceTemplate, "npm");
-  assert.deepEqual(m.managerFilePatterns, ["/^\\.github/workflows/.*\\.ya?ml$/"]);
-  const line = "          TURBO_VERSION: 2.11.8";
-  assert.equal(new RegExp(m.matchStrings[0]).exec(line).groups.currentValue, "2.11.8");
+  assert.equal(
+    p.customManagers.find((x) => x.depNameTemplate === "turbo"),
+    undefined,
+  );
   const rule = p.packageRules.find((r) => r.groupName === "turbo");
-  assert.ok(rule.matchPackageNames.includes("turbo"));
+  assert.ok(rule.matchPackageNames.includes("turbo"), "the catalog pin still groups");
 });
 
 test("affected.mjs is an owned plain file", () => {

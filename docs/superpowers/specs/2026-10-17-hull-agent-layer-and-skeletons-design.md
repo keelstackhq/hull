@@ -99,7 +99,7 @@ no file-by-file overview (ETH study: no gain).
 ## Claude Code
 - Subagents: `Explore` (haiku, search/read), `implementer` (sonnet), `reviewer` (opus, read-only),
   `ci-fixer` (sonnet). Keep reports ≤ 15 lines.
-- Skills: `verify`, `add-piece`[, `docs-lookup`]. `/loop` runs `.claude/loop.md`.
+- Skills: `ready`, `verify`, `add-piece`[, `docs-lookup`]. `/loop` runs `.claude/loop.md`.
 - Hooks: `guard.mjs` denies publish/force-push/tag push/secret reads and asks before editing
   template-owned files; `stop-checks.sh` is opt-in (`HULL_STOP_CHECKS=1`).
 ```
@@ -121,8 +121,10 @@ Input: hook JSON on stdin (`tool_name`, `tool_input`). Output: nothing and exit 
 `hookSpecificOutput` object with `hookEventName: "PreToolUse"`, `permissionDecision: "deny" | "ask"`
 and a one-line `permissionDecisionReason` that says what to do instead. Exported pure function
 `decide(input, { lockText, projectDir }) → null | { decision, reason }` for tests; the CLI wrapper
-reads stdin and the lock. Any internal error → allow (exit 0) and one stderr line: a broken guard
-must not brick a session; the settings deny rules remain as the second layer.
+reads stdin and the lock. Any internal error prints one stderr line and exits 0: it allows, except
+that a call whose text mentions push, publish, release, gh, secret or sops (or a guarded path) is
+denied with "retry the call" (a broken guard must not brick a session, but must not wave a push
+through); the settings deny rules remain as the second layer.
 
 | Rule | Tools | Match | Decision |
 |---|---|---|---|
@@ -134,6 +136,20 @@ must not brick a session; the settings deny rules remain as the second layer.
 | lock | Edit, Write, MultiEdit, Bash (`>`/`sed -i` target) | `.splice/lock.toml` | deny: "only splice writes the lock" |
 | owned edit | Edit, Write, MultiEdit, NotebookEdit | normalised repo-relative `file_path` listed `class = "owned"` in the lock | ask: "owned by the template: `splice update` overwrites it; put local changes in seed files or docs/agents/project.md" |
 
+Hardening (v0.11, from the v0.10.0 audit; each deny's reason names the allowed alternative):
+
+| Rule | Match | Decision |
+|---|---|---|
+| publish verbs | `pnpm\|npm\|yarn\|bun [run] release`, `cargo release`, `make\|just release\|publish`, `gh workflow run release*` | deny (release.yml) |
+| gh admin | `gh pr merge` without `--auto` or with `--admin`, `gh release` except list/view/download, `gh secret *`, `gh repo edit\|delete\|archive\|rename\|transfer`, `gh api` writes to protection, rulesets, environments, actions secrets, hooks, keys, collaborators; `gh auth token` | deny: "only with --auto" / "ask the human" |
+| default branch | `git push` whose dst is `main`, `master` or origin/HEAD (`origin main`, `HEAD:main`, `refs/heads/x:refs/heads/main`), a bare push while HEAD is on it, `--prune`; `git branch -D\|-d\|-f\|-m <default>`, `checkout -B`/`switch -C <default>`, `update-ref refs/heads/<default>`, `reset --hard` while on it | deny: "push a feature branch, PR, `gh pr merge --auto`" |
+| indirection | `eval`, `sh`/interpreter without args (stdin), interpreter `-c`/`-e`/`-p` body, `$VAR`/`$(…)`/backtick as the command or git subcommand, heredoc code with an exec form | deny only when that text mentions push, publish, release, gh or secret; `git -c alias.x=` is resolved; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox`, `doas`, `builtin` are stripped like `nice` |
+| secrets | adds basenames `*.env` (not `process.env`), `.envrc`, `*.pem`, `id_*` (not `.pub`), `keys.txt`, dirs `.age`, `.aws`, `.ssh`, `.config/gh`, `/proc/*/environ`; bare `env`/`printenv`, `export -p`, `declare -x`, `set`, `echo\|printf $…KEY\|TOKEN\|SECRET\|PASSWORD…`, `sops -d`, `age -d`, `hoist secrets exec -- env\|printenv\|sh\|bash` | deny: `.env.example`, or `hoist secrets exec -- <command>` |
+| protected | Edit/Write/MultiEdit/NotebookEdit and Bash write verbs (`>`, `tee`, `rm`, `mv`, `cp` dst, `sed -i`, `chmod`, `git rm`) on `.claude/hooks/*`, `.claude/settings*.json`, `.github/workflows/release*.yml`, `.bosun/*`; `git config core.hooksPath\|alias.*`, `git -c core.hooksPath=` | deny regardless of the lock: "ask the human; local rules in docs/agents/project.md" |
+
+The guard stays a rail: the real fix for a push to `main` is a server-side branch ruleset (one
+line in the generated `AGENTS.md`).
+
 The path a file tool acts on is `targetPath(tool_input)` = `file_path ?? notebook_path ?? path`
 (NotebookEdit uses `notebook_path`, Grep and Glob use `path`). The secret check also looks at a
 Grep `glob` and a Glob `pattern`. The owned rule normalises `targetPath` relative to
@@ -144,9 +160,9 @@ Bash parsing is a tokenizer, not a shell: split on `;`, `&&`, `||`, `|`, newline
 `sudo`, `command`, `time`, `pnpm exec`, `npx`, a leading `(`/`{` and trailing `)`/`}`; programs
 match by basename (`/usr/bin/npm`, `./node_modules/.bin/pnpm`); recurse once into `bash|sh -c '<s>'`;
 `git` global options (`-C <d>`, `-c k=v`, `--git-dir=…`) are skipped before the subcommand (the
-settings deny rules miss `git -C . push -f`). Known gaps, documented in the hook header: `eval`,
-`$(…)` and backticks, scripts that publish, editing owned files through Bash, and a default branch
-not named `main` or `master`. The hook is a guard rail, not a sandbox.
+settings deny rules miss `git -C . push -f`). Known gaps, documented in the hook header: scripts that
+publish, editing guarded files from an interpreter, and a default branch that origin/HEAD does not
+name. The hook is a guard rail, not a sandbox.
 
 ### 3.5 Docs index `scripts/agents-index.mjs`
 

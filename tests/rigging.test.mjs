@@ -93,21 +93,16 @@ test("core: one AGENTS.md section, no files of its own", () => {
   assert.deepEqual(renderedFiles("core"), []);
 });
 
-test("claude: the four agent files owned, no CLAUDE.md section (hull owns CLAUDE.md)", () => {
+test("claude: an empty piece (the agents moved to hull's base), id kept for locks that list it", () => {
   const claude = piece("claude");
   assert.deepEqual(claude.requires, ["meta"]);
   assert.equal(claude.sections, undefined);
-  assert.deepEqual(
-    renderedFiles("claude").sort(),
-    AGENT_FILES.map((f) => `.claude/agents/${f}`),
-  );
-  for (const f of renderedFiles("claude")) {
-    assert.deepEqual(overlaps(outputPath(f), claude.files), ["owned"], f);
-  }
+  assert.equal(claude.files, undefined);
+  assert.match(claude.description, /moved to hull's base/i);
+  assert.deepEqual(renderedFiles("claude"), []);
 });
 
-test("claude agents: the files base dropped in 0.2.0, frontmatter name/description/tools/model", () => {
-  assert.ok(!existsSync(join(REAL_TEMPLATE, "pieces/base/files/.claude/agents")));
+test("base agents: frontmatter name/description/tools/model, org-generic text", () => {
   const removed = readFileSync(join(REAL_TEMPLATE, "migrations/0.2.0.toml"), "utf8");
   for (const f of AGENT_FILES) assert.ok(removed.includes(`".claude/agents/${f}"`), f);
   const want = {
@@ -117,13 +112,15 @@ test("claude agents: the files base dropped in 0.2.0, frontmatter name/descripti
     "ci-fixer.md": ["ci-fixer", "sonnet", "Read, Edit, Write, Bash, Grep, Glob"],
   };
   for (const [file, [name, model, tools]] of Object.entries(want)) {
-    const text = readFileSync(join(RIGGING, "pieces/claude/files/.claude/agents", file), "utf8");
+    const text = readFileSync(
+      join(REAL_TEMPLATE, "pieces/base/files/.claude/agents", file),
+      "utf8",
+    );
     const fm = frontmatter(text);
     assert.equal(fm.name, name, file);
     assert.equal(fm.model, model, file);
     assert.equal(fm.tools, tools, file);
     assert.ok(fm.description, file);
-    // Org-generic: no hull stack commands (pnpm/turbo/vp) in the channel's agents.
     assert.doesNotMatch(text, /\b(pnpm|turbo|vp) /, file);
   }
 });

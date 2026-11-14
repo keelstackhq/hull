@@ -102,9 +102,13 @@ test("update keeps seed, merges shared, guards owned", { skip }, async (t) => {
     await readFile(owned, "utf8"),
     await readFile(join(TEMPLATE, "pieces/preact-app/files/vite.config.ts"), "utf8"),
   );
-  // 0.2.0 moved base's agent files to rigging's claude piece (migrations/0.2.0.toml)
+  // base ships the four subagents again (owned): the update creates them from the template
   for (const f of ["explore", "implementer", "reviewer", "ci-fixer"]) {
-    assert.ok(!existsSync(join(app, `.claude/agents/${f}.md`)), f);
+    assert.equal(
+      await readFile(join(app, `.claude/agents/${f}.md`), "utf8"),
+      await readFile(join(TEMPLATE, `pieces/base/files/.claude/agents/${f}.md`), "utf8"),
+      f,
+    );
   }
   const final = run(app, "check", "--json", "--offline");
   assert.equal(final.status, 0, final.stdout + final.stderr);

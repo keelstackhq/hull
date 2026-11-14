@@ -18,7 +18,7 @@ jobs:
   ci:
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
       TURBO_SCM_HEAD: ${{ github.sha }}
@@ -35,6 +35,8 @@ jobs:
         id: affected
         env:
           TURBO_VERSION: 2.11.10
+          # sha256 of the registry tarball linux-64-2.11.10.tgz, computed 2026-11-14
+          TURBO_SHA256: 07e9052d9e823f204ec1f5e18e109bddb6414ad440bab28f54c9d3b009cad470
         run: |
           # A PR is checked out as a merge into the current base branch: diff against its first
           # parent, not the base sha from when the PR was opened (stale: it would count
@@ -45,8 +47,9 @@ jobs:
             echo "TURBO_SCM_BASE=$TURBO_SCM_BASE" >> "$GITHUB_ENV"
           fi
           set +e
-          curl -fsSL "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz" \
-            | tar -xz -C "$RUNNER_TEMP" --strip-components=2 turbo-linux-x64/bin/turbo
+          curl -fsSL -o "$RUNNER_TEMP/turbo.tgz" "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz"
+          echo "$TURBO_SHA256  $RUNNER_TEMP/turbo.tgz" | sha256sum -c - || exit 1
+          tar -xzf "$RUNNER_TEMP/turbo.tgz" -C "$RUNNER_TEMP" --strip-components=2 turbo-linux-x64/bin/turbo
           "$RUNNER_TEMP/turbo" query affected --tasks lint format:check typecheck test build > "$RUNNER_TEMP/affected.json"
           code=$?
           set -e

@@ -53,6 +53,7 @@ Variables:
 
 Files (owned):
 
+- `.claude/agents/*.md`
 - `.github/workflows/ci.yml`
 - `.github/workflows/preview.yml`
 - `.github/workflows/preview-deploy.yml`
@@ -79,6 +80,7 @@ Files (shared):
 
 Files (seed):
 
+- `docs/agents/index.md`
 - `AGENTS.md`
 - `docs/agents/onboarding.toml`
 - `scripts/ci-pre.sh`

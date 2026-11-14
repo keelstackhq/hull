@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const read = (rel) => readFileSync(fileURLToPath(new URL(`../${rel}`, import.meta.url)), "utf8");
 const DOC = read("docs/adopt.md");
 const { ASSESS_SCHEMA, CLASH, DETECT, assess } = await import(
@@ -87,9 +89,20 @@ test("adopt.md's sha256 check is the real sha256 of ready.mjs (once filled in)",
     DOC,
   );
   assert.ok(m, "the check-before-run line");
-  if (m[1] === "ASSESS_SHA256") return;
-  const file = read("template/pieces/base/files/scripts/ready.mjs");
-  assert.equal(m[1], createHash("sha256").update(file).digest("hex"));
+  if (m[1] === "ASSESS_SHA256") return; // an unreleased top version: the release fills it in
+  // The hosted copy is the released file: hash the tagged ready.mjs, not the working tree's.
+  const top = /^## v(\d+\.\d+\.\d+) — (\S+)/m.exec(read("CHANGELOG.md"));
+  let released;
+  try {
+    released = execFileSync(
+      "git",
+      ["show", `v${top[1]}:template/pieces/base/files/scripts/ready.mjs`],
+      { cwd: ROOT, stdio: ["ignore", "pipe", "ignore"] },
+    );
+  } catch {
+    return; // no tag in this clone (shallow or untagged): CI with full history checks it
+  }
+  assert.equal(m[1], createHash("sha256").update(released).digest("hex"));
 });
 
 test("adopt.md documents the --assess --json fields in order and names the schema", async () => {

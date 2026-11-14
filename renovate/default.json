@@ -12,13 +12,6 @@
     {
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
-      "matchStrings": ["TURBO_VERSION: (?<currentValue>\\d+\\.\\d+\\.\\d+)"],
-      "depNameTemplate": "turbo",
-      "datasourceTemplate": "npm"
-    },
-    {
-      "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
       "matchStrings": ["cargo-deny@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "cargo-deny",
       "datasourceTemplate": "crate"
