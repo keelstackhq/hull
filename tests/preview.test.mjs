@@ -729,3 +729,8 @@ test("preview-deploy: setup-node has no pnpm cache and the package-manager cache
     assert.equal(node.with["package-manager-cache"], false);
   }
 });
+
+test("the generated README stays short (agents read it): at most 40 lines", async () => {
+  const text = await readFile(join(base.dir, "README.md"), "utf8");
+  assert.ok(text.split("\n").length <= 40, `README has ${text.split("\n").length} lines`);
+});

@@ -64,7 +64,7 @@ Configure each App → add the new repo:
 - Claude.
 - Renovate: add the repo to the Renovate App. `renovate.json` extends
   `github>keelstackhq/hull//renovate/default`. TODO(owner): which Renovate App installation.
-- Update bot (splice), pick one (the generated `README.md`, "Update bot: pick a token mode"):
+- Update bot (splice), pick one (the generated `README.md`, section "Update bot"; template-rust: "pick a token mode"):
   an App with Contents, Pull requests and Workflows write, with variable `SPLICE_APP_CLIENT_ID`
   and secret `SPLICE_APP_KEY` in environment `splice-bot`; or a PAT `SPLICE_BOT_TOKEN` in that
   environment; or session mode, repository variable `SPLICE_BOT=off`.
