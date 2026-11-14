@@ -88,3 +88,17 @@ test("deny.mjs: an explicit --config picks the overlay next to it", async () => 
   assert.match(out, /^deny --config \S+ check licenses$/m);
   assert.match(out, /"BSL-1\.0"/);
 });
+
+test("mergeAllow rejects a second table after the allow list (no merging bans into licenses)", () => {
+  const local = `[licenses]\nallow = ["A"]\n[bans]\ndeny = [{ crate = "openssl" }]\n`;
+  assert.throws(() => mergeAllow(BASE, local), /deny\.local\.toml/);
+});
+
+test("mergeAllow accepts TOML literal strings and keeps `$` in a name literal", () => {
+  const out = mergeAllow(BASE, `[licenses]\nallow = ['MPL-2.0', "A$&B"]\n`);
+  assert.match(out, /"MPL-2\.0", "A\$&B"\]/);
+});
+
+test("mergeAllow throws when the list has entries but none is a string", () => {
+  assert.throws(() => mergeAllow(BASE, `[licenses]\nallow = [MPL]\n`), /deny\.local\.toml/);
+});

@@ -66,7 +66,11 @@ for (const combo of combos) {
       );
       if (noisy) {
         for (const [name, j] of Object.entries(wf.jobs)) {
-          assert.ok(j.if, `${file}: job ${name} reacts to comment/label/edit events without an if`);
+          assert.match(
+            String(j.if ?? ""),
+            /github\.event(_name|\.action)/,
+            `${file}: job ${name} reacts to comment/label/edit events without an if`,
+          );
         }
       }
     }

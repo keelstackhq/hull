@@ -365,3 +365,10 @@ test("ci.yml installs the toolchain pinned in rust-toolchain.toml, never @stable
   assert.ok(steps.indexOf(toolchain) < steps.indexOf(cache));
   assert.equal(cache.with.key, "${{ hashFiles('rust-toolchain.toml') }}");
 });
+
+test("lint inputs include deny.local.toml and scripts/deny.mjs, so an overlay change reruns lint", async () => {
+  const { dir } = await renderCombo(PIECES);
+  const t = JSON.parse(await read(dir, "crates/cli/turbo.json"));
+  assert.ok(t.tasks.lint.inputs.includes("deny.local.toml"));
+  assert.ok(t.tasks.lint.inputs.includes("$TURBO_ROOT$/scripts/deny.mjs"));
+});

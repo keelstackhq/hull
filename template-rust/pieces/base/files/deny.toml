@@ -1,5 +1,6 @@
-# The policy for every crate in the workspace. CI runs `cargo deny --locked check bans licenses
-# sources`. Advisories are configured here but checked only in release.yml, so a new advisory never
+# The policy for every crate in the workspace. CI runs `node scripts/deny.mjs --locked check bans
+# licenses sources` (`cargo deny` with deny.local.toml merged in: extra licenses go there, not
+# here). Advisories are configured here but checked only in release.yml, so a new advisory never
 # fails an unrelated pull request.
 
 [advisories]

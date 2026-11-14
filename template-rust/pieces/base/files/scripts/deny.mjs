@@ -8,12 +8,19 @@
 // Usage: node scripts/deny.mjs [cargo deny args]  (an explicit --config <file> is honoured).
 // Node built-ins only.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const quoted = (text) => [...text.matchAll(/"([^"\n]+)"/g)].map((m) => m[1]);
+const quoted = (text) => [...text.matchAll(/"([^"\n]+)"|'([^'\n]+)'/g)].map((m) => m[1] ?? m[2]);
 const ALLOW = /^allow\s*=\s*\[([\s\S]*?)\]/m;
 
 /** Licenses the overlay allows; throws for anything else, which cannot be merged here. */
@@ -21,12 +28,17 @@ function overlayAllow(local) {
   const lines = local.split("\n").map((l) => l.replace(/#.*$/, "").trim());
   const rest = lines.filter((l) => l && l !== "[licenses]");
   const body = rest.join("\n");
-  if (body && !/^allow\s*=\s*\[[\s\S]*\]$/.test(body)) {
+  const fail = () => {
     throw new Error(
-      "deny.local.toml: only `[licenses]` with `allow = [...]` is merged; edit deny.toml for the rest",
+      "deny.local.toml: only `[licenses]` with `allow = [\"...\"]` is merged; edit deny.toml for the rest",
     );
-  }
-  return quoted(body);
+  };
+  if (!body) return [];
+  const m = body.match(/^allow\s*=\s*\[([^\]]*)\]$/);
+  if (!m) return fail();
+  const names = quoted(m[1]);
+  if (m[1].replace(/[\s,]/g, "") !== "" && names.length === 0) fail();
+  return names;
 }
 
 /** `deny.toml` text with the overlay's licenses appended to `[licenses] allow`. */
@@ -38,7 +50,7 @@ export function mergeAllow(base, local) {
   const inner = m[1].replace(/[\s,]+$/, "");
   const sep = inner.trim() === "" ? "" : ", ";
   const list = extra.map((l) => `"${l}"`).join(", ");
-  return base.replace(ALLOW, `allow = [${inner}${sep}${list}]`);
+  return base.replace(ALLOW, () => `allow = [${inner}${sep}${list}]`);
 }
 
 /** Splits `--config <file>` out of the arguments. */
@@ -52,12 +64,15 @@ function main(args) {
   const { file, rest } = configOf(args);
   const local = join(dirname(resolve(file)), "deny.local.toml");
   let cmd = ["deny", ...args];
+  let tmp = null;
   if (existsSync(file) && existsSync(local)) {
-    const merged = join(mkdtempSync(join(tmpdir(), "deny-")), "deny.toml");
+    tmp = mkdtempSync(join(tmpdir(), "deny-"));
+    const merged = join(tmp, "deny.toml");
     writeFileSync(merged, mergeAllow(readFileSync(file, "utf8"), readFileSync(local, "utf8")));
     cmd = ["deny", "--config", merged, ...rest];
   }
   const r = spawnSync("cargo", cmd, { stdio: "inherit" });
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
   process.exitCode = r.status ?? 1;
 }
 
