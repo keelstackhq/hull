@@ -107,29 +107,39 @@ test("AGENTS.md commands block lists install, check, run ci, format and agents:i
 
 test("AGENTS.md rules: secrets, releases, parallel agents, ask becomes deny", async () => {
   const text = await read((await renderCombo(["base"])).dir, "AGENTS.md");
-  assert.match(text, /never read `\.env\*` or `\.dev\.vars`/);
-  assert.match(text, /Releases are tag pushes made by a human/);
+  assert.match(text, /Never print, read or commit secrets/);
+  assert.match(text, /Releases are tag pushes by a human/);
+  assert.match(text, /server-side branch ruleset/);
   assert.match(text, /At most 2-3 parallel agents/);
-  assert.match(text, /hook `ask` becomes a denial in `-p`\/unattended runs/);
+  assert.doesNotMatch(text, /no autonomous work/i);
+  assert.match(text, /hook `ask` is a denial in unattended runs/);
 });
 
 test("AGENTS.md sends local notes to project.md or a package AGENTS.md, not CLAUDE.md", async () => {
   const text = await read((await renderCombo(["base"])).dir, "AGENTS.md");
   assert.match(
     text,
-    /put\n {2}local changes in seed files, `docs\/agents\/project\.md` or a package's `AGENTS\.md`\./,
+    /local changes go\n {2}in seed files, `docs\/agents\/project\.md` or a package's `AGENTS\.md`\./,
   );
   assert.ok(!/below the import/.test(text));
 });
 
 const RIGGING_AGENTS = join(REAL_TEMPLATE, "../rigging/pieces/claude/files/.claude/agents");
 
-test("base ships no .claude/agents: subagents come from rigging's claude piece", async () => {
-  const { dir } = await renderCombo(["base", "docs"]);
-  assert.ok(!existsSync(join(dir, ".claude/agents")));
+test("base ships .claude/agents byte-identical to rigging's claude piece (owned)", async () => {
+  const { dir, result } = await renderCombo(["base", "docs"]);
   for (const [name, file] of AGENTS_LIST) {
-    assert.equal(frontmatter(readFileSync(join(RIGGING_AGENTS, file), "utf8")).name, name, file);
+    const shipped = readFileSync(join(dir, ".claude/agents", file), "utf8");
+    assert.equal(shipped, readFileSync(join(RIGGING_AGENTS, file), "utf8"), file);
+    assert.equal(frontmatter(shipped).name, name, file);
+    assert.equal(result.changes.find((c) => c.path === `.claude/agents/${file}`)?.class, "owned");
   }
+});
+
+test("plain render seeds docs/agents/index.md, the file CLAUDE.md imports", async () => {
+  const { dir, result } = await renderCombo(["base"]);
+  assert.ok(existsSync(join(dir, "docs/agents/index.md")));
+  assert.equal(result.changes.find((c) => c.path === "docs/agents/index.md")?.class, "seed");
 });
 
 test("migration 0.2.0 removes base's four agent files", async () => {
@@ -176,13 +186,15 @@ test("migration 0.2.1 removes the pre-0.1.0 explorer.md, unedited copies only", 
 
 // CLAUDE.md is owned: whoever reads its current text already ran `splice update`, and the template
 // cannot see whether a channel was added, so the hint is conditional in prose and never stale.
-test("CLAUDE.md: add the rigging channel if .claude/agents lacks the subagents", async () => {
+test("CLAUDE.md: names the shipped subagents and all skills, no manual channel add", async () => {
   const text = await read((await renderCombo(["base"])).dir, "CLAUDE.md");
-  assert.doesNotMatch(text, /splice update/, "upgrade order lives in hull's README/CHANGELOG");
-  assert.match(
+  assert.doesNotMatch(
     text,
-    /if `\.claude\/agents\/`\s+lacks them: `splice channel add gh:keelstackhq\/hull\/\/rigging --piece claude`/,
+    /splice update|channel add/,
+    "upgrade order lives in hull's README/CHANGELOG",
   );
+  assert.match(text, /in `\.claude\/agents\/`/);
+  assert.match(text, /Skills: `ready`, `verify`, `add-piece`/);
   for (const [name] of AGENTS_LIST) assert.match(text, new RegExp(`\`${name}\``));
 });
 
@@ -246,7 +258,15 @@ test("always-loaded bytes per combo (AGENTS + CLAUDE + project + index) stay und
 test("settings.json is valid and wires hooks", async () => {
   const { dir } = await renderCombo(["base"]);
   const s = JSON.parse(await read(dir, ".claude/settings.json"));
-  assert.equal(s.model, "opusplan");
+  assert.equal(s.model, undefined, "no model pin: the session picks it");
+  for (const a of [
+    "git push:*",
+    "gh pr create:*",
+    "gh pr merge --auto:*",
+    "gh api:*",
+    "node scripts/*",
+  ])
+    assert.ok(s.permissions.allow.includes(`Bash(${a})`), a);
   assert.equal(s.hooks.SessionStart[0].matcher, "startup|resume");
   assert.equal(s.hooks.SessionStart[0].hooks[0].type, "command");
   assert.match(s.hooks.SessionStart[0].hooks[0].command, /bash .*session-start\.sh/);

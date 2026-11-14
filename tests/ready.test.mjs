@@ -243,20 +243,41 @@ test("a ready repo: every item passes or is skipped as chosen, exit 0", async ()
   assert.match(text, /^ready: /m);
 });
 
-test("no answers: question-gated items are `ask`, exit 1; a manual item keeps its link", async () => {
+test("no answers: defaults apply, only pieces and apps are manual, nothing is asked up front", async () => {
   const root = await readyRepo();
   await put(root, "docs/agents/onboarding.toml", "# no answers yet\n");
   const results = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0" });
   const s = byId(results);
-  for (const id of ["render", "apps", "approvals", "secrets", "bosun", "environments"]) {
-    assert.equal(s[id], "ask", id);
-  }
+  for (const id of ["render", "apps"]) assert.equal(s[id], "manual", id);
+  assert.equal(s.approvals, "pass", "approvals default to bootstrap (D-012)");
+  assert.notEqual(s.secrets, "ask");
+  assert.notEqual(s.bosun, "ask");
+  assert.notEqual(s.environments, "ask");
   assert.equal(s.repo, "pass");
-  const { text, code } = report(results, "https://x/start-checklist.md");
-  assert.equal(code, 1);
+  const { text } = report(results, "https://x/start-checklist.md");
   assert.match(
     text,
-    /^ask +apps .*`apps`.*\n +fix: .*--questions.*\n +see: https:\/\/x\/start-checklist\.md#apps$/m,
+    /^manual +apps .*`apps`.*\n +fix: .*--answer apps=.*\n +see: https:\/\/x\/start-checklist\.md#apps$/m,
+  );
+  assert.match(text, /work is not blocked/);
+  assert.doesNotMatch(text, /Do not start autonomous work/);
+});
+
+test("defaults: update_bot session, secrets none (hoist when secrets.toml exists), bosun by .bosun, approvals by date", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", "# none\n");
+  const q = Object.fromEntries(
+    questions({}, "2026-11-01", "template").map((x) => [x.id, x.default]),
+  );
+  assert.deepEqual(
+    { u: q.update_bot, s: q.secrets, b: q.bosun, a: q.approvals },
+    { u: "session", s: "none", b: "no", a: "bootstrap" },
+  );
+  const late = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0", today: "2026-12-05" });
+  assert.match(
+    late.find((r) => r.id === "approvals").note,
+    /owner/,
+    "after bootstrap mode the default is owner",
   );
 });
 
@@ -425,7 +446,7 @@ test("missing environment, ruleset, plan and old node fail with a fix; exit 1", 
   assert.equal(s.environments, "fail");
   assert.match(results.find((r) => r.id === "environments").note, /preview/);
   assert.equal(s.rulesets, "fail");
-  assert.equal(s.plan, "fail");
+  assert.equal(s.plan, "warn", "a missing plan warns, it does not fail");
   assert.equal(s.environment, "fail");
   const { text, code } = report(results, "u");
   assert.equal(code, 1);
@@ -508,7 +529,7 @@ test("without gh, GitHub items are manual (not a pass); bosun and secrets run wh
   assert.equal(s.bosun, "pass");
 });
 
-test("base renders scripts/ready.mjs and the ready skill (owned); AGENTS.md says run it first", async () => {
+test("base renders scripts/ready.mjs and the ready skill (owned); AGENTS.md never gates work on it", async () => {
   const { dir, result } = await renderCombo(["base"]);
   const cls = Object.fromEntries(result.changes.map((c) => [c.path, c.class]));
   assert.equal(cls["scripts/ready.mjs"], "owned");
@@ -518,7 +539,7 @@ test("base renders scripts/ready.mjs and the ready skill (owned); AGENTS.md says
   const skill = await readFile(join(dir, ".claude/skills/ready/SKILL.md"), "utf8");
   assert.match(skill, /^---\nname: ready\n/);
   assert.match(skill, /node scripts\/ready\.mjs/);
-  assert.match(await readFile(join(dir, "AGENTS.md"), "utf8"), /`ready`.*first/);
+  assert.doesNotMatch(await readFile(join(dir, "AGENTS.md"), "utf8"), /no autonomous work/i);
 });
 
 test("ready.mjs runs as a script and exits 1 outside a ready repo", async () => {
@@ -561,7 +582,7 @@ test("template-rust's ready files are generated from template/ and in sync", () 
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
 
-test("template-rust base renders ready (owned) and the seed answers; AGENTS.md says run it first", async () => {
+test("template-rust base renders ready (owned) and the seed answers; AGENTS.md never gates work on it", async () => {
   const dir = join(await mkdtemp(join(tmpdir(), "ready-rust-")), "out");
   const { renderNew } = await import("../scripts/render.mjs");
   const template = fileURLToPath(new URL("../template-rust", import.meta.url));
@@ -570,7 +591,7 @@ test("template-rust base renders ready (owned) and the seed answers; AGENTS.md s
   assert.equal(cls["scripts/ready.mjs"], "owned");
   assert.equal(cls[".claude/skills/ready/SKILL.md"], "owned");
   assert.equal(cls["docs/agents/onboarding.toml"], "seed");
-  assert.match(await readFile(join(dir, "AGENTS.md"), "utf8"), /`ready`.*first/);
+  assert.doesNotMatch(await readFile(join(dir, "AGENTS.md"), "utf8"), /no autonomous work/i);
 });
 
 const RUST_LOCK = `[template]
@@ -653,7 +674,11 @@ test("template-rust release = no: no release environments, HOIST_RELEASE must no
   assert.equal(on.status, "fail");
   assert.match(on.note, /HOIST_RELEASE/);
   await put(root, "docs/agents/onboarding.toml", answers.replace(/^release = .*\n/m, ""));
-  assert.equal(env({}).status, "ask");
+  assert.notEqual(
+    env({}).status,
+    "ask",
+    "release defaults to no; the owner is asked when it is used",
+  );
 });
 
 test("template/: no release question; release-tags and the release environment stay required", async () => {
@@ -746,19 +771,16 @@ test("template-rust: a secrets.toml fails (no secrets piece) instead of being sk
   assert.match(r.note, /secrets\.toml/);
 });
 
-test("a missing answer names the new question, its options and the exact answer command (D7)", async () => {
+test("a missing answer without a default is one manual line with the exact answer command", async () => {
   const root = await readyRepo();
-  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace(/^update_bot = .*\n/m, ""));
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace(/^apps = .*\n/m, ""));
   const results = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0" });
-  const r = results.find((x) => x.id === "environments");
-  assert.equal(r.status, "ask");
-  assert.match(r.note, /`update_bot`/);
-  assert.match(r.note, /Who opens the weekly splice update PRs\?/);
-  assert.match(r.note, /app \| pat \| session/);
-  assert.match(r.fix, /node scripts\/ready\.mjs --answer update_bot=<app\|pat\|session>/);
-  assert.match(r.fix, /--questions/);
-  const { text } = report(results, "https://x/start-checklist.md");
-  assert.match(text, /question `update_bot`/);
+  const r = results.find((x) => x.id === "apps");
+  assert.equal(r.status, "manual");
+  assert.match(r.note, /`apps`/);
+  assert.match(r.fix, /node scripts\/ready\.mjs --answer apps=</);
+  const ub = results.find((x) => x.id === "environments");
+  assert.notEqual(ub.status, "ask", "update_bot falls back to session");
 });
 
 test("every template ships the same ready.mjs and deny.mjs, byte for byte (D6)", () => {

@@ -4,17 +4,22 @@ Every human step before agents can work autonomously on a new repo rendered from
 or `template-rust/`; both ship `ready`), in order:
 computer steps first, then phone steps (D-009), each with how an agent verifies it. In a rendered
 repo, the `ready` skill (`node scripts/ready.mjs`) runs the automatable checks and links each line
-here, at the hull tag the repo was rendered from. Agents start autonomous work only when it exits
-0 and the owner has confirmed every `manual` item. `TODO(owner)` marks facts not yet written down.
+here, at the hull tag the repo was rendered from. `ready` is advisory and never blocks work: agents
+start at once, print every `manual` item once as one checklist (D-009) and keep going. `TODO(owner)` marks facts not yet written down.
 
 An existing repo? Start with [Adopt an existing repo](adopt.md): it ends with `ready` and the
 items below.
 
 ## Onboarding questions
 
-`ready` first asks these as Claude Code forms (at most 4 per form; the first option is the
-recommended default) and records the answers in `docs/agents/onboarding.toml` (seed). An item is
-`ask` until its questions are answered, and `skipped (chosen: …)` when an answer turns it off.
+`ready` does not ask these up front: an unanswered question takes its default (`update_bot` =
+`session`, `secrets` = `none` (`hoist` when `secrets.toml` exists), `bosun` = `yes` when `.bosun/`
+exists else `no`, `approvals` = `bootstrap` until 2026-11-30 then `owner`, `ci` = `github`,
+`release` = `no`); `pieces` and `apps` have none and show as one `manual` line. The agent asks the
+owner (a Claude Code form, at most 4 per form) only when secrets or a release are about to be used
+and the answer is not recorded; answers go in `docs/agents/onboarding.toml` (seed). An item is
+`skipped (chosen: …)` when an answer turns it off, and `ask` only for an invalid answer or a repo
+that is not adopted yet. A missing plan is a `warn`.
 
 | Question     | Asks                                               | Options (first = recommended)                        | Decides items  | Templates       |
 | ------------ | -------------------------------------------------- | ---------------------------------------------------- | -------------- | --------------- |

@@ -18,19 +18,17 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 
 ## Rules
 
-- Run `ready` first: no autonomous work until it passes and the owner confirms its manual items.
-- Test first: write the failing test, watch it fail, implement, watch it pass.
-- Verify with real output before calling a task done.
-- Keep files small, focused; one task per change; no drive-by refactors.
-- Versions live in the catalog in `pnpm-workspace.yaml` as exact pins; use `catalog:` in packages.
-- Template-owned files (configs, workflows, `.claude/`) change only via `splice update --all`
-  (guide: keelstackhq/hull docs/updating.md); put
-  local changes in seed files, `docs/agents/project.md` or a package's `AGENTS.md`.
-- Never print or commit secrets; never read `.env*` or `.dev.vars`.
-- Releases are tag pushes made by a human; never publish or push tags yourself.
-- At most 2-3 parallel agents, on files that barely overlap.
-- Before a long task, note next steps in `docs/agents/project.md`; compact or start fresh; tell the owner which.
-- A hook `ask` becomes a denial in `-p`/unattended runs: do the change by hand or run interactively.
+- Test first: failing test, then implement; verify with real output before saying a task is done.
+- One task per change; small focused files; no drive-by refactors.
+- Versions: exact pins in the `pnpm-workspace.yaml` catalog; `catalog:` in packages.
+- Template-owned files (configs, workflows, `.claude/`) change via `splice update --all`; local changes go
+  in seed files, `docs/agents/project.md` or a package's `AGENTS.md`.
+- Never print, read or commit secrets (`.env*`, keys). Releases are tag pushes by a human: never publish,
+  push tags or push the default branch; open a PR and `gh pr merge --auto`.
+- The guard hook is a rail, not a sandbox: the real fix is a server-side branch ruleset.
+- A hook `ask` is a denial in unattended runs: use the alternative its reason names.
+- At most 2-3 parallel agents on barely overlapping files; note next steps in `docs/agents/project.md`
+  before a long task.
 {# One line per piece kind goes here, each in its own if on its piece id. #}{# same-branches #}{% if "preact-app" in pieces %}
 ## Pieces
 {% elif "ui-storybook" in pieces %}

@@ -1,26 +1,45 @@
-// PreToolUse guard: denies releases, force/tag pushes, deleting main/master on the remote, secret
-// reads and lock edits; asks before editing files the template owns. A guard rail, not a sandbox.
-// `gh api` writes (non-GET, -f/-F/--input, mutations) and `git update-ref refs/tags/` deny; a bare push
-// dst is a tag when it exists in refs/tags or packed-refs. Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell
-// heredoc is still scanned). Tag pushes mean refs/tags/, `tag <name>`, --tags; `git tag` writes deny.
-// Known gaps: `eval`, `$(...)` and backticks, scripts that publish, editing owned files through
-// Bash, and a default branch not named main or master. Node built-ins only.
-// Any internal error allows the call and prints one stderr line; settings deny rules stay as the
-// second layer.
+// PreToolUse guard: denies releases, force/tag pushes, pushes to the default branch, gh admin verbs
+// (merge without --auto, release, secret, repo edit), secret reads and edits of the guard rail itself
+// (.claude/hooks, .claude/settings*.json, release workflows, .splice/lock.toml, .bosun/); asks before
+// editing files the template owns. Every deny names the allowed alternative. A guard rail, not a
+// sandbox: the real fix is a server-side branch ruleset and environment-gated release.
+// Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell heredoc
+// is still scanned). `eval`, `sh`/interpreter fed from a pipe, `-c`/`-e` bodies, `$VAR` or `$(...)` in
+// command position and git `-c alias.x=` deny when the text mentions push, publish or release.
+// Known gaps: scripts that publish, editing guarded files from an interpreter, and a default branch
+// that origin/HEAD does not name. Node built-ins only.
+// An internal error denies when the call mentions push, publish, release, gh, secret or sops (retry),
+// else allows and prints one stderr line; settings deny rules stay as the second layer.
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template", ".dev.vars.example"]);
 const MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
-const SHELLS = new Set(["bash", "sh", "zsh"]);
+const SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh", "ash", "fish"]);
 const INTERPRETERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
 const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", ...EDIT_TOOLS]);
 const TAG_READ_RE =
   /^(-l|-n\d*|-v|--(list|verify|contains|no-contains|points-at|merged|no-merged|sort|format|column)(=.*)?)$/;
-const DEFAULT_BRANCH_RE = /^(refs\/heads\/)?(main|master)$/;
+const RISKY_RE = /\b(push|publish|unpublish|release|dist-tag|gh|secrets?|sops)\b/i;
+const EXEC_RE =
+  /\b(git|gh|npm|pnpm|yarn|bun|cargo|make|hoist|sops)\b[^\n]*\b(push|publish|unpublish|release|dist-tag|secrets?|merge|decrypt)\b/i;
+const INLINE_RE = /^-[a-zA-Z]*[ceEp]$|^--eval$/;
+const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i;
+const SECRET_DIR_RE =
+  /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/[^/]+\/environ$/;
+const PROTECTED_RES = [
+  /(^|\/)\.claude\/hooks(\/|$)/,
+  /(^|\/)\.claude\/settings[^/]*\.json$/,
+  /(^|\/)\.github\/workflows\/release[^/]*\.ya?ml$/,
+  /(^|\/)\.bosun(\/|$)/,
+  /(^|\/)\.claude$/,
+];
+const FAIL_CLOSED_RE = /\.claude\/(hooks|settings)|workflows\/release|\.bosun\/|\.splice\/lock/;
+const isProtected = (p) => PROTECTED_RES.some((re) => re.test(p));
+const stripTok = (x) => x.replace(/^\d*[>&]*/, "").replace(/^(of=)?(\.\/)?/, "");
 
 /** Program name without its directory: `/usr/bin/npm` → `npm`. */
 const base = (prog) => String(prog).slice(String(prog).lastIndexOf("/") + 1);
@@ -32,14 +51,32 @@ const REASON = {
   tag: "a tag push publishes: push branches only and ask the human to create and push release tags.",
   deleteDefault:
     "never delete the default branch on the remote: delete feature branches only, or ask the human.",
+  pushDefault:
+    "Never push to the default branch: push a feature branch (git push -u origin <feature-branch>), open a PR (gh pr create) and enable gh pr merge --auto.",
+  rewriteDefault:
+    "Never delete or rewrite the default branch: work on a feature branch (git switch -c <name>) and sync with git pull --ff-only.",
   secret:
-    "Secret files are off limits: read .env.example for the variable names, or ask the human.",
+    "Secret files and values are off limits: read .env.example for the variable names, run what needs values as `hoist secrets exec -- <your command>` (never env, printenv or a shell), or ask the human.",
   ghApi:
     "gh api writes are blocked: use plain GET reads, or ask the human for the change (a PR merges by its owner).",
+  ghMerge:
+    "gh pr merge only with --auto (merges once required checks pass); never --admin or an immediate merge: ask the human.",
+  ghAdmin:
+    "Releases, repo settings, branch protection, rulesets and secrets belong to the human: ask the human to run it; gh pr create, view, checks and merge --auto stay open.",
+  evasion:
+    "Hidden or indirect push, publish or release is blocked: run the command directly (git push -u origin <feature-branch>) so the guard can see it.",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
-  owned:
-    "owned by the template: `splice update` overwrites it; put local changes in seed files or docs/agents/project.md",
+  protected:
+    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md.",
+  failClosed:
+    "The guard hit an internal error on a push, publish, release or secret call: retry the call; if it keeps failing, ask the human.",
 };
+
+/** The `ask` text for an owned file: name the place local changes go. */
+const ownedReason = (rel) =>
+  rel === ".github/workflows/ci.yml"
+    ? "owned by the template: `splice update` overwrites it; put repo checks in scripts/ci-extra.sh (runs last in CI)"
+    : "owned by the template: `splice update` overwrites it; put local changes in docs/agents/project.md or a seed file";
 
 /** Tool argument that names a file: `file_path ?? notebook_path ?? path`. */
 export function targetPath(toolInput) {
@@ -169,7 +206,21 @@ function stripPrefixes(tokens) {
     const a = base(raw);
     const b = t[1];
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(raw)) t = t.slice(1);
-    else if (["then", "do", "else", "elif", "!", "exec", "command", "time", "nohup"].includes(a)) {
+    else if (
+      [
+        "then",
+        "do",
+        "else",
+        "elif",
+        "!",
+        "exec",
+        "command",
+        "builtin",
+        "time",
+        "nohup",
+        "setsid",
+      ].includes(a)
+    ) {
       t = t.slice(1);
       skipOptions();
     } else if (a === "env") {
@@ -184,6 +235,21 @@ function stripPrefixes(tokens) {
     } else if (a === "nice") {
       t = t.slice(1);
       skipOptions(["-n", "--adjustment"]);
+    } else if (a === "ionice") {
+      t = t.slice(1);
+      skipOptions(["-c", "-n", "-p", "-P", "-u", "--class", "--classdata", "--pid"]);
+    } else if (a === "stdbuf") {
+      t = t.slice(1);
+      skipOptions(["-i", "-o", "-e", "--input", "--output", "--error"]);
+    } else if (a === "doas") {
+      t = t.slice(1);
+      skipOptions(["-u", "-C"]);
+    } else if (a === "busybox") {
+      t = t.slice(1);
+    } else if (a === "watch") {
+      t = t.slice(1);
+      skipOptions(["-n", "--interval"]);
+      if (t.length === 1 && /\s/.test(t[0])) t = split(t[0]).flat();
     } else if (a === "xargs") {
       t = t.slice(1);
       skipOptions(["-n", "-I", "-L", "-P", "-s", "-d", "-E"]);
@@ -198,32 +264,56 @@ function stripPrefixes(tokens) {
   }
 }
 
-/** Simple commands in `cmd` as token lists, prefixes stripped, `bash -c '<s>'` expanded once. */
+/** Simple commands in `cmd` as token lists, prefixes stripped, `bash -c '<s>'` expanded recursively.
+ * Pseudo-commands `@evade` (text with a risky word is refused) and `@evade-exec` (same, for code
+ * bodies) mark constructs the guard cannot read. */
 export function commands(cmd) {
+  const text = String(cmd ?? "");
   const out = [];
-  for (const seg of split(String(cmd ?? ""))) {
+  const secretTokens = (body) => {
+    for (const m of body.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
+      if (secretLike(m[0])) out.push(["cat", m[0]]);
+    }
+  };
+  for (const seg of split(text)) {
     const t = stripPrefixes(seg);
-    if (!t.length) continue;
+    if (!t.length) {
+      // A bare `env` (options and assignments only) prints the environment.
+      if (base(seg[0].replace(/^[({]+/, "")) === "env") out.push(["printenv"]);
+      continue;
+    }
     out.push(t);
-    if (INTERPRETERS.test(base(t[0]))) {
-      // Heredoc code is not scanned like a shell, only for reads of secret files.
+    const prog = base(t[0]);
+    if (/^[$`]|\$\(/.test(t[0])) out.push(["@evade", text]);
+    // `git $SUB ...` hides the subcommand.
+    if (prog === "git" && t.slice(1, 4).some((x) => /^[$`]|\$\(/.test(x)))
+      out.push(["@evade", text]);
+    if (prog === "eval") {
+      const body = t.slice(1).join(" ");
+      out.push(["@evade", body]);
+      for (const inner of commands(body)) out.push(inner);
+    }
+    const noArgs = t.slice(1).every((x) => x.startsWith("-")) && !seg.docs?.length;
+    if (INTERPRETERS.test(prog)) {
+      const i = t.findIndex((x, n) => n > 0 && INLINE_RE.test(x));
+      if (i > 0 && t[i + 1] !== undefined) {
+        out.push(["@evade", t[i + 1]]);
+        secretTokens(t[i + 1]);
+      } else if (noArgs) out.push(["@evade", text]); // code fed on stdin
+      // Heredoc code is not scanned like a shell, only for reads of secret files and exec text.
       for (const body of seg.docs ?? []) {
-        for (const m of body.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
-          if (secretLike(m[0])) out.push(["cat", m[0]]);
-        }
+        out.push(["@evade-exec", body]);
+        secretTokens(body);
       }
     }
-    if (SHELLS.has(base(t[0]))) {
+    if (SHELLS.has(prog)) {
       for (const body of seg.docs ?? []) {
         for (const inner of commands(body)) out.push(inner);
       }
       const i = t.findIndex((x, n) => n > 0 && /^-[a-z]*c$/.test(x));
       if (i > 0 && t[i + 1] !== undefined) {
-        for (const inner of split(t[i + 1])) {
-          const it = stripPrefixes(inner);
-          if (it.length) out.push(it);
-        }
-      }
+        for (const inner of commands(t[i + 1])) out.push(inner);
+      } else if (noArgs) out.push(["@evade", text]); // script fed on stdin
     }
   }
   return out;
@@ -231,8 +321,10 @@ export function commands(cmd) {
 
 function isSecretName(name) {
   if (!name || SECRET_SAFE.has(name)) return false;
-  if (name === ".env" || name.startsWith(".env.")) return true;
+  if (name === ".env" || name.startsWith(".env.") || name === ".envrc") return true;
   if (name === ".dev.vars" || name.startsWith(".dev.vars.")) return true;
+  if (/^[\w-]+\.env$/.test(name) && !/^(process|Deno|Bun)\.env$/.test(name)) return true;
+  if (name.endsWith(".pem") || name === "keys.txt" || /^id_[a-z0-9]+$/.test(name)) return true;
   if (/[*?[{]/.test(name)) {
     const prefix = name.slice(0, name.search(/[*?[{]/));
     return (
@@ -248,18 +340,21 @@ function secretLike(value) {
   if (typeof value !== "string" || !value) return false;
   const clean = value.replace(/^[<>]+/, "");
   for (const v of new Set([clean, clean.slice(clean.lastIndexOf("=") + 1)])) {
-    if (isSecretName(v.slice(v.lastIndexOf("/") + 1))) return true;
+    if (isSecretName(v.slice(v.lastIndexOf("/") + 1)) || SECRET_DIR_RE.test(v.replace(/\/+$/, "")))
+      return true;
   }
   return false;
 }
 
 function gitSub(t) {
   let i = 1;
+  const cfg = [];
   while (i < t.length && t[i].startsWith("-")) {
     const takesValue = ["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(t[i]);
+    if (t[i] === "-c" && t[i + 1] !== undefined) cfg.push(t[i + 1]);
     i += takesValue ? 2 : 1;
   }
-  return { sub: t[i], args: t.slice(i + 1) };
+  return { sub: t[i], args: t.slice(i + 1), cfg };
 }
 
 /** Directories that hold refs: the repo's .git (or a worktree's gitdir and its common dir). */
@@ -299,11 +394,41 @@ function isTagName(name, projectDir) {
   return false;
 }
 
+/** `main`, `master` and the branch origin/HEAD points at. */
+function isDefault(name, projectDir) {
+  const n = String(name)
+    .replace(/^\+/, "")
+    .replace(/^refs\/heads\//, "");
+  if (n === "main" || n === "master") return true;
+  for (const dir of gitDirs(projectDir)) {
+    try {
+      const head = readFileSync(resolve(dir, "refs/remotes/origin/HEAD"), "utf8");
+      if (/^ref:\s*refs\/remotes\/[^/\s]+\/(.+)$/m.exec(head)?.[1].trim() === n) return true;
+    } catch {
+      // no origin/HEAD
+    }
+  }
+  return false;
+}
+
+/** Branch HEAD points at, or undefined (detached, not a checkout). */
+function currentBranch(projectDir) {
+  const dir = gitDirs(projectDir)[0];
+  try {
+    return /^ref:\s*refs\/heads\/(.+)$/m
+      .exec(readFileSync(resolve(dir, "HEAD"), "utf8"))?.[1]
+      .trim();
+  } catch {
+    return undefined;
+  }
+}
+
 function pushRule(args, projectDir) {
   let tag = false;
   let del = false;
   const refs = [];
   for (const a of args) {
+    if (a === "--prune") return "pushDefault";
     if (a === "--mirror" || a === "--force" || a.startsWith("--force-") || a.startsWith("--force="))
       return "force";
     if (/^-[A-Za-z]*f[A-Za-z]*$/.test(a)) return "force";
@@ -314,24 +439,50 @@ function pushRule(args, projectDir) {
     if (!a.startsWith("-")) {
       refs.push(a);
       const dst = a.slice(a.lastIndexOf(":") + 1);
-      if (a.startsWith(":") && DEFAULT_BRANCH_RE.test(dst)) return "deleteDefault";
+      if (a.startsWith(":") && isDefault(dst, projectDir)) return "deleteDefault";
       if (dst.startsWith("refs/tags/") || isTagName(dst, projectDir)) tag = true;
       // A tag src with an unqualified dst (`tmp:name`) still pushes a tag.
       const src = a.includes(":") ? a.slice(0, a.indexOf(":")).replace(/^\+/, "") : "";
       if (src && (src.startsWith("refs/tags/") || isTagName(src, projectDir))) tag = true;
     }
   }
-  if (del && refs.some((r) => DEFAULT_BRANCH_RE.test(r))) return "deleteDefault";
-  return tag ? "tag" : null;
+  if (del && refs.some((r) => isDefault(r, projectDir))) return "deleteDefault";
+  if (tag) return "tag";
+  // refs[0] is the remote; every later positional is a refspec whose dst must not be the default.
+  for (const r of refs.slice(1)) {
+    const spec = r.replace(/^\+/, "");
+    if (spec.startsWith(":")) continue;
+    if (isDefault(spec.slice(spec.lastIndexOf(":") + 1), projectDir)) return "pushDefault";
+  }
+  // No refspec: push.default pushes the current branch.
+  if (refs.length <= 1 && !del) {
+    const cur = currentBranch(projectDir);
+    if (cur && isDefault(cur, projectDir)) return "pushDefault";
+  }
+  return null;
 }
 
-function writesLock(t, i) {
+/** True when the command `t` writes, moves or deletes its operand at index `i`. */
+function writesTarget(t, i) {
   const tok = t[i];
   if (/^\d*>>?/.test(tok) || /^&>>?/.test(tok)) return true;
   if (/^\d*>>?$|^&>>?$/.test(t[i - 1] ?? "")) return true;
-  if (["tee", "mv", "cp", "rm", "truncate", "install", "ln", "touch"].includes(t[0])) return true;
+  const prog = base(t[0]);
+  if (
+    ["tee", "mv", "rm", "truncate", "touch", "chmod", "chown", "shred", "unlink", "rmdir"].includes(
+      prog,
+    )
+  )
+    return true;
+  if (prog === "dd") return tok.startsWith("of=");
+  if (["cp", "install", "ln"].includes(prog)) {
+    let last = t.length - 1;
+    while (last > 0 && t[last].startsWith("-")) last--;
+    return i === last;
+  }
+  if (prog === "git") return t.some((x) => x === "rm" || x === "mv");
   return (
-    (t[0] === "sed" || t[0] === "perl") &&
+    (prog === "sed" || prog === "perl") &&
     t.some((x) => /^-[A-Za-z]*i/.test(x) || /^--in-place/.test(x))
   );
 }
@@ -350,30 +501,134 @@ function ghApiWrites(args) {
   return args.includes("graphql") && args.some((a) => /\bmutation\b/i.test(a));
 }
 
+const ADMIN_API_RE =
+  /\/(branches\/[^/\s]+\/protection|rulesets?|environments|actions\/(secrets|variables|permissions)|hooks|keys|collaborators|transfer|rename)\b/;
+
 function bashRule(t, projectDir) {
   const prog = base(t[0]);
   const args = t.slice(1);
+  if (prog === "@evade") return RISKY_RE.test(t[1]) ? "evasion" : null;
+  if (prog === "@evade-exec") return EXEC_RE.test(t[1]) ? "evasion" : null;
+  const run = args.findIndex((a) => a === "run" || a === "run-script");
   if (
     MANAGERS.has(prog) &&
-    args.some((a) => a === "publish" || a === "unpublish" || a === "dist-tag")
+    (args.some((a) => a === "publish" || a === "unpublish" || a === "dist-tag") ||
+      args[0] === "release" ||
+      (run >= 0 && args[run + 1] === "release"))
   )
     return "publish";
-  if (prog === "cargo" && args.includes("publish")) return "publish";
-  if (prog === "changeset" && args.includes("publish")) return "publish";
-  if (prog === "gh" && args[0] === "api" && ghApiWrites(args.slice(1))) return "ghApi";
-  if (prog === "gh" && args[0] === "release" && ["create", "upload"].includes(args[1]))
+  if (
+    prog === "cargo" &&
+    (args.includes("publish") || args.find((a) => !a.startsWith("+")) === "release")
+  )
     return "publish";
+  if (
+    ["make", "gmake", "just", "task"].includes(prog) &&
+    args.some((a) => /^(publish|release)$/.test(a))
+  )
+    return "publish";
+  if (prog === "changeset" && args.includes("publish")) return "publish";
+  if (prog === "gh") {
+    const [a0, a1] = args;
+    if (a0 === "api" && ghApiWrites(args.slice(1)))
+      return args.slice(1).some((a) => ADMIN_API_RE.test(a)) ? "ghAdmin" : "ghApi";
+    if (a0 === "pr" && a1 === "merge") {
+      if (args.includes("--admin")) return "ghMerge";
+      if (!args.includes("--auto") && !args.includes("--disable-auto")) return "ghMerge";
+    }
+    if (a0 === "release" && ["create", "upload"].includes(a1)) return "publish";
+    if (a0 === "release" && !["list", "view", "download", undefined].includes(a1)) return "ghAdmin";
+    if (a0 === "workflow" && ["run", "enable", "disable"].includes(a1))
+      return args.slice(2).some((a) => /release/i.test(a)) ? "publish" : null;
+    if (a0 === "secret") return "ghAdmin";
+    if (a0 === "repo" && ["edit", "delete", "archive", "rename", "transfer"].includes(a1))
+      return "ghAdmin";
+    if (a0 === "auth" && a1 === "token") return "secret";
+  }
   if (prog === "git") {
-    const { sub, args: rest } = gitSub(t);
+    const { sub, args: rest, cfg } = gitSub(t);
+    if (cfg.some((c) => /^core\.hookspath=/i.test(c))) return "protected";
+    const alias = cfg
+      .map((c) => /^alias\.([^=]+)=(.*)$/i.exec(c))
+      .find((m) => m && m[1].toLowerCase() === String(sub).toLowerCase());
+    if (alias) {
+      if (alias[2].startsWith("!")) {
+        for (const inner of commands(`${alias[2].slice(1)} ${rest.join(" ")}`)) {
+          const r = bashRule(inner, projectDir);
+          if (r) return r;
+        }
+        return null;
+      }
+      return bashRule(["git", ...split(alias[2]).flat(), ...rest], projectDir);
+    }
     if (sub === "push") return pushRule(rest, projectDir);
-    if (sub === "update-ref" && rest.some((a) => a === "--stdin" || a.startsWith("refs/tags/")))
-      return "tag";
+    if (sub === "config" && rest.some((a) => /^(core\.hookspath|alias\.)/i.test(a)))
+      return "protected";
+    if (sub === "update-ref") {
+      if (rest.some((a) => a === "--stdin" || a.startsWith("refs/tags/"))) return "tag";
+      if (rest.some((a) => a.startsWith("refs/heads/") && isDefault(a, projectDir)))
+        return "rewriteDefault";
+    }
     if (sub === "tag" && rest.length && !TAG_READ_RE.test(rest[0])) return "tag";
+    const names = rest.filter((a) => !a.startsWith("-"));
+    if (
+      sub === "branch" &&
+      rest.some(
+        (a) => /^-[A-Za-z]*[dDfmMcC][A-Za-z]*$/.test(a) || /^--(delete|force|move|copy)$/.test(a),
+      ) &&
+      names.some((n) => isDefault(n, projectDir))
+    )
+      return "rewriteDefault";
+    if (
+      (sub === "checkout" || sub === "switch") &&
+      rest.some((a) => ["-B", "-C", "--force-create"].includes(a)) &&
+      names.some((n) => isDefault(n, projectDir))
+    )
+      return "rewriteDefault";
+    if (sub === "reset" && rest.includes("--hard")) {
+      const cur = currentBranch(projectDir);
+      if (cur && isDefault(cur, projectDir)) return "rewriteDefault";
+    }
+  }
+  if (["echo", "printf"].includes(prog) && args.some((a) => SECRET_VAR_RE.test(a))) return "secret";
+  if (
+    prog === "printenv" &&
+    (args.length === 0 || args.some((a) => /KEY|TOKEN|SECRET|PASSW|CREDENTIAL/i.test(a)))
+  )
+    return "secret";
+  if (prog === "export" && (args.length === 0 || args.includes("-p"))) return "secret";
+  if (
+    (prog === "declare" || prog === "typeset") &&
+    args.some((a) => /^-[a-z]*[xp]/.test(a)) &&
+    args.every((a) => a.startsWith("-"))
+  )
+    return "secret";
+  if (prog === "set" && args.length === 0) return "secret";
+  if (
+    prog === "sops" &&
+    args.some((a) => ["-d", "--decrypt", "decrypt", "exec-env", "exec-file"].includes(a))
+  )
+    return "secret";
+  if (prog === "age" && args.some((a) => a === "-d" || a === "--decrypt")) return "secret";
+  if (prog === "hoist" && args[0] === "secrets" && args[1] === "exec") {
+    const dd = args.indexOf("--");
+    const inner = dd >= 0 ? args.slice(dd + 1) : args.slice(2);
+    const first = base(inner[0] ?? "");
+    if (
+      ["env", "printenv", "export", "set", "declare", "sh", "bash", "zsh", "dash", "ksh"].includes(
+        first,
+      ) ||
+      (INTERPRETERS.test(first) && inner.some((a, n) => n > 0 && INLINE_RE.test(a)))
+    )
+      return "secret";
   }
   // A token with whitespace is prose (a quoted message or label), not a file name.
   if (t.some((x) => !/\s/.test(x) && secretLike(x))) return "secret";
-  const li = t.findIndex((x) => LOCK_RE.test(x.replace(/^\d*[>&]*/, "").replace(/^\.\//, "")));
-  if (li >= 0 && writesLock(t, li)) return "lock";
+  for (let i = 0; i < t.length; i++) {
+    const x = stripTok(t[i]);
+    if (LOCK_RE.test(x) && writesTarget(t, i)) return "lock";
+    if (isProtected(x) && writesTarget(t, i)) return "protected";
+  }
   return null;
 }
 
@@ -410,15 +665,34 @@ export function decide(input, ctx) {
   if (typeof target !== "string" || !target) return null;
   const rel = relPath(target, ctx.projectDir);
   if (rel === ".splice/lock.toml") return deny("lock");
+  if (isProtected(rel)) return deny("protected");
   if (ctx.lockText && ownedPaths(ctx.lockText).has(rel)) {
-    return { decision: "ask", reason: REASON.owned };
+    return { decision: "ask", reason: ownedReason(rel) };
   }
   return null;
 }
 
+/** True when a call that failed inside the guard still looks like push, publish, release or secrets. */
+export function failClosed(raw) {
+  return RISKY_RE.test(String(raw ?? "")) || FAIL_CLOSED_RE.test(String(raw ?? ""));
+}
+
+const emit = (decision, reason) =>
+  process.stdout.write(
+    `${JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: decision,
+        permissionDecisionReason: reason,
+      },
+    })}\n`,
+  );
+
 function main() {
+  let raw = "";
   try {
-    const input = JSON.parse(readFileSync(0, "utf8"));
+    raw = readFileSync(0, "utf8");
+    const input = JSON.parse(raw);
     const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     let lockText;
     try {
@@ -427,21 +701,12 @@ function main() {
       lockText = undefined;
     }
     const d = decide(input, { lockText, projectDir });
-    if (d) {
-      process.stdout.write(
-        `${JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: "PreToolUse",
-            permissionDecision: d.decision,
-            permissionDecisionReason: d.reason,
-          },
-        })}\n`,
-      );
-    }
+    if (d) emit(d.decision, d.reason);
   } catch (err) {
     process.stderr.write(
-      `guard.mjs: ignored internal error: ${String(err?.message ?? err).split("\n")[0]}\n`,
+      `guard.mjs: internal error: ${String(err?.message ?? err).split("\n")[0]}\n`,
     );
+    if (failClosed(raw)) emit("deny", REASON.failClosed);
   }
 }
 

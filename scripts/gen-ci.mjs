@@ -43,7 +43,7 @@ jobs:
   ci:
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       TURBO_SCM_BASE: \${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
       TURBO_SCM_HEAD: \${{ github.sha }}
@@ -112,7 +112,7 @@ jobs:
   ci:
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       BASE: \${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
     steps:

@@ -90,11 +90,16 @@ pnpm dlx @keelstackhq/splice channel add gh:keelstackhq/hull//rigging --piece cl
 `channel add` refuses while base's copies are still there, so run `update` first. Delete or move
 any edited copy it reports before the `channel add`.
 
+Since hull 0.11 `base` ships the four agents again, byte-identical to rigging's `claude` piece
+(`splice channel add ... --piece claude` is no longer needed and is refused on a hull repo: both would
+own the same paths). A repo that already added that piece removes it from `.splice/lock.toml`'s
+channel list before `splice update`.
+
 ## Built for Claude Code
 
-A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, subagents from the
-`rigging` channel (`splice channel add gh:keelstackhq/hull//rigging --piece claude`: a project
-`Explore` on haiku plus `implementer` sonnet, `reviewer` opus and `ci-fixer` sonnet), skills
+A canonical `AGENTS.md` (read by any agent) with a thin `CLAUDE.md` on top, subagents
+(`.claude/agents/`, shipped in `base`; the `rigging` channel's `claude` piece carries the same files
+for repos not rendered from hull: a project `Explore` on haiku plus `implementer` sonnet, `reviewer` opus and `ci-fixer` sonnet), skills
 (`verify`, `add-piece`, `docs-lookup`), a `/loop` default that iterates until checks pass, a
 PreToolUse guard hook (denies publish, force or tag pushes and secret reads; asks before editing
 template-owned files), a generated docs index (`docs/agents/index.md`), an opt-in Stop hook, and

@@ -42,7 +42,7 @@ test("exactly jobs ci and ci-ok; ci-ok needs ci and runs always", () => {
   assert.equal(ok.if, "always()");
   const text = JSON.stringify(ok.steps);
   assert.match(text, /needs\.ci\.result/);
-  assert.equal(wf.jobs.ci["timeout-minutes"], 15);
+  assert.equal(wf.jobs.ci["timeout-minutes"], 10);
   assert.equal(wf.jobs.ci["runs-on"], "ubuntu-latest");
 });
 
@@ -77,6 +77,9 @@ test("early exit downloads the turbo binary without npx", () => {
     s.run.includes("https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz"),
   );
   assert.match(s.run, /"\$RUNNER_TEMP\/turbo" query affected/);
+  assert.match(s.run, /sha256sum -c/, "the tarball is verified before it is unpacked");
+  assert.match(s.env.TURBO_SHA256, /^[0-9a-f]{64}$/);
+  assert.ok(!/\|\s*tar/.test(s.run), "no curl | tar");
 });
 
 test("every step after the affected check is guarded by skip", () => {

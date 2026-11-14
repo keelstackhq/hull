@@ -114,9 +114,108 @@ const DENY = [
   "git push -d origin master",
   "git push origin --delete main",
 ];
+// Audit round: each of these was an ALLOW before and must now deny.
+const DENY2 = [
+  // G1 gh admin verbs
+  "gh pr merge 5",
+  "gh pr merge 5 --admin",
+  "gh pr merge 5 --auto --admin",
+  "gh pr merge 5 --squash",
+  "gh release delete v1",
+  "gh release edit v1",
+  "gh workflow run release.yml",
+  "gh workflow run release.yml -f x=1",
+  "gh secret set X",
+  "gh secret list",
+  "gh repo edit --visibility public",
+  "gh repo delete o/r --yes",
+  "gh api -X PUT repos/o/r/branches/main/protection",
+  "gh api repos/o/r/rulesets -X POST --input r.json",
+  // G2 release as publish
+  "pnpm run release",
+  "npm run release",
+  "pnpm release",
+  "cargo release patch",
+  "make publish",
+  "make release",
+  // G3 evasions
+  "GIT=git; $GIT push -f",
+  'eval "git push -f"',
+  'echo "git push -f" | sh',
+  'echo "git push -f" | bash -s',
+  "python -c \"import os; os.system('git push --force')\"",
+  "python3 -c 'import os; os.system(\"npm publish\")'",
+  "node -e \"require('child_process').execSync('git push -f')\"",
+  "ruby -e 'system(\"git push -f\")'",
+  "perl -e 'system(q(npm publish))'",
+  "git -c alias.p=push p -f",
+  "git -c alias.p='!git push -f' p",
+  "setsid git push -f",
+  "ionice -c 3 git push -f",
+  "stdbuf -oL git push -f",
+  "watch -n 1 git push -f",
+  "watch 'git push -f'",
+  "busybox git push -f",
+  "X=push; git $X -f",
+  "$(echo git) push -f",
+  // G3b default branch
+  "git push origin main",
+  "git push origin HEAD:main",
+  "git push origin HEAD:master",
+  "git push origin refs/heads/x:refs/heads/main",
+  "git push -u origin main",
+  "git push --prune origin",
+  "git branch -D main",
+  "git branch -d master",
+  "git branch --delete main",
+  "git branch -f main HEAD",
+  "git branch -M main",
+  // G4 secrets
+  "cat prod.env",
+  "cat .envrc",
+  "cat server.pem",
+  "cat ~/.ssh/id_ed25519",
+  "cat id_rsa",
+  "cat keys.txt",
+  "ls ~/.aws",
+  "cat ~/.aws/credentials",
+  "cat ~/.config/gh/hosts.yml",
+  "cat .age/key",
+  "cat /proc/self/environ",
+  "cat /proc/1/environ",
+  "printenv",
+  "env",
+  "env -i",
+  "printenv API_KEY",
+  "echo $API_KEY",
+  'echo "$GITHUB_TOKEN"',
+  "echo ${AWS_SECRET_ACCESS_KEY}",
+  "printf '%s' $DB_PASSWORD",
+  "export -p",
+  "declare -x",
+  "sops -d secrets.yaml",
+  "sops decrypt secrets.yaml",
+  "sops --decrypt a.enc.yaml",
+  "age -d -i key.txt a.age",
+  "age --decrypt a.age",
+  "hoist secrets exec -- env",
+  "hoist secrets exec -- printenv",
+  "hoist secrets exec --env prod -- sh -c 'echo $X'",
+  "hoist secrets exec -- bash",
+  // G5b protected writes
+  "rm .claude/hooks/guard.mjs",
+  "rm -rf .claude/hooks",
+  "sed -i s/a/b/ .claude/settings.json",
+  "echo {} > .claude/settings.local.json",
+  "tee .github/workflows/release.yml",
+  "mv .bosun/bosun.toml /tmp/x",
+  "cp /tmp/x .claude/hooks/guard.mjs",
+  "git config core.hooksPath /dev/null",
+  "git -c core.hooksPath=/dev/null commit -m x",
+  "git config alias.p push",
+];
 const ALLOW = [
   "grep -r publish docs",
-  "git push origin main",
   "git push",
   "cat .env.example",
   "cat .env.sample",
@@ -125,7 +224,7 @@ const ALLOW = [
   "echo .envrc-notes",
   "pnpm run ci",
   "cargo test",
-  "/usr/bin/git push origin main",
+  "/usr/bin/git push origin feat/x",
   "git push origin :feature",
   "git push --delete origin feature",
   "env -u FOO pnpm test",
@@ -149,9 +248,55 @@ const ALLOW = [
   "cat <<'EOF' > notes.md\nsee .env and .dev.vars\nnpm publish\nEOF",
   "cat <<-EOF\n\t.env\n\tEOF\necho done",
   "git commit -F - <<EOF\nlabel .env\nEOF",
+  // legit flows the rail must not block
+  "gh pr merge 5 --auto",
+  "gh pr merge 5 --auto --squash",
+  "gh pr merge --disable-auto 5",
+  "gh pr create --title x --body y",
+  "gh pr view 5",
+  "gh pr checks 5",
+  "gh release list",
+  "gh release view v1",
+  "gh api repos/o/r/pulls",
+  "git push -u origin feat/guard",
+  "git push origin HEAD",
+  "git push origin HEAD:feat/x",
+  "git push origin feat/main-fix",
+  "git branch -D feat/x",
+  "git branch feat/x",
+  "git reset --hard origin/feat/x",
+  "git config user.name x",
+  "pnpm run release-notes",
+  "pnpm run ci",
+  "make test",
+  "python3 -c 'print(1)'",
+  "node -e 'console.log(1)'",
+  "echo $HOME",
+  "echo $PATH",
+  "printenv HOME",
+  "env FOO=1 pnpm test",
+  "cat .claude/hooks/guard.mjs",
+  "cat .claude/settings.json",
+  "git diff -- .claude/settings.json",
+  "grep -n x .github/workflows/release.yml",
+  "cp .claude/settings.json /tmp/x",
+  "sops -e secrets.yaml",
+  "hoist secrets exec -- pnpm test",
+  "hoist secrets check",
+  "cat id_rsa.pub",
+  "echo release notes > notes.md",
+  "ionice -c 3 pnpm test",
+  "stdbuf -oL pnpm test",
+  "watch -n 1 git status",
+  "setsid pnpm test",
+  "git -c alias.st=status st",
+  "FOO=1 git status",
 ];
 for (const c of DENY) {
   test(`deny: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
+}
+for (const c of DENY2) {
+  test(`deny2: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
 }
 for (const c of ALLOW) {
   test(`allow: ${c}`, () => assert.equal(decide(bash(c), ctx), null));
@@ -312,4 +457,155 @@ test("bare tag destination refused when the tag exists in refs/tags or packed-re
     "git push origin tmp:m1-v2",
   ])
     assert.equal(decide(bash(cmd), c), null, cmd);
+});
+
+/** A checkout whose HEAD is `branch`, with optional origin/HEAD target. */
+function repoOn(branch, originHead) {
+  const dir = mkdtempSync(join(tmpdir(), "guard-head-"));
+  mkdirSync(join(dir, ".git/refs/remotes/origin"), { recursive: true });
+  writeFileSync(join(dir, ".git/HEAD"), `ref: refs/heads/${branch}\n`);
+  if (originHead) {
+    writeFileSync(
+      join(dir, ".git/refs/remotes/origin/HEAD"),
+      `ref: refs/remotes/origin/${originHead}\n`,
+    );
+  }
+  return { projectDir: dir };
+}
+
+test("rewrites of the default branch deny only on the default branch", () => {
+  const onMain = repoOn("main");
+  const onFeat = repoOn("feat/x");
+  for (const cmd of [
+    "git reset --hard origin/main",
+    "git reset --hard",
+    "git checkout -B main",
+    "git switch -C main origin/main",
+    "git update-ref refs/heads/main HEAD",
+    "git push",
+    "git push origin",
+    "git push -u origin",
+  ])
+    assert.equal(decide(bash(cmd), onMain)?.decision, "deny", cmd);
+  for (const cmd of [
+    "git reset --hard origin/main",
+    "git reset --hard",
+    "git push",
+    "git push origin",
+  ])
+    assert.equal(decide(bash(cmd), onFeat), null, cmd);
+  assert.equal(decide(bash("git checkout -B main"), onFeat)?.decision, "deny");
+  assert.equal(decide(bash("git update-ref refs/heads/main HEAD"), onFeat)?.decision, "deny");
+});
+
+test("default branch is read from origin/HEAD, not only main and master", () => {
+  const c = repoOn("feat/x", "trunk");
+  assert.equal(decide(bash("git push origin HEAD:trunk"), c)?.decision, "deny");
+  assert.equal(decide(bash("git push origin trunk"), c)?.decision, "deny");
+  assert.equal(decide(bash("git branch -D trunk"), c)?.decision, "deny");
+  assert.equal(decide(bash("git push origin feat/x"), c), null);
+});
+
+test("evasion constructs without a risky word are allowed", () => {
+  for (const cmd of [
+    'eval "$(ssh-agent -s)"',
+    "X=1; $X",
+    "echo ls | sh",
+    "python3 -c 'print(open(\"README.md\").read())'",
+  ])
+    assert.equal(decide(bash(cmd), ctx), null, cmd);
+});
+
+test("interpreter inline bodies still scan for secret files", () => {
+  assert.equal(decide(bash("python3 -c \"print(open('.env').read())\""), ctx)?.decision, "deny");
+  assert.equal(
+    decide(bash("node -e \"require('fs').readFileSync('prod.env')\""), ctx)?.decision,
+    "deny",
+  );
+});
+
+test("Edit/Write on protected files deny regardless of the lock", () => {
+  for (const f of [
+    ".claude/hooks/guard.mjs",
+    ".claude/hooks/session-start.sh",
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".github/workflows/release.yml",
+    ".github/workflows/release-npm.yml",
+    ".splice/lock.toml",
+    ".bosun/bosun.toml",
+    "/r/.claude/hooks/guard.mjs",
+  ])
+    for (const name of ["Edit", "Write", "MultiEdit"]) {
+      const d = decide(tool(name, { file_path: f }), ctx);
+      assert.equal(d?.decision, "deny", `${name} ${f}`);
+    }
+  assert.equal(decide(tool("Edit", { file_path: ".github/workflows/ci.yml" }), ctx), null);
+  assert.equal(decide(tool("Read", { file_path: ".claude/settings.json" }), ctx), null);
+});
+
+test("Read/Grep of key and cloud-credential paths deny", () => {
+  for (const [name, input] of [
+    ["Read", { file_path: "/root/.ssh/id_ed25519" }],
+    ["Read", { file_path: "/home/u/.aws/credentials" }],
+    ["Read", { file_path: "/home/u/.config/gh/hosts.yml" }],
+    ["Read", { file_path: "/proc/self/environ" }],
+    ["Read", { file_path: "certs/server.pem" }],
+    ["Read", { file_path: "prod.env" }],
+    ["Grep", { pattern: "x", path: "/home/u/.age" }],
+  ])
+    assert.equal(decide(tool(name, input), ctx)?.decision, "deny", JSON.stringify(input));
+  assert.equal(decide(tool("Read", { file_path: "/home/u/keys/id_rsa.pub" }), ctx), null);
+});
+
+test("owned ask names the alternative: ci.yml → scripts/ci-extra.sh, else docs/agents/project.md", () => {
+  const lockText = `[files]\n".github/workflows/ci.yml" = { class = "owned" }\n"renovate.json" = { class = "owned" }\n`;
+  const ci = decide(tool("Edit", { file_path: ".github/workflows/ci.yml" }), {
+    projectDir: "/r",
+    lockText,
+  });
+  assert.equal(ci.decision, "ask");
+  assert.match(ci.reason, /scripts\/ci-extra\.sh/);
+  const other = decide(tool("Edit", { file_path: "renovate.json" }), {
+    projectDir: "/r",
+    lockText,
+  });
+  assert.match(other.reason, /docs\/agents\/project\.md/);
+});
+
+test("every new deny reason names an allowed alternative", () => {
+  const want = [
+    ["gh pr merge 5", /--auto/],
+    ["gh release delete v1", /human/],
+    ["gh secret set X", /human/],
+    ["pnpm run release", /release\.yml/],
+    ["echo 'git push -f' | sh", /run the command directly/],
+    ["git push origin main", /feature branch/],
+    ["git branch -D main", /feature branch/],
+    ["printenv", /hoist secrets exec/],
+    ["sops -d x.yaml", /hoist secrets exec/],
+    ["rm .claude/hooks/guard.mjs", /docs\/agents\/project\.md/],
+  ];
+  for (const [cmd, re] of want) assert.match(decide(bash(cmd), ctx)?.reason ?? "", re, cmd);
+});
+
+test("CLI: internal error fails closed for risky text, open otherwise", () => {
+  const risky = run('{"tool_name":"Bash","tool_input":{"command":"git push -f"', {
+    CLAUDE_PROJECT_DIR: "/r",
+  });
+  assert.equal(risky.status, 0);
+  assert.equal(JSON.parse(risky.stdout).hookSpecificOutput.permissionDecision, "deny");
+  assert.match(JSON.parse(risky.stdout).hookSpecificOutput.permissionDecisionReason, /retry/);
+  assert.equal(risky.stderr.split("\n").filter(Boolean).length, 1);
+  for (const word of ["publish", "release", "gh pr", "secret"]) {
+    const r = run(`{"tool_name":"Bash","tool_input":{"command":"x ${word}"`, {
+      CLAUDE_PROJECT_DIR: "/r",
+    });
+    assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, "deny", word);
+  }
+  const safe = run('{"tool_name":"Bash","tool_input":{"command":"ls"', {
+    CLAUDE_PROJECT_DIR: "/r",
+  });
+  assert.equal(safe.stdout, "");
+  assert.equal(safe.stderr.split("\n").filter(Boolean).length, 1);
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Checks the project-start checklist (hull docs/start-checklist.md) before autonomous agent work.
+// Checks the project-start checklist (hull docs/start-checklist.md). Advisory: it never blocks agent work.
 // Each item prints pass, fail, manual, ask (an onboarding answer is missing) or skipped (turned
 // off by an answer). Exit 0 only when nothing fails or asks; the owner confirms manual items.
 // Item and question ids match the checklist (a hull test keeps them in sync).
@@ -38,6 +38,16 @@ export const ITEMS = [
 /** hull templates; a question or option without `templates` is in both. */
 export const TEMPLATES = ["template", "template-rust"];
 const opt = (value, label, description, templates) => ({ value, label, description, templates });
+/** Answers assumed when a question is unanswered (bosun and secrets also follow what exists). */
+const AUTO_DEFAULTS = {
+  update_bot: "session",
+  approvals: "bootstrap",
+  bosun: "no",
+  secrets: "none",
+  ci: "github",
+  release: "no",
+};
+
 /** Asked by the `ready` skill. The first option is the recommended default; `off` skips `items`. */
 export const QUESTIONS = [
   {
@@ -235,6 +245,7 @@ export function requiredEnvironments(root) {
 
 const pass = (note) => ({ status: "pass", note });
 const fail = (note) => ({ status: "fail", note });
+const warn = (note) => ({ status: "warn", note });
 const manual = (note) => ({ status: "manual", note });
 const ASK_FIX = "Run the `ready` skill: it asks via `node scripts/ready.mjs --questions`.";
 /** How an existing repo takes the template (docs/adopt.md); flags follow splice's `adopt`. */
@@ -275,7 +286,17 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
     const label = [cmd, ...args].join(" ");
     return r.ok ? pass(label) : fail((r.err || r.out).trim().split("\n")[0] || `${label} failed`);
   };
-  const answers = readAnswers(root);
+  // Unanswered onboarding questions take a default, so nobody is asked up front. Only `pieces` and
+  // `apps` stay unknown (manual); the owner is asked about secrets and release when they are used.
+  const answers = {
+    update_bot: "session",
+    approvals: today > BOOTSTRAP_END ? "owner" : "bootstrap",
+    bosun: file(".bosun") ? "yes" : "no",
+    secrets: file("secrets.toml") ? "hoist" : "none",
+    ci: "github",
+    release: "no",
+    ...readAnswers(root),
+  };
   const profile = profileOf(root);
   /** ask when a gating question is unanswered; skipped when an answer turns the item off. */
   const gate = (id) => {
@@ -287,12 +308,12 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
     for (const q of questionsOf(profile).filter((x) => x.items.includes(id))) {
       const a = answers[q.id];
       if (a === undefined) {
-        // Names the question: after `splice update` a new one (e.g. `release`) may be unanswered.
+        // No default for it: print one manual line; `--answer` records it for the next run.
         const values = q.options.map((o) => o.value);
         return {
-          status: "ask",
-          note: `unanswered question \`${q.id}\` ("${q.question}"): ${values.join(" | ")}`,
-          fix: `node scripts/ready.mjs --answer ${q.id}=<${values.join("|")}> (${ASK_FIX})`,
+          status: "manual",
+          note: `\`${q.id}\` ("${q.question}") is not recorded: ${values.join(" | ")}`,
+          fix: `node scripts/ready.mjs --answer ${q.id}=<${values.join("|")}>`,
         };
       }
       const ok = [].concat(a).every((v) => q.options.some((o) => o.value === v));
@@ -455,7 +476,9 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       const steps = /^## Steps\n+[-\d]/m.test(project);
       return md("docs/superpowers/plans") || md("docs/superpowers/specs") || steps
         ? pass("plan found")
-        : fail("no plan or brief");
+        : warn(
+            "no plan or brief: write one before a long task (docs/superpowers/plans/*.md or `## Steps`)",
+          );
     },
     approvals: () =>
       answers.approvals === "bootstrap" && today > BOOTSTRAP_END
@@ -489,6 +512,7 @@ export function questions(
       question,
       multiSelect: Boolean(multi),
       answer: answers[id] ?? null,
+      default: AUTO_DEFAULTS[id] ?? null,
       options: options.map(({ templates, ...o }, i) => ({
         ...o,
         recommended: late ? o.value === "owner" : i === 0,
@@ -504,6 +528,7 @@ export function questions(
 export const CLASH = {
   template: {
     owned:
+      ".claude/agents/ci-fixer.md .claude/agents/explore.md .claude/agents/implementer.md .claude/agents/reviewer.md " +
       ".claude/hooks/guard.mjs .claude/hooks/session-start.sh .claude/hooks/stop-checks.sh " +
       ".claude/loop.md .claude/settings.json .claude/skills/add-piece/SKILL.md " +
       ".claude/skills/docs-lookup/SKILL.md .claude/skills/ready/SKILL.md " +
@@ -516,11 +541,12 @@ export const CLASH = {
       "packages/shared/tsconfig.json packages/shared/vite.config.ts",
     shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
     seed:
-      "AGENTS.md README.md docs/agents/onboarding.toml docs/agents/project.md " +
+      "AGENTS.md README.md docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md " +
       "scripts/ci-pre.sh scripts/ci-extra.sh packages/shared/src/**",
   },
   "template-rust": {
     owned:
+      ".claude/agents/ci-fixer.md .claude/agents/explore.md .claude/agents/implementer.md .claude/agents/reviewer.md " +
       ".claude/hooks/guard.mjs .claude/hooks/session-start.sh .claude/hooks/stop-checks.sh " +
       ".claude/loop.md .claude/settings.json .claude/skills/add-piece/SKILL.md " +
       ".claude/skills/ready/SKILL.md .claude/skills/verify/SKILL.md .claude/statusline.sh " +
@@ -530,7 +556,7 @@ export const CLASH = {
       "scripts/agents-index.mjs scripts/deny.mjs scripts/ready.mjs",
     shared: "Cargo.toml crates/common/Cargo.toml",
     seed:
-      "AGENTS.md README.md deny.local.toml docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
+      "AGENTS.md README.md deny.local.toml docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
       "scripts/ci-pre.sh scripts/ci-extra.sh crates/common/src/**",
   },
 };
@@ -721,12 +747,12 @@ export function report(results, url) {
     }
   }
   const failed = results.filter((r) => ["fail", "ask"].includes(r.status)).length;
-  const manuals = results.some((r) => r.status === "manual");
+  const manuals = results.filter((r) => r.status === "manual").map((r) => r.id);
   lines.push(
     failed
-      ? `not ready: ${failed} item(s) fail or need an answer. Do not start autonomous work.`
-      : manuals
-        ? "automatable items pass: confirm every manual item with the owner before autonomous work."
+      ? `${failed} item(s) fail or need an answer; fix them when convenient, work is not blocked.`
+      : manuals.length
+        ? `manual items for the owner, to confirm once (${manuals.join(", ")}); work is not blocked.`
         : "ready: every item passes or was skipped by choice.",
   );
   return { text: `${lines.join("\n")}\n`, code: failed ? 1 : 0 };

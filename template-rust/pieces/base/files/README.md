@@ -6,10 +6,9 @@ and an AI layer (`AGENTS.md`, `CLAUDE.md`, `.claude/`). No Node toolchain is nee
 
 ## After `splice new`
 
-Add the subagents and the org decisions as splice channels (D-004), then refresh the index:
+Add the org decisions as a splice channel (D-004), then refresh the index:
 
 ```bash
-splice channel add gh:keelstackhq/hull//rigging --piece claude
 splice channel add gh:keelstackhq/decisions//channel --track main --piece import-project
 node scripts/agents-index.mjs
 ```
