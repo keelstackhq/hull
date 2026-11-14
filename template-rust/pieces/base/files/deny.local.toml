@@ -1,0 +1,5 @@
+# Local additions to the license policy. deny.toml is owned (`splice update` rewrites it); this file
+# is yours and survives updates. scripts/deny.mjs merges `allow` into deny.toml before `cargo deny`.
+# Only `[licenses] allow` is merged.
+[licenses]
+allow = []

@@ -12,6 +12,7 @@ const ZERO = /^0+$/;
  * includes a root `*.md` as doc tests gets them checked on `main`, not on a docs-only PR. */
 export function isDoc(path) {
   if (path.startsWith("docs/") || path.startsWith(".claude/")) return true;
+  if (path.startsWith("changelog.d/")) return true;
   if (!path.includes("/")) return path.endsWith(".md") || /^LICENSE/.test(path);
   return false;
 }
@@ -21,8 +22,27 @@ export function decide(paths) {
   return paths !== null && paths.length > 0 && paths.every(isDoc);
 }
 
-function changed(base) {
-  if (!base || ZERO.test(base)) return null;
+/** On a pull_request, actions/checkout builds the merge of the PR into the current base branch, so
+ * BASE (the base sha when the PR was opened or last synchronized) is stale: `BASE...HEAD` would
+ * include everything merged since. The merge commit's first parent is the current base. */
+function effectiveBase(base) {
+  if (process.env.GITHUB_EVENT_NAME !== "pull_request") return base;
+  try {
+    const parents = execFileSync("git", ["rev-list", "--parents", "-n", "1", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+      .trim()
+      .split(" ");
+    return parents.length === 3 ? parents[1] : base;
+  } catch {
+    return base;
+  }
+}
+
+function changed(rawBase) {
+  if (!rawBase || ZERO.test(rawBase)) return null;
+  const base = effectiveBase(rawBase);
   try {
     const out = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
       encoding: "utf8",

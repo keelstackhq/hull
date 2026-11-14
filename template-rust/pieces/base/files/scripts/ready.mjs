@@ -286,8 +286,15 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
     if (absent) return { status: "skipped", note: `no ${absent.id} piece in ${profile}` };
     for (const q of questionsOf(profile).filter((x) => x.items.includes(id))) {
       const a = answers[q.id];
-      if (a === undefined)
-        return { status: "ask", note: `answer question \`${q.id}\``, fix: ASK_FIX };
+      if (a === undefined) {
+        // Names the question: after `splice update` a new one (e.g. `release`) may be unanswered.
+        const values = q.options.map((o) => o.value);
+        return {
+          status: "ask",
+          note: `unanswered question \`${q.id}\` ("${q.question}"): ${values.join(" | ")}`,
+          fix: `node scripts/ready.mjs --answer ${q.id}=<${values.join("|")}> (${ASK_FIX})`,
+        };
+      }
       const ok = [].concat(a).every((v) => q.options.some((o) => o.value === v));
       if (!ok || (!q.multi && typeof a !== "string")) {
         return { status: "ask", note: `not a valid answer to \`${q.id}\`: ${a}`, fix: ASK_FIX };
@@ -505,7 +512,7 @@ export const CLASH = {
       ".github/workflows/ci.yml .github/workflows/desktop.yml .github/workflows/preview-deploy.yml " +
       ".github/workflows/preview.yml .github/workflows/release.yml .github/workflows/splice.yml " +
       ".gitattributes .gitignore .node-version CLAUDE.md Cargo.toml renovate.json rust-toolchain.toml " +
-      "scripts/agents-index.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
+      "scripts/agents-index.mjs scripts/deny.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
       "packages/shared/tsconfig.json packages/shared/vite.config.ts",
     shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
     seed:
@@ -520,10 +527,10 @@ export const CLASH = {
       ".config/nextest.toml .github/scripts/docs-only.mjs .github/scripts/release-pending.mjs " +
       ".github/workflows/ci.yml .github/workflows/release.yml .github/workflows/splice.yml " +
       ".gitattributes .gitignore CLAUDE.md deny.toml renovate.json rust-toolchain.toml rustfmt.toml " +
-      "scripts/agents-index.mjs scripts/ready.mjs",
+      "scripts/agents-index.mjs scripts/deny.mjs scripts/ready.mjs",
     shared: "Cargo.toml crates/common/Cargo.toml",
     seed:
-      "AGENTS.md README.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
+      "AGENTS.md README.md deny.local.toml docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
       "scripts/ci-pre.sh scripts/ci-extra.sh crates/common/src/**",
   },
 };

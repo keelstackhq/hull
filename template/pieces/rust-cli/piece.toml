@@ -10,7 +10,7 @@ name = { prompt = "crate and binary name", default = "cli", pattern = "^[a-z][a-
 [files]
 owned = ["turbo.json", "deny.toml", "AGENTS.md"]
 shared = ["Cargo.toml", "package.json"]
-seed = ["src/**", "tests/**", "CLAUDE.md"]
+seed = ["deny.local.toml", "src/**", "tests/**", "CLAUDE.md"]
 
 [merge]
 "Cargo.toml" = "toml"

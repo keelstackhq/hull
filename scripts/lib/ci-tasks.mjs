@@ -47,6 +47,14 @@ const GITHUB_STEPS = [
       "        env:",
       "          TURBO_VERSION: 2.11.10",
       "        run: |",
+      "          # A PR is checked out as a merge into the current base branch: diff against its first",
+      "          # parent, not the base sha from when the PR was opened (stale: it would count",
+      "          # everything merged since).",
+      '          if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -eq 3 ]; then',
+      '            TURBO_SCM_BASE="$(git rev-parse HEAD^1)"',
+      "            export TURBO_SCM_BASE",
+      '            echo "TURBO_SCM_BASE=$TURBO_SCM_BASE" >> "$GITHUB_ENV"',
+      "          fi",
       "          set +e",
       '          curl -fsSL "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz" \\',
       '            | tar -xz -C "$RUNNER_TEMP" --strip-components=2 turbo-linux-x64/bin/turbo',
@@ -368,7 +376,7 @@ export const CI_PLAN = Object.freeze(
 export const RUST_CI_STEPS = Object.freeze([
   "cargo fmt --all --check",
   "cargo clippy --workspace --all-targets --locked -- -D warnings",
-  "cargo deny --locked check bans licenses sources",
+  "node scripts/deny.mjs --locked check bans licenses sources",
   "cargo nextest run --workspace --locked --profile ci",
   "cargo test --workspace --doc --locked",
 ]);

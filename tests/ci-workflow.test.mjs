@@ -318,3 +318,36 @@ test("generated ci.yml installs cargo-nextest@0.9.148 and cargo-deny@0.20.2", ()
   assert.equal(step("taiki-e/install-action").with.tool, "cargo-nextest@0.9.148,cargo-deny@0.20.2");
   assert.match(step("taiki-e/install-action").if, /steps\.rust\.outputs\.rust == 'true'/);
 });
+
+test("affected step re-bases TURBO_SCM_BASE onto HEAD^1 of a pull_request merge commit (D3)", async () => {
+  const run = steps[affectedIdx].run;
+  const pre = run.slice(0, run.indexOf("curl "));
+  assert.match(pre, /GITHUB_ENV/);
+  const repo = await mkdtemp(join(tmpdir(), "hull-scm-base-"));
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.email=a@b.c", "-c", "user.name=t", ...a], {
+      cwd: repo,
+      encoding: "utf8",
+    }).trim();
+  git("init", "-q", "-b", "main");
+  git("commit", "-q", "--allow-empty", "-m", "base");
+  const stale = git("rev-parse", "HEAD");
+  git("checkout", "-q", "-b", "pr");
+  git("commit", "-q", "--allow-empty", "-m", "pr work");
+  git("checkout", "-q", "main");
+  git("commit", "-q", "--allow-empty", "-m", "merged since");
+  const current = git("rev-parse", "HEAD");
+  git("checkout", "-q", "-b", "merge");
+  git("merge", "-q", "--no-ff", "-m", "merge", "pr");
+  const envFile = join(repo, "..", `env-${Date.now()}`);
+  await writeFile(envFile, "");
+  const go = (event) =>
+    execFileSync("bash", ["-c", `${pre}\necho "base=$TURBO_SCM_BASE"`], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, TURBO_SCM_BASE: stale, GITHUB_EVENT_NAME: event, GITHUB_ENV: envFile },
+    }).trim();
+  assert.equal(go("pull_request"), `base=${current}`);
+  assert.match(await readFile(envFile, "utf8"), new RegExp(`TURBO_SCM_BASE=${current}`));
+  assert.equal(go("push"), `base=${stale}`);
+});

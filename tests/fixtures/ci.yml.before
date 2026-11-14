@@ -36,6 +36,14 @@ jobs:
         env:
           TURBO_VERSION: 2.11.10
         run: |
+          # A PR is checked out as a merge into the current base branch: diff against its first
+          # parent, not the base sha from when the PR was opened (stale: it would count
+          # everything merged since).
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -eq 3 ]; then
+            TURBO_SCM_BASE="$(git rev-parse HEAD^1)"
+            export TURBO_SCM_BASE
+            echo "TURBO_SCM_BASE=$TURBO_SCM_BASE" >> "$GITHUB_ENV"
+          fi
           set +e
           curl -fsSL "https://registry.npmjs.org/@turbo/linux-64/-/linux-64-$TURBO_VERSION.tgz" \
             | tar -xz -C "$RUNNER_TEMP" --strip-components=2 turbo-linux-x64/bin/turbo

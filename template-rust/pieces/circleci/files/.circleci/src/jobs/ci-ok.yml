@@ -82,7 +82,7 @@ steps:
   # step: deny
   - run:
       name: Dependency policy
-      command: cargo deny --locked check bans licenses sources
+      command: node scripts/deny.mjs --locked check bans licenses sources
   # step: nextest
   - run:
       name: Tests

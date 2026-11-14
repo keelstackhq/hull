@@ -21,12 +21,12 @@ follows [the start checklist](start-checklist.md) instead. This file is versione
 check its sha256 before running it, from the repo root:
 
 ```bash
-curl -fsSL https://keelstack.dev/assess/v0.9.0.mjs -o /tmp/assess.mjs
-echo "cfb3ee4a11d17ec817c55d73f3aaf8cbb97c40822555a75c2576b9bac3274f87  /tmp/assess.mjs" | sha256sum -c
+curl -fsSL https://keelstack.dev/assess/v0.10.0.mjs -o /tmp/assess.mjs
+echo "ASSESS_SHA256  /tmp/assess.mjs" | sha256sum -c
 node /tmp/assess.mjs --assess --json
 ```
 
-The sha256 is that of hull v0.9.0's `template/pieces/base/files/scripts/ready.mjs` (a hull test
+The sha256 is that of hull v0.10.0's `template/pieces/base/files/scripts/ready.mjs` (a hull test
 keeps it equal); never use an unpinned latest URL. With a hull clone, run that file directly. It
 reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 
@@ -83,14 +83,14 @@ on any breaking change (a removed, renamed or retyped field); otherwise fields a
 - **owned**: refused when it exists and differs from the template's (dry-run action `conflict`,
   message "refuse: `<path>`"; an identical file is `skip`); `--force` would replace it (`update`,
   "replace: `<path>`").
-  - `template/`: `.claude/hooks/guard.mjs`, `.claude/hooks/session-start.sh`, `.claude/hooks/stop-checks.sh`, `.claude/loop.md`, `.claude/settings.json`, `.claude/skills/add-piece/SKILL.md`, `.claude/skills/docs-lookup/SKILL.md`, `.claude/skills/ready/SKILL.md`, `.claude/skills/verify/SKILL.md`, `.claude/statusline.sh`, `.github/scripts/affected.mjs`, `.github/scripts/preview.mjs`, `.github/scripts/release-plan.mjs`, `.github/scripts/rust-affected.mjs`, `.github/workflows/ci.yml`, `.github/workflows/desktop.yml`, `.github/workflows/preview-deploy.yml`, `.github/workflows/preview.yml`, `.github/workflows/release.yml`, `.github/workflows/splice.yml`, `.gitattributes`, `.gitignore`, `.node-version`, `CLAUDE.md`, `Cargo.toml`, `renovate.json`, `rust-toolchain.toml`, `scripts/agents-index.mjs`, `scripts/ready.mjs`, `tsconfig.base.json`, `vite.config.ts`, `packages/shared/tsconfig.json`, `packages/shared/vite.config.ts`
-  - `template-rust/`: `.claude/hooks/guard.mjs`, `.claude/hooks/session-start.sh`, `.claude/hooks/stop-checks.sh`, `.claude/loop.md`, `.claude/settings.json`, `.claude/skills/add-piece/SKILL.md`, `.claude/skills/ready/SKILL.md`, `.claude/skills/verify/SKILL.md`, `.claude/statusline.sh`, `.config/nextest.toml`, `.github/scripts/docs-only.mjs`, `.github/scripts/release-pending.mjs`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/splice.yml`, `.gitattributes`, `.gitignore`, `CLAUDE.md`, `deny.toml`, `renovate.json`, `rust-toolchain.toml`, `rustfmt.toml`, `scripts/agents-index.mjs`, `scripts/ready.mjs`
+  - `template/`: `.claude/hooks/guard.mjs`, `.claude/hooks/session-start.sh`, `.claude/hooks/stop-checks.sh`, `.claude/loop.md`, `.claude/settings.json`, `.claude/skills/add-piece/SKILL.md`, `.claude/skills/docs-lookup/SKILL.md`, `.claude/skills/ready/SKILL.md`, `.claude/skills/verify/SKILL.md`, `.claude/statusline.sh`, `.github/scripts/affected.mjs`, `.github/scripts/preview.mjs`, `.github/scripts/release-plan.mjs`, `.github/scripts/rust-affected.mjs`, `.github/workflows/ci.yml`, `.github/workflows/desktop.yml`, `.github/workflows/preview-deploy.yml`, `.github/workflows/preview.yml`, `.github/workflows/release.yml`, `.github/workflows/splice.yml`, `.gitattributes`, `.gitignore`, `.node-version`, `CLAUDE.md`, `Cargo.toml`, `renovate.json`, `rust-toolchain.toml`, `scripts/agents-index.mjs`, `scripts/deny.mjs`, `scripts/ready.mjs`, `tsconfig.base.json`, `vite.config.ts`, `packages/shared/tsconfig.json`, `packages/shared/vite.config.ts`
+  - `template-rust/`: `.claude/hooks/guard.mjs`, `.claude/hooks/session-start.sh`, `.claude/hooks/stop-checks.sh`, `.claude/loop.md`, `.claude/settings.json`, `.claude/skills/add-piece/SKILL.md`, `.claude/skills/ready/SKILL.md`, `.claude/skills/verify/SKILL.md`, `.claude/statusline.sh`, `.config/nextest.toml`, `.github/scripts/docs-only.mjs`, `.github/scripts/release-pending.mjs`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/splice.yml`, `.gitattributes`, `.gitignore`, `CLAUDE.md`, `deny.toml`, `renovate.json`, `rust-toolchain.toml`, `rustfmt.toml`, `scripts/agents-index.mjs`, `scripts/deny.mjs`, `scripts/ready.mjs`
 - **shared**: merged (dry-run action `merge`, or `conflict` when both sides changed).
   - `template/`: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `packages/shared/package.json`
   - `template-rust/`: `Cargo.toml`, `crates/common/Cargo.toml`
 - **seed**: kept as they are (dry-run action `skip`).
   - `template/`: `AGENTS.md`, `README.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `packages/shared/src/**`
-  - `template-rust/`: `AGENTS.md`, `README.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `hoist.toml`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `crates/common/src/**`
+  - `template-rust/`: `AGENTS.md`, `README.md`, `deny.local.toml`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `hoist.toml`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `crates/common/src/**`
 - **targets**: a piece's target directory that already exists and is not the piece's source.
 
 Every other file the template writes is new (`create`). Pieces add more files under their target.

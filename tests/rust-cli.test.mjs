@@ -181,7 +181,7 @@ test("lint runs clippy -D warnings then cargo deny … check … bans licenses s
   const pkg = JSON.parse(await read(dir, "crates/cli/package.json"));
   assert.equal(
     pkg.scripts.lint,
-    "cargo clippy -p cli --all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources",
+    "cargo clippy -p cli --all-targets --locked -- -D warnings && node ../../scripts/deny.mjs --manifest-path Cargo.toml --config deny.toml check bans licenses sources",
   );
 });
 

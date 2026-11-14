@@ -165,3 +165,25 @@ for (const [name, pieces] of [
     assert.equal(out.split("\n")[0], HEADER);
   });
 }
+
+test("skips fragment directories (docs/progress.d, changelog.d) so a fragment never changes the index (D4)", async () => {
+  const d = await tmpCopy("small");
+  await put(d, "docs/progress.d/abc.md", "# Fragment\n");
+  await put(d, "docs/changelog.d/1.md", "# Fragment\n");
+  await put(d, "changelog.d/2.md", "# Fragment\n");
+  assert.equal(buildIndex(d), read("small.expected.md"));
+});
+
+test("template-rust agents-index skips the same fragment directories (D4)", async () => {
+  const rust = fileURLToPath(
+    new URL("../template-rust/pieces/base/files/scripts/agents-index.mjs", import.meta.url),
+  );
+  const { buildIndex: build } = await import(rust);
+  const d = await mkdtemp(join(tmpdir(), "idx-rust-"));
+  await put(d, "Cargo.toml", "[workspace]\n");
+  await put(d, "docs/a.md", "# A\n");
+  const before = build(d);
+  await put(d, "docs/progress.d/abc.md", "# Fragment\n");
+  await put(d, "docs/changelog.d/1.md", "# Fragment\n");
+  assert.equal(build(d), before);
+});
