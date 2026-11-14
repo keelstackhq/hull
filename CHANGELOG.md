@@ -127,8 +127,8 @@ Keep `unreleased` while changes accumulate.
   move `SPLICE_BOT_TOKEN` / `HOIST_RELEASE_TOKEN` there and delete the repository-level secrets.**
 - **Upgrade (TypeScript repos): `template/` now ships `.github/workflows/splice.yml`, the weekly
   update bot (it also renders with `circleci-only`). Create the `splice-bot` environment first, as
-  in the bullet above.** The README sections "Update bot" and "pick a token mode" are
-  seed: existing repos do not get them.
+  in the bullet above.** The README section "Update bot" is
+  seed: existing repos do not get it.
 - Update bot and release PR token, in this order: GitHub App (variable `SPLICE_APP_CLIENT_ID` and
   secret `SPLICE_APP_KEY` in `splice-bot`; the App needs Contents, Pull requests and Workflows
   write), then PAT (`SPLICE_BOT_TOKEN`), then `github.token`. A PR opened with `github.token` gets

@@ -792,3 +792,14 @@ test("every template ships the same ready.mjs and deny.mjs, byte for byte (D6)",
     assert.equal(texts[1], texts[0], `${rel} differs between template and template-rust`);
   }
 });
+
+test("report: manual items with the same note share one line and no per-item fix", () => {
+  const note = "gh is not logged in here: the owner confirms this on github.com";
+  const mk = (id) => ({ id, status: "manual", note, fix: `fix ${id}` });
+  const { text, code } = report([mk("repo"), mk("actions"), mk("rulesets")], "URL");
+  assert.equal(code, 0);
+  assert.equal(text.split(note).length - 1, 1, text);
+  assert.match(text, /^manual +repo, actions, rulesets +gh is not logged in/m);
+  assert.doesNotMatch(text, /fix repo/);
+  assert.match(text, /URL/);
+});
