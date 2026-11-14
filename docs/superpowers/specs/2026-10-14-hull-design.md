@@ -478,7 +478,9 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   glob (`cd .cla*`); relative paths resolve against the hook's `cwd`; `patch` and `git apply` are read
   (file, `<` or heredoc) and deny when the diff names a protected path or cannot be read (piped, or a
   file another command of the same chain wrote). Exception: a file made earlier in the chain by
-  `git diff|show|format-patch|stash ... > f` (or `--output=f`) is the repo's own change and applies.
+  `git diff|show|format-patch ... -- <paths> > f` (or `--output=f`) applies, when the explicit paths
+  hold no protected file; plain `diff`, `--no-index`, prefixes and a missing pathspec do not.
+  Clustered `-xC`, `cp -t`, `unzip -d`, `curl -o` and a `cd` to a variable or `$(...)` are refused.
   Every deny names the allowed alternative. Asks the human before Edit/Write on a file the lock
   lists as `owned` (the reason names `scripts/ci-extra.sh` for `ci.yml`, else
   `docs/agents/project.md`). A tokenizer, not a sandbox: the real fix is a server-side branch

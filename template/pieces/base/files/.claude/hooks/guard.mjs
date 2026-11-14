@@ -6,9 +6,10 @@
 // Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell heredoc
 // is still scanned). `eval`, `sh`/interpreter fed from a pipe, `-c`/`-e` bodies, `$VAR` or `$(...)` in
 // command position and git `-c alias.x=` deny when the text mentions push, publish or release.
-// Known gaps: scripts that publish, editing guarded files from an interpreter, `patch -p1 < x.diff`
-// (the target is inside the diff), `cd` into a guarded dir, and a default branch that origin/HEAD
-// does not name. Node built-ins only.
+// Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
+// a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
+// piped in (refused) or made by a producer other than `git diff|show|format-patch -- <paths>`
+// (refused), and a default branch that origin/HEAD does not name. Node built-ins only.
 // An internal error denies when the call mentions push, publish, release, gh, secret or sops (retry),
 // else allows and prints one stderr line. Settings deny rules only cover force pushes and publish
 // commands: the guard is the one layer for default-branch pushes and secrets.
@@ -17,7 +18,6 @@ import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template", ".dev.vars.example"]);
-const DIFF_SUBS = new Set(["diff", "show", "format-patch", "stash"]);
 const MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh", "ash", "fish"]);
 const INTERPRETERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
@@ -551,9 +551,10 @@ const ADMIN_API_RE =
   /\/(branches\/[^/\s]+\/protection|rulesets?|environments|actions\/(secrets|variables|permissions)|hooks|keys|collaborators|transfer|rename)\b/;
 
 const CHDIR_FLAG_RE =
-  /^(?:-C|--chdir|--directory|--work-tree|--prefix|--cwd|--dir)(?:=(.*)|(?!-)(.+))?$/;
+  /^(?:(?:-[A-Za-z]*[CtdoO]|--chdir|--directory|--work-tree|--prefix|--cwd|--dir|--target-directory|--output|--output-document)(?:=(.*))?|-[A-Za-z]*[CtdoO](.+))$/;
 
-/** Directories a command changes into with a flag (`env -C`, `tar -C`, `make -C`, `--work-tree=`). */
+/** Directories a command changes into or writes under with a flag (`env -C`, `tar -xC`, `make -C`,
+ * `--work-tree=`, `cp -t`, `unzip -d`, `curl -o`). */
 function chdirs(tokens) {
   const out = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -580,7 +581,9 @@ function bashRule(
   if (prog === "@chdir") return guardedDir(t[1], projectDir, cwd) ? "protected" : null;
   if (["cd", "pushd"].includes(prog)) {
     const dirs = args.filter((a) => !a.startsWith("-"));
-    if (dirs.some((d) => d && guardedDir(d, projectDir, cwd))) return "protected";
+    // `cd "$(echo .claude)"`, `cd $X`: the target is unknown, so it is refused.
+    if (dirs.some((d) => d && (/[$`]/.test(d) || guardedDir(d, projectDir, cwd))))
+      return "protected";
   }
   if (prog === "patch" || (prog === "git" && gitSub(t).sub === "apply")) {
     // The diff names the files it writes: read it (file operand, <redirect or heredoc). Piped or
@@ -876,11 +879,39 @@ export function decide(input, ctx) {
   return null;
 }
 
-/** Track files written earlier in a chain: `git diff > f` makes a patch of the repo's own changes;
- * any other write leaves content the guard cannot read. */
+/** True when a git path argument could name a protected file or a dir that holds one. */
+function riskyPathspec(p) {
+  const x = stripTok(p).replace(/^\.\//, "");
+  if (!x || x === "." || /^[:/]|(^|\/)\.\.(\/|$)|[*?[{\\]/.test(x)) return true;
+  const dir = x.replace(/\/+$/, "");
+  return (
+    isProtected(dir) ||
+    isProtected(`${dir}/x`) ||
+    LOCK_RE.test(dir) ||
+    [
+      ".claude/settings.json",
+      ".github/workflows/release.yml",
+      ".bosun/x",
+      ".splice/lock.toml",
+    ].some((s) => s === dir || s.startsWith(`${dir}/`))
+  );
+}
+
+/** A patch the repo itself yields: git diff/show/format-patch with an explicit `--` pathspec that
+ * names no protected path. Plain `diff`, `--no-index`, prefixes and no pathspec are not. */
+function isRepoPatch(t) {
+  if (base(t[0]) !== "git" || !["diff", "show", "format-patch"].includes(gitSub(t).sub))
+    return false;
+  if (t.some((x) => /^--(no-index|src-prefix|dst-prefix|relative)(=|$)/.test(x))) return false;
+  const dd = t.indexOf("--");
+  const specs = dd < 0 ? [] : t.slice(dd + 1).filter((x) => !/^(\d*>|--output)/.test(x));
+  return specs.length > 0 && !specs.some((x) => riskyPathspec(x) || /^\d*>/.test(x));
+}
+
+/** Track files written earlier in a chain: a repo patch (`git diff -- src > f`) is the repo's own
+ * change; any other write leaves content the guard cannot read. */
 function noteWrites(t, cwd, chain) {
-  const prog = base(t[0]);
-  const diffLike = prog === "diff" || (prog === "git" && DIFF_SUBS.has(gitSub(t).sub));
+  const repoPatch = isRepoPatch(t);
   for (let i = 0; i < t.length; i++) {
     let name = "";
     if (/^--output=/.test(t[i])) name = t[i].slice(9);
@@ -891,7 +922,7 @@ function noteWrites(t, cwd, chain) {
     const viaRedirect =
       /^\d*>/.test(t[i]) || /^\d*>[>|]?$/.test(t[i - 1] ?? "") || t[i].startsWith("--output=");
     const append = />>/.test(t[i]) || />>$/.test(t[i - 1] ?? "");
-    if (diffLike && viaRedirect && !append) {
+    if (repoPatch && viaRedirect && !append) {
       chain.made.add(abs);
       chain.tainted.delete(abs);
     } else {

