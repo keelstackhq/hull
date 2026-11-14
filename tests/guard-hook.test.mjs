@@ -711,3 +711,45 @@ test("lock: symlink to it, case variants, and rsync source are handled", () => {
   assert.equal(decide(bash("rsync -a .claude/ /tmp/backup/"), ctx), null);
   assert.equal(decide(bash("rsync -a /tmp/evil/ .claude/hooks/"), ctx)?.decision, "deny");
 });
+
+test("cd into a guarded dir, a persisted cwd there, patch and git apply do not hide a protected write", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-cd-"));
+  mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  const evil = "--- a/.claude/settings.json\n+++ b/.claude/settings.json\n@@ -1 +1 @@\n-a\n+b\n";
+  const fine = "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n";
+  writeFileSync(join(dir, "evil.diff"), evil);
+  writeFileSync(join(dir, "fine.diff"), fine);
+  const c = { projectDir: dir };
+  for (const cmd of [
+    "cd .claude && echo x > settings.json",
+    "cd .claude/hooks && sed -i s/a/b/ guard.mjs",
+    "pushd .claude; tee settings.json",
+    "cd .github/workflows && echo > release.yml",
+    "cd .bosun",
+    "cd ./.claude/",
+    "git -C .claude checkout -- settings.json",
+    "patch -p1 < evil.diff",
+    "patch -p1 -i evil.diff",
+    "git apply evil.diff",
+    "cat evil.diff | git apply -",
+    `patch -p1 <<'EOF'\n${evil}EOF`,
+    `git apply <<EOF\n${evil}EOF`,
+    "find . -name x -exec sh -c 'npm publish' ;",
+    "find . -exec bash -c 'git push origin main' ;",
+  ])
+    assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
+  const inClaude = { projectDir: dir, cwd: join(dir, ".claude") };
+  for (const cmd of ["echo x > settings.json", "rm hooks/guard.mjs"])
+    assert.equal(decide(bash(cmd), inClaude)?.decision, "deny", cmd);
+  assert.equal(decide(tool("Write", { file_path: "settings.json" }), inClaude)?.decision, "deny");
+  for (const cmd of [
+    "cd src",
+    "cd .github",
+    "git apply fine.diff",
+    "patch -p1 < fine.diff",
+    "git apply --check fine.diff",
+    "find . -name x -exec sh -c 'echo hi' ;",
+  ])
+    assert.equal(decide(bash(cmd), c), null, cmd);
+});

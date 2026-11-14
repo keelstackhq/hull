@@ -743,9 +743,11 @@ export function report(results, url) {
   for (const r of results) {
     lines.push(`${r.status.padEnd(7)} ${r.id.padEnd(12)} ${r.note}`);
     if (!["pass", "skipped"].includes(r.status)) {
-      lines.push(`        fix: ${r.fix}`, `        see: ${url}#${r.id}`);
+      lines.push(`        fix: ${r.fix}`);
     }
   }
+  if (results.some((r) => !["pass", "skipped"].includes(r.status)))
+    lines.push(`details per item (anchor = item id): ${url}`);
   const failed = results.filter((r) => ["fail", "ask"].includes(r.status)).length;
   const manuals = results.filter((r) => r.status === "manual").map((r) => r.id);
   lines.push(

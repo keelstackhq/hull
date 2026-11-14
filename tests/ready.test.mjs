@@ -255,10 +255,9 @@ test("no answers: defaults apply, only pieces and apps are manual, nothing is as
   assert.notEqual(s.environments, "ask");
   assert.equal(s.repo, "pass");
   const { text } = report(results, "https://x/start-checklist.md");
-  assert.match(
-    text,
-    /^manual +apps .*`apps`.*\n +fix: .*--answer apps=.*\n +see: https:\/\/x\/start-checklist\.md#apps$/m,
-  );
+  assert.match(text, /^manual +apps .*`apps`.*\n +fix: .*--answer apps=.*$/m);
+  assert.match(text, /^details per item \(anchor = item id\): https:\/\/x\/start-checklist\.md$/m);
+  assert.doesNotMatch(text, /^ +see:/m, "one details line, not one per item");
   assert.match(text, /work is not blocked/);
   assert.doesNotMatch(text, /Do not start autonomous work/);
 });
@@ -450,7 +449,8 @@ test("missing environment, ruleset, plan and old node fail with a fix; exit 1", 
   assert.equal(s.environment, "fail");
   const { text, code } = report(results, "u");
   assert.equal(code, 1);
-  assert.match(text, /^fail +rulesets .*\n +fix: .*\n +see: u#rulesets$/m);
+  assert.match(text, /^fail +rulesets .*\n +fix: .*$/m);
+  assert.match(text, /^details per item .*: u$/m);
 });
 
 test("false passes: release from main only, inactive tag ruleset, repo outside keelstackhq", async () => {
