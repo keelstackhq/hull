@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.10.0 — unreleased
+## v0.10.0 — 2026-11-14
 
 - Docs-only CI skip: `changelog.d/**` counts as docs (`docs/progress.d/**` already did); on a pull
   request the diff base is the first parent of the merge commit (`HEAD^1`) instead of the stale PR
@@ -23,6 +23,7 @@ Keep `unreleased` while changes accumulate.
   the owned workflows (current renders are compliant; `docs/updating.md`).
 - Tests of the Actions-minutes rules on every rendered workflow of every combo: D-007 and a port
   of bosun's `ci-minutes` gate rules (draft guard, `ci-ok`, `ready_for_review`, concurrency, paths).
+- Pairing: repos governed by bosun need bosun ≥ 0.15.0 (it gates `deny.local.toml`).
 
 ## v0.9.0 — 2026-11-12
 
