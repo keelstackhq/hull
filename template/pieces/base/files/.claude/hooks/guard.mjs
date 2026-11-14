@@ -9,7 +9,8 @@
 // Known gaps: scripts that publish, editing guarded files from an interpreter, and a default branch
 // that origin/HEAD does not name. Node built-ins only.
 // An internal error denies when the call mentions push, publish, release, gh, secret or sops (retry),
-// else allows and prints one stderr line; settings deny rules stay as the second layer.
+// else allows and prints one stderr line. Settings deny rules only cover force pushes and publish
+// commands: the guard is the one layer for default-branch pushes and secrets.
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,6 +164,8 @@ function split(cmd) {
       pending = [];
       i = at - 1;
       endSegment();
+    } else if (c === "|" && cur.endsWith(">")) {
+      cur += c; // `>|` forces a redirect
     } else if (c === ";" || c === "|" || c === "\n") {
       endSegment();
     } else if (c === "&" && !cur.endsWith(">") && !cur.endsWith("<")) {
@@ -270,7 +273,9 @@ function stripPrefixes(tokens) {
 export function commands(cmd) {
   const text = String(cmd ?? "");
   const out = [];
+  const DUMP_RE = /process\.env(?![.[\w])|os\.environ(?![.[\w])|\bENVIRON\b/;
   const secretTokens = (body) => {
+    if (DUMP_RE.test(body)) out.push(["printenv"]);
     for (const m of body.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
       if (secretLike(m[0])) out.push(["cat", m[0]]);
     }
@@ -284,7 +289,18 @@ export function commands(cmd) {
     }
     out.push(t);
     const prog = base(t[0]);
-    if (/^[$`]|\$\(/.test(t[0])) out.push(["@evade", text]);
+    const segText = seg.join(" ");
+    // `xargs git ...` takes its last arguments from stdin; `find -exec cmd ... ;` runs cmd.
+    if (base(seg[0].replace(/^[({]+/, "")) === "xargs") out.push(["@evade", segText]);
+    if (prog === "find") {
+      const e = t.findIndex((x) => x === "-exec" || x === "-execdir" || x === "-ok");
+      if (e >= 0) {
+        const end = t.findIndex((x, n) => n > e && (x === ";" || x === "+"));
+        const inner = stripPrefixes(t.slice(e + 1, end < 0 ? undefined : end));
+        if (inner.length) out.push(inner);
+      }
+    }
+    if (/^[$`]|\$\(/.test(t[0])) out.push(["@evade", segText]);
     // `git $SUB ...` hides the subcommand.
     if (prog === "git" && t.slice(1, 4).some((x) => /^[$`]|\$\(/.test(x)))
       out.push(["@evade", text]);
@@ -293,7 +309,7 @@ export function commands(cmd) {
       out.push(["@evade", body]);
       for (const inner of commands(body)) out.push(inner);
     }
-    const noArgs = t.slice(1).every((x) => x.startsWith("-")) && !seg.docs?.length;
+    const noArgs = t.slice(1).every((x) => x === "-" || x === "-s") && !seg.docs?.length;
     if (INTERPRETERS.test(prog)) {
       const i = t.findIndex((x, n) => n > 0 && INLINE_RE.test(x));
       if (i > 0 && t[i + 1] !== undefined) {
@@ -327,6 +343,8 @@ function isSecretName(name) {
   if (name.endsWith(".pem") || name === "keys.txt" || /^id_[a-z0-9]+$/.test(name)) return true;
   if (/[*?[{]/.test(name)) {
     const prefix = name.slice(0, name.search(/[*?[{]/));
+    if (prefix.length >= 2 && (".env".startsWith(prefix) || ".dev.vars".startsWith(prefix)))
+      return true; // `.e*`, `.en?` can expand to .env
     return (
       prefix.length > 0 &&
       !SECRET_SAFE.has(prefix) &&
@@ -339,7 +357,8 @@ function isSecretName(name) {
 function secretLike(value) {
   if (typeof value !== "string" || !value) return false;
   const clean = value.replace(/^[<>]+/, "");
-  for (const v of new Set([clean, clean.slice(clean.lastIndexOf("=") + 1)])) {
+  const variants = [clean, clean.slice(clean.lastIndexOf("=") + 1), clean.split(/[<>]/).pop()];
+  for (const v of new Set(variants)) {
     if (isSecretName(v.slice(v.lastIndexOf("/") + 1)) || SECRET_DIR_RE.test(v.replace(/\/+$/, "")))
       return true;
   }
@@ -428,7 +447,7 @@ function pushRule(args, projectDir) {
   let del = false;
   const refs = [];
   for (const a of args) {
-    if (a === "--prune") return "pushDefault";
+    if (a === "--prune" || a === "--all") return "pushDefault";
     if (a === "--mirror" || a === "--force" || a.startsWith("--force-") || a.startsWith("--force="))
       return "force";
     if (/^-[A-Za-z]*f[A-Za-z]*$/.test(a)) return "force";
@@ -452,7 +471,9 @@ function pushRule(args, projectDir) {
   for (const r of refs.slice(1)) {
     const spec = r.replace(/^\+/, "");
     if (spec.startsWith(":")) continue;
-    if (isDefault(spec.slice(spec.lastIndexOf(":") + 1), projectDir)) return "pushDefault";
+    let dst = spec.slice(spec.lastIndexOf(":") + 1);
+    if (dst === "HEAD" || dst === "@") dst = currentBranch(projectDir) ?? dst;
+    if (isDefault(dst, projectDir)) return "pushDefault";
   }
   // No refspec: push.default pushes the current branch.
   if (refs.length <= 1 && !del) {
@@ -465,8 +486,8 @@ function pushRule(args, projectDir) {
 /** True when the command `t` writes, moves or deletes its operand at index `i`. */
 function writesTarget(t, i) {
   const tok = t[i];
-  if (/^\d*>>?/.test(tok) || /^&>>?/.test(tok)) return true;
-  if (/^\d*>>?$|^&>>?$/.test(t[i - 1] ?? "")) return true;
+  if (/^\d*>[>|]?/.test(tok) || /^&>>?/.test(tok)) return true;
+  if (/^\d*>[>|]?$|^&>>?$/.test(t[i - 1] ?? "")) return true;
   const prog = base(t[0]);
   if (
     ["tee", "mv", "rm", "truncate", "touch", "chmod", "chown", "shred", "unlink", "rmdir"].includes(
@@ -480,7 +501,7 @@ function writesTarget(t, i) {
     while (last > 0 && t[last].startsWith("-")) last--;
     return i === last;
   }
-  if (prog === "git") return t.some((x) => x === "rm" || x === "mv");
+  if (prog === "git") return t.some((x) => ["rm", "mv", "checkout", "restore"].includes(x));
   return (
     (prog === "sed" || prog === "perl") &&
     t.some((x) => /^-[A-Za-z]*i/.test(x) || /^--in-place/.test(x))
@@ -548,6 +569,8 @@ function bashRule(t, projectDir) {
   if (prog === "git") {
     const { sub, args: rest, cfg } = gitSub(t);
     if (cfg.some((c) => /^core\.hookspath=/i.test(c))) return "protected";
+    if (sub === "push" && cfg.some((c) => /^(remote\.[^=]*\.push|push\.default)=/i.test(c)))
+      return "pushDefault";
     const alias = cfg
       .map((c) => /^alias\.([^=]+)=(.*)$/i.exec(c))
       .find((m) => m && m[1].toLowerCase() === String(sub).toLowerCase());
@@ -613,17 +636,32 @@ function bashRule(t, projectDir) {
   if (prog === "hoist" && args[0] === "secrets" && args[1] === "exec") {
     const dd = args.indexOf("--");
     const inner = dd >= 0 ? args.slice(dd + 1) : args.slice(2);
-    const first = base(inner[0] ?? "");
+    const it = stripPrefixes(inner);
+    const SHELLISH = [
+      "env",
+      "printenv",
+      "export",
+      "set",
+      "declare",
+      "sh",
+      "bash",
+      "zsh",
+      "dash",
+      "ksh",
+    ];
     if (
-      ["env", "printenv", "export", "set", "declare", "sh", "bash", "zsh", "dash", "ksh"].includes(
-        first,
-      ) ||
-      (INTERPRETERS.test(first) && inner.some((a, n) => n > 0 && INLINE_RE.test(a)))
+      inner.slice(0, 4).some((x) => SHELLISH.includes(base(x))) ||
+      (INTERPRETERS.test(base(it[0] ?? "")) && it.some((a, n) => n > 0 && INLINE_RE.test(a))) ||
+      /ENVIRON|environ|process\.env/.test(inner.join(" "))
     )
       return "secret";
   }
   // A token with whitespace is prose (a quoted message or label), not a file name.
-  if (t.some((x) => !/\s/.test(x) && secretLike(x))) return "secret";
+  const firstOperand = t.findIndex((y, m) => m > 0 && !y.startsWith("-"));
+  const files = ["grep", "egrep", "fgrep", "rg", "ag"].includes(prog)
+    ? t.filter((x, n) => n === 0 || x.startsWith("-") || n > firstOperand) // the first operand is the pattern
+    : t;
+  if (files.some((x) => !/\s/.test(x) && secretLike(x))) return "secret";
   for (let i = 0; i < t.length; i++) {
     const x = stripTok(t[i]);
     if (LOCK_RE.test(x) && writesTarget(t, i)) return "lock";

@@ -204,7 +204,7 @@ export function readAnswers(root) {
     }
   };
   return Object.fromEntries(
-    [...text.matchAll(/^([a-z_]+)\s*=\s*(.+?)\s*$/gm)].map((m) => [m[1], parse(m[2])]),
+    [...text.matchAll(/^([a-z_]+)[ \t]*=[ \t]*(.+?)[ \t]*$/gm)].map((m) => [m[1], parse(m[2])]),
   );
 }
 
@@ -512,7 +512,7 @@ export function questions(
       question,
       multiSelect: Boolean(multi),
       answer: answers[id] ?? null,
-      default: AUTO_DEFAULTS[id] ?? null,
+      default: id === "approvals" && late ? "owner" : (AUTO_DEFAULTS[id] ?? null),
       options: options.map(({ templates, ...o }, i) => ({
         ...o,
         recommended: late ? o.value === "owner" : i === 0,

@@ -609,3 +609,52 @@ test("CLI: internal error fails closed for risky text, open otherwise", () => {
   assert.equal(safe.stdout, "");
   assert.equal(safe.stderr.split("\n").filter(Boolean).length, 1);
 });
+
+// Review round: bypasses found after the first pass.
+test("review round: default-branch aliases, wrappers and more secret reads deny", () => {
+  const onMain = repoOn("main");
+  for (const cmd of [
+    "git push origin HEAD",
+    "git push origin @",
+    "git push -u origin HEAD",
+    "git -c remote.origin.push=HEAD:main push",
+    "git -c push.default=matching push",
+    "git push --all",
+    "git push --all origin",
+  ])
+    assert.equal(decide(bash(cmd), onMain)?.decision, "deny", `on main: ${cmd}`);
+  for (const cmd of [
+    "git -c remote.origin.push=HEAD:main push",
+    "git push --all",
+    "echo main | xargs git push origin",
+    "find . -exec git push origin main \\;",
+    "git checkout -- .claude/hooks",
+    "git restore .claude/hooks/guard.mjs",
+    "cat x >| .claude/settings.json",
+    "cat<.env",
+    "cat .e*",
+    "cat .en?",
+    "node -p process.env",
+    "python3 -c 'import os;print(os.environ)'",
+    "hoist secrets exec -- awk 'BEGIN{for(k in ENVIRON) print k}'",
+    "hoist secrets exec -- pnpm exec node -e 'x'",
+    "hoist secrets exec -- pnpm exec env",
+  ])
+    assert.equal(decide(bash(cmd), ctx)?.decision, "deny", cmd);
+  assert.equal(decide(bash("git push origin HEAD"), repoOn("feat/x")), null);
+  assert.equal(decide(bash("git push -u origin HEAD"), repoOn("feat/x")), null);
+});
+
+test("review round: legit commands next to risky words are not denied", () => {
+  for (const cmd of [
+    "node --version && git push -u origin feat",
+    "bash --version; gh pr create --fill",
+    "$PWD/node_modules/.bin/vp build && git push -u origin feat",
+    "grep -r .env docs",
+    "rg .envrc README.md",
+    "node -e 'console.log(process.env.NODE_ENV)'",
+    "python3 -c 'import os;print(os.environ[\"HOME\"])'",
+    "cargo build --release",
+  ])
+    assert.equal(decide(bash(cmd), ctx), null, cmd);
+});
