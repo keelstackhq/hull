@@ -124,13 +124,13 @@ test("AGENTS.md sends local notes to project.md or a package AGENTS.md, not CLAU
   assert.ok(!/below the import/.test(text));
 });
 
-const RIGGING_AGENTS = join(REAL_TEMPLATE, "../rigging/pieces/claude/files/.claude/agents");
+const BASE_AGENTS = join(REAL_TEMPLATE, "pieces/base/files/.claude/agents");
 
-test("base ships .claude/agents byte-identical to rigging's claude piece (owned)", async () => {
+test("base ships the four .claude/agents files (owned, shared with template-rust)", async () => {
   const { dir, result } = await renderCombo(["base", "docs"]);
   for (const [name, file] of AGENTS_LIST) {
     const shipped = readFileSync(join(dir, ".claude/agents", file), "utf8");
-    assert.equal(shipped, readFileSync(join(RIGGING_AGENTS, file), "utf8"), file);
+    assert.equal(shipped, readFileSync(join(BASE_AGENTS, file), "utf8"), file);
     assert.equal(frontmatter(shipped).name, name, file);
     assert.equal(result.changes.find((c) => c.path === `.claude/agents/${file}`)?.class, "owned");
   }
@@ -199,7 +199,7 @@ test("CLAUDE.md: names the shipped subagents and all skills, no manual channel a
 });
 
 test("Explore (rigging): haiku, read-only tools, use proactively", async () => {
-  const fm = frontmatter(readFileSync(join(RIGGING_AGENTS, "explore.md"), "utf8"));
+  const fm = frontmatter(readFileSync(join(BASE_AGENTS, "explore.md"), "utf8"));
   assert.equal(fm.name, "Explore");
   assert.equal(fm.model, "haiku");
   assert.equal(fm.tools, "Read, Grep, Glob");

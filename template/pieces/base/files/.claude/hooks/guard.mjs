@@ -12,14 +12,14 @@
 // else allows and prints one stderr line. Settings deny rules only cover force pushes and publish
 // commands: the guard is the one layer for default-branch pushes and secrets.
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { posix, resolve } from "node:path";
+import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SECRET_SAFE = new Set([".env.example", ".env.sample", ".env.template", ".dev.vars.example"]);
 const MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh", "ash", "fish"]);
 const INTERPRETERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
-const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/;
+const LOCK_RE = /(^|\/)\.splice\/lock\.toml$/i;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", ...EDIT_TOOLS]);
 const TAG_READ_RE =
@@ -32,15 +32,19 @@ const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDE
 const SECRET_DIR_RE =
   /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/[^/]+\/environ$/;
 const PROTECTED_RES = [
-  /(^|\/)\.claude\/hooks(\/|$)/,
-  /(^|\/)\.claude\/settings[^/]*\.json$/,
-  /(^|\/)\.github\/workflows\/release[^/]*\.ya?ml$/,
-  /(^|\/)\.bosun(\/|$)/,
-  /(^|\/)\.claude$/,
+  /(^|\/)\.claude\/hooks(\/|$)/i,
+  /(^|\/)\.claude\/settings[^/]*\.json$/i,
+  /(^|\/)\.github\/workflows\/release[^/]*\.ya?ml$/i,
+  /(^|\/)\.bosun(\/|$)/i,
+  /(^|\/)\.claude$/i,
 ];
-const FAIL_CLOSED_RE = /\.claude\/(hooks|settings)|workflows\/release|\.bosun\/|\.splice\/lock/;
+const FAIL_CLOSED_RE = /\.claude\/(hooks|settings)|workflows\/release|\.bosun\/|\.splice\/lock/i;
 const isProtected = (p) => PROTECTED_RES.some((re) => re.test(p));
-const stripTok = (x) => x.replace(/^\d*[>&]*/, "").replace(/^(of=)?(\.\/)?/, "");
+const stripTok = (x) =>
+  x
+    .replace(/^\d*[>&]*/, "")
+    .replace(/^(of=)?(\.\/)?/, "")
+    .replace(/(.)\/+$/, "$1");
 
 /** Program name without its directory: `/usr/bin/npm` → `npm`. */
 const base = (prog) => String(prog).slice(String(prog).lastIndexOf("/") + 1);
@@ -136,6 +140,11 @@ function split(cmd) {
     } else if (c === "\\" && i + 1 < cmd.length) {
       cur += cmd[++i];
       has = true;
+    } else if (c === "<" && cmd.startsWith("<<<", i)) {
+      endToken(); // a here-string: its word is data fed to the command
+      cur = "<<<";
+      has = true;
+      i += 2;
     } else if (c === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
       const m = /^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|([^\s;&|<>()]+))/.exec(cmd.slice(i));
       if (m) {
@@ -310,6 +319,13 @@ export function commands(cmd) {
       for (const inner of commands(body)) out.push(inner);
     }
     const noArgs = t.slice(1).every((x) => x === "-" || x === "-s") && !seg.docs?.length;
+    // `bash <<< 'cmd'`: the here-string is evaluated.
+    const hs = t.findIndex((x) => x.startsWith("<<<"));
+    if (hs >= 0 && (SHELLS.has(prog) || INTERPRETERS.test(prog))) {
+      const body = t[hs].length > 3 ? t[hs].slice(3) : (t[hs + 1] ?? "");
+      if (SHELLS.has(prog)) for (const inner of commands(body)) out.push(inner);
+      out.push(["@evade", body], ["@evade-exec", body]);
+    }
     if (INTERPRETERS.test(prog)) {
       const i = t.findIndex((x, n) => n > 0 && INLINE_RE.test(x));
       if (i > 0 && t[i + 1] !== undefined) {
@@ -496,6 +512,8 @@ function writesTarget(t, i) {
   )
     return true;
   if (prog === "dd") return tok.startsWith("of=");
+  if (["rsync", "ex", "vi", "vim", "nvim", "ed", "patch"].includes(prog)) return true;
+  if (["awk", "gawk"].includes(prog) && t.includes("inplace")) return true;
   if (["cp", "install", "ln"].includes(prog)) {
     let last = t.length - 1;
     while (last > 0 && t[last].startsWith("-")) last--;
@@ -665,9 +683,27 @@ function bashRule(t, projectDir) {
   for (let i = 0; i < t.length; i++) {
     const x = stripTok(t[i]);
     if (LOCK_RE.test(x) && writesTarget(t, i)) return "lock";
-    if (isProtected(x) && writesTarget(t, i)) return "protected";
+    if (!writesTarget(t, i)) continue;
+    if (isProtected(x)) return "protected";
+    const real = realRel(x, projectDir);
+    if (real && isProtected(real)) return "protected";
   }
   return null;
+}
+
+/** Repo-relative path with symlinks resolved through the deepest existing ancestor, or undefined. */
+function realRel(p, projectDir) {
+  try {
+    let cur = resolve(projectDir, String(p));
+    const tail = [];
+    while (!existsSync(cur) && dirname(cur) !== cur) {
+      tail.unshift(basename(cur));
+      cur = dirname(cur);
+    }
+    return posix.relative(realpathSync(projectDir), join(realpathSync(cur), ...tail));
+  } catch {
+    return undefined;
+  }
 }
 
 function relPath(p, projectDir) {
@@ -704,6 +740,9 @@ export function decide(input, ctx) {
   const rel = relPath(target, ctx.projectDir);
   if (rel === ".splice/lock.toml") return deny("lock");
   if (isProtected(rel)) return deny("protected");
+  const real = realRel(target, ctx.projectDir);
+  if (real === ".splice/lock.toml") return deny("lock");
+  if (real && isProtected(real)) return deny("protected");
   if (ctx.lockText && ownedPaths(ctx.lockText).has(rel)) {
     return { decision: "ask", reason: ownedReason(rel) };
   }

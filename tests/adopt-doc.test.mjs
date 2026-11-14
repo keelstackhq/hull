@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -72,15 +72,6 @@ test("the start checklist sends existing repos to adopt.md", () => {
   assert.match(read("docs/start-checklist.md"), /existing repo.*\(adopt\.md\)/i);
 });
 
-/** True when changelog.d/ holds a fragment (a change not yet folded into CHANGELOG.md). */
-function pendingFragments() {
-  try {
-    return readdirSync(join(ROOT, "changelog.d")).some((n) => n.endsWith(".md"));
-  } catch {
-    return false;
-  }
-}
-
 test("adopt.md's fetch URL is pinned to the CHANGELOG's top version, with a sha256 once it is dated", () => {
   const top = /^## v(\d+\.\d+\.\d+) — (\S+)/m.exec(read("CHANGELOG.md"));
   assert.match(
@@ -88,7 +79,7 @@ test("adopt.md's fetch URL is pinned to the CHANGELOG's top version, with a sha2
     new RegExp(`https://keelstack\\.dev/assess/v${top[1].replaceAll(".", "\\.")}\\.mjs`),
   );
   assert.doesNotMatch(DOC, /keelstack\.dev\/assess(\.mjs|\/latest)/, "never an unpinned URL");
-  if (top[2] !== "unreleased" && !pendingFragments())
+  if (top[2] !== "unreleased")
     assert.doesNotMatch(DOC, /ASSESS_SHA256/, "the release fills in the sha256");
 });
 
@@ -98,17 +89,20 @@ test("adopt.md's sha256 check is the real sha256 of ready.mjs (once filled in)",
     DOC,
   );
   assert.ok(m, "the check-before-run line");
-  if (m[1] === "ASSESS_SHA256") {
-    // The placeholder stands while ready.mjs changed after the last release: fragments in
-    // changelog.d/ are the unreleased changes the release folds into CHANGELOG.md.
-    assert.ok(
-      /^## v\d+\.\d+\.\d+ — unreleased/m.test(read("CHANGELOG.md")) || pendingFragments(),
-      "ASSESS_SHA256 only while a release is pending",
+  if (m[1] === "ASSESS_SHA256") return; // an unreleased top version: the release fills it in
+  // The hosted copy is the released file: hash the tagged ready.mjs, not the working tree's.
+  const top = /^## v(\d+\.\d+\.\d+) — (\S+)/m.exec(read("CHANGELOG.md"));
+  let released;
+  try {
+    released = execFileSync(
+      "git",
+      ["show", `v${top[1]}:template/pieces/base/files/scripts/ready.mjs`],
+      { cwd: ROOT, stdio: ["ignore", "pipe", "ignore"] },
     );
-    return;
+  } catch {
+    return; // no tag in this clone (shallow or untagged): CI with full history checks it
   }
-  const file = read("template/pieces/base/files/scripts/ready.mjs");
-  assert.equal(m[1], createHash("sha256").update(file).digest("hex"));
+  assert.equal(m[1], createHash("sha256").update(released).digest("hex"));
 });
 
 test("adopt.md documents the --assess --json fields in order and names the schema", async () => {

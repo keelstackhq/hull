@@ -422,10 +422,10 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   (subagent line, skills, hooks). Per-instance notes are `<target>/AGENTS.md` (loaded on demand;
   §4.3.3) with a seed `<target>/CLAUDE.md` of `@AGENTS.md`.
 - `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`). `base` ships them
-  again (owned, byte-identical to rigging's `claude` piece, §14, so a plain render has no manual
-  channel step; a test keeps the copies equal). They left `base` in 0.2.0 (`migrations/0.2.0.toml`
-  removes the then-current copies, 0.2.1 also the pre-0.1.0 `explorer.md`); a repo that added
-  rigging's `claude` piece drops it before `splice update`, since both would own the same paths.
+  again (owned; a plain render has no manual channel step). They left `base` in 0.2.0
+  (`migrations/0.2.0.toml` removes the then-current copies, 0.2.1 also the pre-0.1.0 `explorer.md`).
+  Rigging's `claude` piece (§14) keeps its id but is empty ("moved to base"), so a repo that added it
+  has no claim conflict: update the channel first, then the template.
   `docs/agents/index.md` is a seed stub, so the `CLAUDE.md` import resolves before
   `agents-index.mjs` first runs:
 
@@ -662,7 +662,7 @@ upstream.
      `node scripts/agents-index.mjs --check` fails when `docs/agents/index.md` is stale (docs-only
      cost < 1 s).
   3. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
-     `TURBO_VERSION` (= the catalog pin, tracked by the Renovate preset) from the npm registry with
+     `TURBO_VERSION` (= the catalog pin; the Renovate preset does not bump it alone, since the pinned `TURBO_SHA256` must move with it: `splice update` carries version and sha together) from the npm registry with
      `curl` (~1 s; `npx` took ~5-7 s) into `$RUNNER_TEMP` and verifies it against the pinned
      `TURBO_SHA256` before unpacking (no `curl | tar`), then `turbo query affected --tasks lint format:check
      typecheck test build` writes JSON; `node .github/scripts/affected.mjs` [owned] reads it, drops tasks of the root

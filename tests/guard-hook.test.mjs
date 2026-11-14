@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -657,4 +657,44 @@ test("review round: legit commands next to risky words are not denied", () => {
     "cargo build --release",
   ])
     assert.equal(decide(bash(cmd), ctx), null, cmd);
+});
+
+// Orchestrator review round.
+test("protected paths: trailing slash, case, here-strings, rsync/awk/ex writes deny", () => {
+  for (const cmd of [
+    "rm -rf .claude/",
+    "mv .claude/ /tmp/x",
+    "cp -r /tmp/evil/. .claude/",
+    "rm .CLAUDE/hooks/guard.mjs",
+    "echo x > .Claude/Settings.json",
+    "rsync -a /tmp/evil/ .claude/hooks/",
+    "awk -i inplace '{print}' .claude/settings.json",
+    "ex -c 'wq' .claude/settings.json",
+    "vi -c 'wq' .claude/hooks/guard.mjs",
+    "echo x > .SPLICE/lock.toml",
+    "bash <<< 'git push origin main'",
+    'bash -s <<< "npm publish"',
+    "sh <<<'git push -f'",
+    "python3 <<< \"import os; os.system('git push -f')\"",
+  ])
+    assert.equal(decide(bash(cmd), ctx)?.decision, "deny", cmd);
+  for (const cmd of ["bash <<< 'echo hi'", "cat <<< 'git push -f'", "rsync -a src/ dist/"])
+    assert.equal(decide(bash(cmd), ctx), null, cmd);
+});
+
+test("a symlink into a protected dir does not hide the write", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-sym-"));
+  mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+  writeFileSync(join(dir, ".claude/hooks/guard.mjs"), "x\n");
+  symlinkSync(join(dir, ".claude/hooks"), join(dir, "hk"));
+  const c = { projectDir: dir };
+  for (const input of [
+    tool("Edit", { file_path: join(dir, "hk/guard.mjs") }),
+    tool("Write", { file_path: "hk/new.mjs" }),
+    bash("cp /dev/null hk/guard.mjs"),
+    bash("unlink hk/guard.mjs"),
+    bash("echo x > hk/guard.mjs"),
+  ])
+    assert.equal(decide(input, c)?.decision, "deny", JSON.stringify(input));
+  assert.equal(decide(tool("Edit", { file_path: "src/a.ts" }), c), null);
 });

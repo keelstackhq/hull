@@ -159,18 +159,16 @@ test("renovate preset groups react, cascivo, sentry and preact", async () => {
   assert.deepEqual(names("preact"), ["preact", "@preact/**"]);
 });
 
-test("preset has a custom manager for the workflow turbo pin", async () => {
+test("preset does not bump the workflow turbo pin alone: its sha256 pin would go stale", async () => {
   const p = JSON.parse(
     await readFile(new URL("../renovate/default.json", import.meta.url), "utf8"),
   );
-  const m = p.customManagers.find((x) => x.depNameTemplate === "turbo");
-  assert.equal(m.customType, "regex");
-  assert.equal(m.datasourceTemplate, "npm");
-  assert.deepEqual(m.managerFilePatterns, ["/^\\.github/workflows/.*\\.ya?ml$/"]);
-  const line = "          TURBO_VERSION: 2.11.8";
-  assert.equal(new RegExp(m.matchStrings[0]).exec(line).groups.currentValue, "2.11.8");
+  assert.equal(
+    p.customManagers.find((x) => x.depNameTemplate === "turbo"),
+    undefined,
+  );
   const rule = p.packageRules.find((r) => r.groupName === "turbo");
-  assert.ok(rule.matchPackageNames.includes("turbo"));
+  assert.ok(rule.matchPackageNames.includes("turbo"), "the catalog pin still groups");
 });
 
 test("affected.mjs is an owned plain file", () => {
