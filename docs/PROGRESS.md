@@ -98,6 +98,7 @@ One line per finished task: `YYYY-MM-DD · plan/task · commit · test summary (
 - 2026-11-09 · deps · `chore(deps): vite-plus 1.5.0` · npm view 2026-11-09 (1.5.1 is <3 days old, waits); dogfood base web site docs lib cli rust ok. Container note: put `/usr/bin` first on PATH, else turbo hits ENOEXEC on pnpm 12 shim.
 - 2026-11-12 · release · `docs: release v0.9.0` · CHANGELOG dated (vite-plus 1.5.1, #95); release.yml tags v0.9.0 after the owner approves the `release` environment.
 - 2026-11-12 · deps · `chore(deps): vite-plus 1.5.1` · security release, npm view 2026-11-12 (published 2026-11-09T14:00:53Z, 3 days old at 14:01Z); 1.6.0 (2026-11-11) waits; 1066 tests pass, lint+fmt clean; dogfood base cli docs lib rust rust-circleci rust-circleci-only site web web-circleci web-circleci-only web-secrets ok.
+- 2026-11-14 · release · `docs: release v0.10.0` · CHANGELOG dated (#97: docs-only base/fragments, `deny.local.toml` overlay, ready messages, ci-minutes tests; bosun ≥ 0.15.0 pairing); adopt.md URL v0.10.0 with the real sha256 of ready.mjs (2fb956cb…). Human: host assess/v0.10.0.mjs on keelstack.dev (as v0.9.0); release.yml tags v0.10.0 after the owner approves the `release` environment.
 
 ## Measurements
 
