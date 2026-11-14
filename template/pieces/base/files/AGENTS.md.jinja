@@ -6,30 +6,34 @@ TypeScript, Vite+. Packages live in `apps/*`, `packages/*`, `crates/*`.
 ## Commands
 
 ```bash
-pnpm install        # install (SessionStart runs it too)
+pnpm install        # install
 pnpm check          # lint, format:check, typecheck, test (all packages)
 pnpm run ci         # the CI task list on changed packages (--affected)
 pnpm format         # vp fmt
-pnpm agents:index   # regenerate docs/agents/index.md (after adding a package/doc)
+pnpm agents:index   # regenerate docs/agents/index.md
 ```
 
-Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap tasks in `vp run`.
-`scripts/ci-extra.sh` (seed): repo checks, run last in CI; keep it fast.
+Packages call `vp build/test/lint/fmt/pack` directly (Turbo caches); never `vp run`.
+`scripts/ci-extra.sh` (seed): repo checks, run last in CI; keep fast.
 
 ## Rules
 
-- Test first: failing test, then implement; verify with real output before saying a task is done.
-  Tests: `*.test.ts` beside source, from `vite-plus/test`; one package `pnpm --filter <name> test`.
-- One task per change; small focused files; no drive-by refactors.
+- Test first, then implement; verify with real output before saying done. Tests: `*.test.ts` beside
+  source, from `vite-plus/test`; one package: `pnpm --filter <name> test`.
+- One task per change; no drive-by refactors.
 - Versions: exact pins in the `pnpm-workspace.yaml` catalog; `catalog:` in packages.
 - Template-owned files (configs, workflows, `.claude/`) change via `splice update --all`; local changes go
   in seed files, `docs/agents/project.md` or a package's `AGENTS.md`.
 - Never print, read or commit secrets (`.env*`, keys). Releases are tag pushes by a human: never publish,
-  push tags or push the default branch; open a PR and `gh pr merge --auto`.
+  push tags or push the default branch; use a PR.
 - The guard hook is a rail, not a sandbox: the real fix is a server-side branch ruleset.
 - A hook `ask` is a denial in unattended runs: use the alternative its reason names.
-- At most 2-3 parallel agents on barely overlapping files; note next steps in `docs/agents/project.md`
-  before a long task.
+- At most 2-3 parallel agents on barely overlapping files; note next steps in `docs/agents/project.md`.
+- Sibling package: `"@scope/name": "workspace:*"`, then `pnpm install`.
+
+## Ready for a PR
+
+Branch `feat/<topic>`; commits `feat:`/`fix:`/`docs:`. `pnpm run ci`, one push, `gh pr create`, `gh pr merge --auto`.
 {# One line per piece kind goes here, each in its own if on its piece id. #}{# same-branches #}{% if "preact-app" in pieces %}
 ## Pieces
 {% elif "ui-storybook" in pieces %}
@@ -69,8 +73,8 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 {% endif %}
 ## Where to look
 
-- `docs/agents/project.md`: repo-specific notes; read first, fill its bullets.
-- `docs/agents/index.md`: generated map of commands, packages and docs.{% if "docs" in pieces %}
+- `docs/agents/project.md`: repo-specific notes; read first.
+- `docs/agents/index.md`: generated map: commands, packages, docs.{% if "docs" in pieces %}
 - `docs/agents/docs.md`: how to look up dependency docs.{% endif %}{% if "secrets" in pieces %}
 - `docs/agents/secrets.md`: rules for secrets; never read values.{% endif %}
-- `<dir>/AGENTS.md`: notes for one package.
+- `<dir>/AGENTS.md`: one package's notes.

@@ -7,6 +7,16 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## unreleased
+
+- `AGENTS.md` (seed) gains a "Ready for a PR" section (branch, commit prefixes, `pnpm run ci`,
+  `gh pr create`, `gh pr merge --auto`) and the `workspace:*` rule. **Existing repos do not get it
+  (seed): copy those lines from a fresh render if you want them.**
+- `ready` prints manual items that share one note (gh not logged in) as one line.
+- Upgrade note v0.10.0 to here: `splice update` adds `.claude/agents/*`, a new `guard.mjs`
+  (denies default-branch push, tag push, `gh pr merge` without `--auto`) and the seed
+  `docs/agents/index.md`; the post step `agents-index` fills it. No shared file changes.
+
 ## v0.10.0 — 2026-11-14
 
 - Docs-only CI skip: `changelog.d/**` counts as docs (`docs/progress.d/**` already did); on a pull
