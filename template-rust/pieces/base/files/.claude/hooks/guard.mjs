@@ -6,8 +6,9 @@
 // Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell heredoc
 // is still scanned). `eval`, `sh`/interpreter fed from a pipe, `-c`/`-e` bodies, `$VAR` or `$(...)` in
 // command position and git `-c alias.x=` deny when the text mentions push, publish or release.
-// Known gaps: scripts that publish, editing guarded files from an interpreter, and a default branch
-// that origin/HEAD does not name. Node built-ins only.
+// Known gaps: scripts that publish, editing guarded files from an interpreter, `patch -p1 < x.diff`
+// (the target is inside the diff), `cd` into a guarded dir, and a default branch that origin/HEAD
+// does not name. Node built-ins only.
 // An internal error denies when the call mentions push, publish, release, gh, secret or sops (retry),
 // else allows and prints one stderr line. Settings deny rules only cover force pushes and publish
 // commands: the guard is the one layer for default-branch pushes and secrets.
@@ -512,9 +513,9 @@ function writesTarget(t, i) {
   )
     return true;
   if (prog === "dd") return tok.startsWith("of=");
-  if (["rsync", "ex", "vi", "vim", "nvim", "ed", "patch"].includes(prog)) return true;
+  if (["ex", "vi", "vim", "nvim", "ed", "patch"].includes(prog)) return true;
   if (["awk", "gawk"].includes(prog) && t.includes("inplace")) return true;
-  if (["cp", "install", "ln"].includes(prog)) {
+  if (["cp", "install", "ln", "rsync"].includes(prog)) {
     let last = t.length - 1;
     while (last > 0 && t[last].startsWith("-")) last--;
     return i === last;
@@ -686,6 +687,7 @@ function bashRule(t, projectDir) {
     if (!writesTarget(t, i)) continue;
     if (isProtected(x)) return "protected";
     const real = realRel(x, projectDir);
+    if (real && LOCK_RE.test(real)) return "lock";
     if (real && isProtected(real)) return "protected";
   }
   return null;
@@ -738,10 +740,10 @@ export function decide(input, ctx) {
   const target = targetPath(ti);
   if (typeof target !== "string" || !target) return null;
   const rel = relPath(target, ctx.projectDir);
-  if (rel === ".splice/lock.toml") return deny("lock");
+  if (LOCK_RE.test(rel)) return deny("lock");
   if (isProtected(rel)) return deny("protected");
   const real = realRel(target, ctx.projectDir);
-  if (real === ".splice/lock.toml") return deny("lock");
+  if (real && LOCK_RE.test(real)) return deny("lock");
   if (real && isProtected(real)) return deny("protected");
   if (ctx.lockText && ownedPaths(ctx.lockText).has(rel)) {
     return { decision: "ask", reason: ownedReason(rel) };

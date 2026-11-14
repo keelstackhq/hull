@@ -698,3 +698,16 @@ test("a symlink into a protected dir does not hide the write", () => {
     assert.equal(decide(input, c)?.decision, "deny", JSON.stringify(input));
   assert.equal(decide(tool("Edit", { file_path: "src/a.ts" }), c), null);
 });
+
+test("lock: symlink to it, case variants, and rsync source are handled", () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-lk-"));
+  mkdirSync(join(dir, ".splice"), { recursive: true });
+  writeFileSync(join(dir, ".splice/lock.toml"), "x\n");
+  symlinkSync(join(dir, ".splice/lock.toml"), join(dir, "lk"));
+  const c = { projectDir: dir };
+  assert.equal(decide(bash("echo x > lk"), c)?.decision, "deny");
+  assert.equal(decide(tool("Write", { file_path: ".SPLICE/lock.toml" }), ctx)?.decision, "deny");
+  assert.equal(decide(tool("Edit", { file_path: "lk" }), c)?.decision, "deny");
+  assert.equal(decide(bash("rsync -a .claude/ /tmp/backup/"), ctx), null);
+  assert.equal(decide(bash("rsync -a /tmp/evil/ .claude/hooks/"), ctx)?.decision, "deny");
+});
