@@ -6,9 +6,10 @@
 // Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell heredoc
 // is still scanned). `eval`, `sh`/interpreter fed from a pipe, `-c`/`-e` bodies, `$VAR` or `$(...)` in
 // command position and git `-c alias.x=` deny when the text mentions push, publish or release.
-// Known gaps: scripts that publish, editing guarded files from an interpreter, `patch -p1 < x.diff`
-// (the target is inside the diff), `cd` into a guarded dir, and a default branch that origin/HEAD
-// does not name. Node built-ins only.
+// Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
+// a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
+// piped in (refused) or made by a producer other than `git diff|show|format-patch -- <paths>`
+// (refused), and a default branch that origin/HEAD does not name. Node built-ins only.
 // An internal error denies when the call mentions push, publish, release, gh, secret or sops (retry),
 // else allows and prints one stderr line. Settings deny rules only cover force pushes and publish
 // commands: the guard is the one layer for default-branch pushes and secrets.
@@ -73,7 +74,7 @@ const REASON = {
     "Hidden or indirect push, publish or release is blocked: run the command directly (git push -u origin <feature-branch>) so the guard can see it.",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
   protected:
-    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md.",
+    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md. Use paths from the repo root (no cd, -C, --chdir or --work-tree into guarded dirs) and apply patches from a file in the repo.",
   failClosed:
     "The guard hit an internal error on a push, publish, release or secret call: retry the call; if it keeps failing, ask the human.",
 };
@@ -298,6 +299,7 @@ export function commands(cmd) {
       continue;
     }
     if (seg.docs) t.docs = seg.docs;
+    for (const d of chdirs(seg)) out.push(["@chdir", d]);
     out.push(t);
     const prog = base(t[0]);
     const segText = seg.join(" ");
@@ -548,14 +550,40 @@ function ghApiWrites(args) {
 const ADMIN_API_RE =
   /\/(branches\/[^/\s]+\/protection|rulesets?|environments|actions\/(secrets|variables|permissions)|hooks|keys|collaborators|transfer|rename)\b/;
 
-function bashRule(t, projectDir, cwd = projectDir) {
+const CHDIR_FLAG_RE =
+  /^(?:(?:-[A-Za-z]*[CtdoO]|--chdir|--directory|--work-tree|--prefix|--cwd|--dir|--target-directory|--output|--output-document)(?:=(.*))?|-[A-Za-z]*[CtdoO](.+))$/;
+
+/** Directories a command changes into or writes under with a flag (`env -C`, `tar -xC`, `make -C`,
+ * `--work-tree=`, `cp -t`, `unzip -d`, `curl -o`). */
+function chdirs(tokens) {
+  const out = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const m = CHDIR_FLAG_RE.exec(tokens[i]);
+    if (!m) continue;
+    const v = m[1] ?? m[2] ?? tokens[++i];
+    if (v) out.push(v);
+  }
+  return out;
+}
+
+const dirOf = (cwd, x) => resolve(cwd, stripTok(x));
+
+function bashRule(
+  t,
+  projectDir,
+  cwd = projectDir,
+  chain = { made: new Set(), tainted: new Set() },
+) {
   const prog = base(t[0]);
   const args = t.slice(1);
   if (prog === "@evade") return RISKY_RE.test(t[1]) ? "evasion" : null;
   if (prog === "@evade-exec") return EXEC_RE.test(t[1]) ? "evasion" : null;
-  if (["cd", "pushd"].includes(prog) || (prog === "git" && t.includes("-C"))) {
-    const dirs = prog === "git" ? [t[t.indexOf("-C") + 1]] : args.filter((a) => !a.startsWith("-"));
-    if (dirs.some((d) => d && guardedDir(d, projectDir, cwd))) return "protected";
+  if (prog === "@chdir") return guardedDir(t[1], projectDir, cwd) ? "protected" : null;
+  if (["cd", "pushd"].includes(prog)) {
+    const dirs = args.filter((a) => !a.startsWith("-"));
+    // `cd "$(echo .claude)"`, `cd $X`: the target is unknown, so it is refused.
+    if (dirs.some((d) => d && (/[$`]/.test(d) || guardedDir(d, projectDir, cwd))))
+      return "protected";
   }
   if (prog === "patch" || (prog === "git" && gitSub(t).sub === "apply")) {
     // The diff names the files it writes: read it (file operand, <redirect or heredoc). Piped or
@@ -563,6 +591,12 @@ function bashRule(t, projectDir, cwd = projectDir) {
     const texts = [...(t.docs ?? [])];
     let read = texts.length > 0;
     for (const f of args.map((x) => x.replace(/^<+/, "")).filter((x) => x && !x.startsWith("-"))) {
+      const abs = dirOf(cwd, f);
+      if (chain.made.has(abs)) {
+        read = true; // written earlier in this chain by git diff: the repo's own changes
+        continue;
+      }
+      if (chain.tainted.has(abs)) return "protected"; // content made by the chain cannot be read
       try {
         texts.push(readFileSync(resolve(cwd, f), "utf8"));
         read = true;
@@ -721,9 +755,51 @@ const GUARDED_DIR_RE = /^(\.claude(\/hooks)?|\.bosun(\/.*)?|\.github\/workflows)
 /** `cd`/`git -C` into a guarded dir would turn later relative writes into unguarded names. */
 function guardedDir(d, projectDir, cwd) {
   const x = stripTok(d);
+  if (/[*?[{]/.test(x) && globHitsGuarded(x, projectDir, cwd)) return true;
   return [x, realRel(x, projectDir, cwd)].some(
     (r) => r && (GUARDED_DIR_RE.test(r) || isProtected(r) || LOCK_RE.test(r)),
   );
+}
+
+const GUARDED_DIRS = [".claude", ".claude/hooks", ".bosun", ".github/workflows"];
+
+/** True when a glob (`.cla*`, `.?laude`, `.claud{e,x}`) could expand to a guarded dir. */
+function globHitsGuarded(glob, projectDir, cwd) {
+  const rel = relPath(glob, projectDir, cwd).replace(/\/+$/, "");
+  const re = (g) => {
+    let out = "";
+    for (let i = 0; i < g.length; i++) {
+      const c = g[i];
+      if (c === "*") out += g[i + 1] === "*" ? (i++, ".*") : "[^/]*";
+      else if (c === "?") out += "[^/]";
+      else if (c === "[") {
+        const e = g.indexOf("]", i + 2);
+        if (e < 0) out += "\\[";
+        else {
+          out += `[${g.slice(i + 1, e).replace(/^!/, "^")}]`;
+          i = e;
+        }
+      } else if (c === "{") {
+        // stripPrefixes may have cut a trailing `}`: read to the end then
+        const e = g.indexOf("}", i) < 0 ? g.length : g.indexOf("}", i);
+        {
+          out += `(?:${g
+            .slice(i + 1, e)
+            .split(",")
+            .map((a) => a.replace(/[.+^$()|\\]/g, "\\$&"))
+            .join("|")})`;
+          i = e;
+        }
+      } else out += c.replace(/[.+^$()|\\]/g, "\\$&");
+    }
+    return out;
+  };
+  try {
+    const r = new RegExp(`^${re(rel)}$`, "i");
+    return GUARDED_DIRS.some((g) => r.test(g));
+  } catch {
+    return true; // unreadable glob: refuse
+  }
 }
 
 /** True when a unified diff or patch writes a protected path (any `-p` strip level). */
@@ -776,9 +852,11 @@ export function decide(input, ctx) {
   const deny = (key) => ({ decision: "deny", reason: REASON[key] });
   const cwd = [ctx.cwd, input?.cwd].find((x) => typeof x === "string" && x) ?? ctx.projectDir;
   if (name === "Bash") {
+    const chain = { made: new Set(), tainted: new Set() };
     for (const t of commands(ti.command)) {
-      const rule = bashRule(t, ctx.projectDir, cwd);
+      const rule = bashRule(t, ctx.projectDir, cwd, chain);
       if (rule) return deny(rule);
+      noteWrites(t, cwd, chain);
     }
     return null;
   }
@@ -799,6 +877,59 @@ export function decide(input, ctx) {
     return { decision: "ask", reason: ownedReason(rel) };
   }
   return null;
+}
+
+/** True when a git path argument could name a protected file or a dir that holds one. */
+function riskyPathspec(p) {
+  const x = stripTok(p).replace(/^\.\//, "");
+  if (!x || x === "." || /^[:/]|(^|\/)\.\.(\/|$)|[*?[{\\]/.test(x)) return true;
+  const dir = x.replace(/\/+$/, "");
+  return (
+    isProtected(dir) ||
+    isProtected(`${dir}/x`) ||
+    LOCK_RE.test(dir) ||
+    [
+      ".claude/settings.json",
+      ".github/workflows/release.yml",
+      ".bosun/x",
+      ".splice/lock.toml",
+    ].some((s) => s === dir || s.startsWith(`${dir}/`))
+  );
+}
+
+/** A patch the repo itself yields: git diff/show/format-patch with an explicit `--` pathspec that
+ * names no protected path. Plain `diff`, `--no-index`, prefixes and no pathspec are not. */
+function isRepoPatch(t) {
+  if (base(t[0]) !== "git" || !["diff", "show", "format-patch"].includes(gitSub(t).sub))
+    return false;
+  if (t.some((x) => /^--(no-index|src-prefix|dst-prefix|relative)(=|$)/.test(x))) return false;
+  const dd = t.indexOf("--");
+  const specs = dd < 0 ? [] : t.slice(dd + 1).filter((x) => !/^(\d*>|--output)/.test(x));
+  return specs.length > 0 && !specs.some((x) => riskyPathspec(x) || /^\d*>/.test(x));
+}
+
+/** Track files written earlier in a chain: a repo patch (`git diff -- src > f`) is the repo's own
+ * change; any other write leaves content the guard cannot read. */
+function noteWrites(t, cwd, chain) {
+  const repoPatch = isRepoPatch(t);
+  for (let i = 0; i < t.length; i++) {
+    let name = "";
+    if (/^--output=/.test(t[i])) name = t[i].slice(9);
+    else if (writesTarget(t, i) && !t[i].startsWith("-")) name = stripTok(t[i]);
+    else continue;
+    if (!name || /^\d+$/.test(name)) continue;
+    const abs = dirOf(cwd, name);
+    const viaRedirect =
+      /^\d*>/.test(t[i]) || /^\d*>[>|]?$/.test(t[i - 1] ?? "") || t[i].startsWith("--output=");
+    const append = />>/.test(t[i]) || />>$/.test(t[i - 1] ?? "");
+    if (repoPatch && viaRedirect && !append) {
+      chain.made.add(abs);
+      chain.tainted.delete(abs);
+    } else {
+      chain.made.delete(abs);
+      chain.tainted.add(abs);
+    }
+  }
 }
 
 /** True when a call that failed inside the guard still looks like push, publish, release or secrets. */

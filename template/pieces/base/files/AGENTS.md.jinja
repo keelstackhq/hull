@@ -10,7 +10,7 @@ pnpm install        # install (SessionStart runs it too)
 pnpm check          # lint, format:check, typecheck, test (all packages)
 pnpm run ci         # the CI task list on changed packages (--affected)
 pnpm format         # vp fmt
-pnpm agents:index   # regenerate docs/agents/index.md
+pnpm agents:index   # regenerate docs/agents/index.md (after adding a package/doc)
 ```
 
 Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap tasks in `vp run`.
@@ -19,6 +19,7 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 ## Rules
 
 - Test first: failing test, then implement; verify with real output before saying a task is done.
+  Tests: `*.test.ts` beside source, from `vite-plus/test`; one package `pnpm --filter <name> test`.
 - One task per change; small focused files; no drive-by refactors.
 - Versions: exact pins in the `pnpm-workspace.yaml` catalog; `catalog:` in packages.
 - Template-owned files (configs, workflows, `.claude/`) change via `splice update --all`; local changes go
@@ -68,7 +69,7 @@ Packages call `vp build/test/lint/fmt/pack` directly. Turbo caches; never wrap t
 {% endif %}
 ## Where to look
 
-- `docs/agents/project.md`: repo-specific notes; read first.
+- `docs/agents/project.md`: repo-specific notes; read first, fill its bullets.
 - `docs/agents/index.md`: generated map of commands, packages and docs.{% if "docs" in pieces %}
 - `docs/agents/docs.md`: how to look up dependency docs.{% endif %}{% if "secrets" in pieces %}
 - `docs/agents/secrets.md`: rules for secrets; never read values.{% endif %}

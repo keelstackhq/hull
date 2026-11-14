@@ -1,0 +1,1 @@
+- 2026-11-14 · improve-round-3 · `fix(guard): …` chdir variants, glob cd, chain-made git diff patches; combos dogfooded with /usr/bin first on PATH; agent dry run notes in the PR.
