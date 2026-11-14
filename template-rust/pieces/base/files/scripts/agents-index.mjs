@@ -89,7 +89,10 @@ function render(rows, docs, dropped) {
   const parts = [
     HEADER,
     "## Commands",
-    fence("|step|command", COMMANDS.map(([k, v]) => `|${k}|${v}`)),
+    fence(
+      "|step|command",
+      COMMANDS.map(([k, v]) => `|${k}|${v}`),
+    ),
     "## Crates",
     fence("|path|name|targets", rows),
     "## Docs",

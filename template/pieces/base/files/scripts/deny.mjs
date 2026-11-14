@@ -30,7 +30,7 @@ function overlayAllow(local) {
   const body = rest.join("\n");
   const fail = () => {
     throw new Error(
-      "deny.local.toml: only `[licenses]` with `allow = [\"...\"]` is merged; edit deny.toml for the rest",
+      'deny.local.toml: only `[licenses]` with `allow = ["..."]` is merged; edit deny.toml for the rest',
     );
   };
   if (!body) return [];
@@ -43,7 +43,9 @@ function overlayAllow(local) {
 
 /** `deny.toml` text with the overlay's licenses appended to `[licenses] allow`. */
 export function mergeAllow(base, local) {
-  const extra = overlayAllow(local).filter((l) => !quoted(base.match(ALLOW)?.[1] ?? "").includes(l));
+  const extra = overlayAllow(local).filter(
+    (l) => !quoted(base.match(ALLOW)?.[1] ?? "").includes(l),
+  );
   if (extra.length === 0) return base;
   const m = base.match(ALLOW);
   if (!m) throw new Error("deny.toml has no `allow = [...]` list to extend");
