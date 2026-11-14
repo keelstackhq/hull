@@ -72,26 +72,26 @@ test("the start checklist sends existing repos to adopt.md", () => {
   assert.match(read("docs/start-checklist.md"), /existing repo.*\(adopt\.md\)/i);
 });
 
-test("adopt.md's fetch URL is pinned to the CHANGELOG's top version, with a sha256 once it is dated", () => {
-  const top = /^## v(\d+\.\d+\.\d+) — (\S+)/m.exec(read("CHANGELOG.md"));
+/** Newest released (dated) CHANGELOG version: adopt.md pins it, never an `unreleased` one. */
+const releasedTop = () => /^## v(\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})$/m.exec(read("CHANGELOG.md"));
+
+test("adopt.md's fetch URL is pinned to the newest released CHANGELOG version", () => {
+  const top = releasedTop();
+  assert.ok(top, "a dated CHANGELOG heading");
   assert.match(
     DOC,
     new RegExp(`https://keelstack\\.dev/assess/v${top[1].replaceAll(".", "\\.")}\\.mjs`),
   );
   assert.doesNotMatch(DOC, /keelstack\.dev\/assess(\.mjs|\/latest)/, "never an unpinned URL");
-  if (top[2] !== "unreleased")
-    assert.doesNotMatch(DOC, /ASSESS_SHA256/, "the release fills in the sha256");
+  assert.doesNotMatch(DOC, /ASSESS_SHA256/, "no placeholder: adopters would paste it");
 });
 
 test("adopt.md's sha256 check is the real sha256 of ready.mjs (once filled in)", async () => {
   const { createHash } = await import("node:crypto");
-  const m = /^echo "([0-9a-f]{64}|ASSESS_SHA256) {2}\/tmp\/assess\.mjs" \| sha256sum -c$/m.exec(
-    DOC,
-  );
+  const m = /^echo "([0-9a-f]{64}) {2}\/tmp\/assess\.mjs" \| sha256sum -c$/m.exec(DOC);
   assert.ok(m, "the check-before-run line");
-  if (m[1] === "ASSESS_SHA256") return; // an unreleased top version: the release fills it in
   // The hosted copy is the released file: hash the tagged ready.mjs, not the working tree's.
-  const top = /^## v(\d+\.\d+\.\d+) — (\S+)/m.exec(read("CHANGELOG.md"));
+  const top = releasedTop();
   let released;
   try {
     released = execFileSync(
