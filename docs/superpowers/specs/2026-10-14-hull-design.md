@@ -507,8 +507,8 @@ package is `@<scope>/<name>-crate` (the published npm name belongs to `npm-cli`)
 pin), `[[bin]]`, `[lints] workspace = true`, every dependency pinned `=x.y.z` (§7). Scripts, all with
 `-p <name>`, `--locked` where cargo reads the lockfile: `build` `cargo build -p <name> --locked` (a debug
 build: release binaries are built only by the release workflow), `lint` `cargo clippy -p <name>
---all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans
-licenses sources`, `format:check`, `typecheck` `cargo check -p <name> --all-targets --locked`, `test`
+--all-targets --locked -- -D warnings && node ../../scripts/deny.mjs --manifest-path Cargo.toml --config deny.toml check
+bans licenses sources`, `format:check`, `typecheck` `cargo check -p <name> --all-targets --locked`, `test`
 `cargo nextest run -p <name> --locked`. `turbo.json` [owned] extends `//`; every task's inputs name
 `src/**`, `Cargo.toml` and the three root files with `$TURBO_ROOT$` (`Cargo.toml`, `Cargo.lock`,
 `rust-toolchain.toml`), lint/typecheck/test/format also `tests/**`, lint also `deny.toml`; build outputs
@@ -1123,8 +1123,10 @@ circleci-only), no template `[vars]`. hull's `v<semver>` tags version all three 
 
 1. `node scripts/agents-index.mjs --check` (runner's node).
 2. Docs-only early exit: `node .github/scripts/docs-only.mjs` sets `skip=true` only when the
-   `BASE...HEAD` diff is not empty and every path is root `*.md`, `docs/**`, `.claude/**` or
-   `LICENSE*`. Files under `crates/` are never docs, because `include_str!`/`#[doc]` can read them.
+   `BASE...HEAD` diff is not empty and every path is root `*.md`, `docs/**`, `changelog.d/**`,
+   `.claude/**` or `LICENSE*`. On a pull request the checkout is a merge into the current base, so
+   the diff base is `HEAD^1`, not the stale PR base sha (the `template` affected step does the same
+   for `TURBO_SCM_BASE`). Files under `crates/` are never docs, because `include_str!`/`#[doc]` can read them.
    An unknown base or a git error runs everything. All later steps check `skip`.
 3. `rustup toolchain install` (reads `rust-toolchain.toml`), `Swatinem/rust-cache@v2` (key
    `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action`
@@ -1132,7 +1134,8 @@ circleci-only), no template `[vars]`. hull's `v<semver>` tags version all three 
 4. The Rust CI steps, in order. `RUST_CI_STEPS` in `scripts/lib/ci-tasks.mjs` keeps the workflow,
    `AGENTS.md` and dogfood in sync:
    `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`;
-   `cargo deny --locked check bans licenses sources`;
+   `node scripts/deny.mjs --locked check bans licenses sources` (cargo deny with the seed
+   `deny.local.toml` allow list merged into `deny.toml`, so extra licenses survive `splice update`);
    `cargo nextest run --workspace --locked --profile ci`; `cargo test --workspace --doc --locked`
    (nextest does not run doc tests).
 5. `Job duration` against the budget (45 s typical PR, 15 s docs-only).

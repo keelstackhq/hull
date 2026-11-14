@@ -82,11 +82,11 @@ test("template-rust ci.yml without '# step:' lines equals the golden file fixtur
 test("run commands in both providers equal RUST_CI_STEPS", () => {
   const gh = YAML.parse(github)
     .jobs.ci.steps.map((s) => s.run)
-    .filter((r) => r?.startsWith("cargo "));
+    .filter((r) => /^(cargo |node scripts\/deny\.mjs)/.test(r ?? ""));
   assert.deepEqual(gh, [...RUST_CI_STEPS]);
   const cc = YAML.parse(ciOk)
     .steps.map((s) => s.run?.command)
-    .filter((c) => c?.startsWith("cargo "));
+    .filter((c) => /^(cargo |node scripts\/deny\.mjs)/.test(c ?? ""));
   assert.deepEqual(cc, [...RUST_CI_STEPS]);
 });
 

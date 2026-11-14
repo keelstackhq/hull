@@ -65,6 +65,7 @@ Files (owned):
 - `.github/scripts/release-plan.mjs`
 - `scripts/agents-index.mjs`
 - `scripts/ready.mjs`
+- `scripts/deny.mjs`
 - `Cargo.toml`
 - `rust-toolchain.toml`
 - `renovate.json`
@@ -307,6 +308,7 @@ Files (shared):
 
 Files (seed):
 
+- `deny.local.toml`
 - `src/**`
 - `tests/**`
 - `CLAUDE.md`

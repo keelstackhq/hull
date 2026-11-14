@@ -59,7 +59,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Dependency policy
         if: steps.affected.outputs.skip != 'true'
-        run: cargo deny --locked check bans licenses sources
+        run: node scripts/deny.mjs --locked check bans licenses sources
       - name: Tests
         if: steps.affected.outputs.skip != 'true'
         run: cargo nextest run --workspace --locked --profile ci

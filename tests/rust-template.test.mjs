@@ -105,7 +105,9 @@ test("AGENTS.md <= 60 and CLAUDE.md <= 20 lines, for base and the rust combo", a
 
 test("RUST_CI_STEPS parity: ci.yml, AGENTS.md, verify skill and the index list the same steps", async () => {
   const wf = YAML.parse(await ciText());
-  const cargoRuns = wf.jobs.ci.steps.map((s) => s.run).filter((r) => r?.startsWith("cargo "));
+  const cargoRuns = wf.jobs.ci.steps
+    .map((s) => s.run)
+    .filter((r) => /^(cargo |node scripts\/deny\.mjs)/.test(r ?? ""));
   assert.deepEqual(cargoRuns, [...RUST_CI_STEPS]);
   const agents = await readFile(join(BASE, "AGENTS.md.jinja"), "utf8");
   const verify = await readFile(join(BASE, ".claude/skills/verify/SKILL.md"), "utf8");
@@ -114,7 +116,7 @@ test("RUST_CI_STEPS parity: ci.yml, AGENTS.md, verify skill and the index list t
     assert.ok(verify.includes(`${s}\n`), `verify lacks ${s}`);
   }
   assert.deepEqual(
-    indexMod.COMMANDS.map(([, c]) => c).filter((c) => c.startsWith("cargo ")),
+    indexMod.COMMANDS.map(([, c]) => c).filter((c) => /^(cargo |node scripts\/deny\.mjs)/.test(c)),
     [...RUST_CI_STEPS],
   );
 });
@@ -358,4 +360,47 @@ test("base post hooks: Cargo.lock is refreshed minimally on update, never re-res
   assert.ok(
     order.indexOf("cargo update --workspace") < order.indexOf("node scripts/agents-index.mjs"),
   );
+});
+
+test("docs-only: changelog.d and docs/progress.d fragments count as docs (D2)", () => {
+  const { decide, isDoc } = docsOnly;
+  assert.equal(isDoc("changelog.d/123-fix.md"), true);
+  assert.equal(isDoc("docs/progress.d/abc.md"), true);
+  assert.equal(decide(["changelog.d/1.md", "docs/progress.d/2.md"]), true);
+  assert.equal(isDoc("crates/x/changelog.d/1.md"), false);
+});
+
+test("docs-only CLI: on a pull_request merge commit it diffs against HEAD^1, not the stale base (D3)", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "hull-docs-only-merge-"));
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...a], {
+      cwd: repo,
+      encoding: "utf8",
+    }).trim();
+  const script = join(BASE, ".github/scripts/docs-only.mjs");
+  git("init", "-q", "-b", "main");
+  await writeFile(join(repo, "Cargo.toml"), "[workspace]\n");
+  git("add", "-A");
+  git("commit", "-q", "-m", "init");
+  const stale = git("rev-parse", "HEAD");
+  git("checkout", "-q", "-b", "pr");
+  await mkdir(join(repo, "changelog.d"), { recursive: true });
+  await writeFile(join(repo, "changelog.d/1.md"), "x\n");
+  git("add", "-A");
+  git("commit", "-q", "-m", "docs");
+  git("checkout", "-q", "main");
+  await writeFile(join(repo, "Cargo.toml"), "[workspace]\nmembers = []\n");
+  git("commit", "-q", "-am", "code merged meanwhile");
+  git("checkout", "-q", "-b", "merge");
+  git("merge", "-q", "--no-ff", "-m", "merge", "pr");
+  const run = (event) =>
+    execFileSync("node", [script], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, BASE: stale, GITHUB_EVENT_NAME: event },
+    });
+  // HEAD^1 is current main, so only the PR's own docs file differs.
+  assert.equal(run("pull_request"), "skip=true\n");
+  // Other events keep BASE as given: the stale base includes the code change.
+  assert.equal(run("push"), "skip=false\n");
 });

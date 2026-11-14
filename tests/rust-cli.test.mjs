@@ -181,7 +181,7 @@ test("lint runs clippy -D warnings then cargo deny … check … bans licenses s
   const pkg = JSON.parse(await read(dir, "crates/cli/package.json"));
   assert.equal(
     pkg.scripts.lint,
-    "cargo clippy -p cli --all-targets --locked -- -D warnings && cargo deny --manifest-path Cargo.toml --config deny.toml check bans licenses sources",
+    "cargo clippy -p cli --all-targets --locked -- -D warnings && node ../../scripts/deny.mjs --manifest-path Cargo.toml --config deny.toml check bans licenses sources",
   );
 });
 
@@ -364,4 +364,11 @@ test("ci.yml installs the toolchain pinned in rust-toolchain.toml, never @stable
   const cache = steps.find((s) => s.uses?.startsWith("Swatinem/rust-cache@"));
   assert.ok(steps.indexOf(toolchain) < steps.indexOf(cache));
   assert.equal(cache.with.key, "${{ hashFiles('rust-toolchain.toml') }}");
+});
+
+test("lint inputs include deny.local.toml and scripts/deny.mjs, so an overlay change reruns lint", async () => {
+  const { dir } = await renderCombo(PIECES);
+  const t = JSON.parse(await read(dir, "crates/cli/turbo.json"));
+  assert.ok(t.tasks.lint.inputs.includes("deny.local.toml"));
+  assert.ok(t.tasks.lint.inputs.includes("$TURBO_ROOT$/scripts/deny.mjs"));
 });

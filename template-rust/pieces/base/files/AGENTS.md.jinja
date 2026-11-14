@@ -10,7 +10,7 @@ The CI steps, in order (run them all before saying a change is done):
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo deny --locked check bans licenses sources
+node scripts/deny.mjs --locked check bans licenses sources
 cargo nextest run --workspace --locked --profile ci
 cargo test --workspace --doc --locked
 ```

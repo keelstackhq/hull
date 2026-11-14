@@ -7,6 +7,23 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.10.0 — unreleased
+
+- Docs-only CI skip: `changelog.d/**` counts as docs (`docs/progress.d/**` already did); on a pull
+  request the diff base is the first parent of the merge commit (`HEAD^1`) instead of the stale PR
+  base sha, in `template-rust`'s `docs-only.mjs` and the `template` affected step (`TURBO_SCM_BASE`).
+- `scripts/agents-index.mjs` skips `progress.d/` and `changelog.d/`: a fragment no longer changes
+  `docs/agents/index.md`.
+- License overlay: seed `deny.local.toml` (`[licenses] allow = [...]`, `template-rust` root and each
+  `rust-cli` crate) is merged by the new owned `scripts/deny.mjs`, which CI, `lint` and the verify
+  skill now call instead of `cargo deny`. Extra licenses survive `splice update`.
+- `ready` names an unanswered onboarding question, its options and the `--answer id=<value>`
+  command (e.g. a `release` question added by an update).
+- Repos on an older hull that fail bosun's `ci-minutes` gate: `splice update` clears the findings in
+  the owned workflows (current renders are compliant; `docs/updating.md`).
+- Tests of the Actions-minutes rules on every rendered workflow of every combo: D-007 and a port
+  of bosun's `ci-minutes` gate rules (draft guard, `ci-ok`, `ready_for_review`, concurrency, paths).
+
 ## v0.9.0 — 2026-11-12
 
 - `vite-plus` 1.5.1 (with the vite override `@voidzero-dev/vite-plus-core` 1.5.1; security): fixes

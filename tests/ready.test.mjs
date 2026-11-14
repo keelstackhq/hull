@@ -745,3 +745,28 @@ test("template-rust: a secrets.toml fails (no secrets piece) instead of being sk
   assert.equal(r.status, "fail");
   assert.match(r.note, /secrets\.toml/);
 });
+
+test("a missing answer names the new question, its options and the exact answer command (D7)", async () => {
+  const root = await readyRepo();
+  await put(root, "docs/agents/onboarding.toml", ANSWERS.replace(/^update_bot = .*\n/m, ""));
+  const results = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0" });
+  const r = results.find((x) => x.id === "environments");
+  assert.equal(r.status, "ask");
+  assert.match(r.note, /`update_bot`/);
+  assert.match(r.note, /Who opens the weekly splice update PRs\?/);
+  assert.match(r.note, /app \| pat \| session/);
+  assert.match(r.fix, /node scripts\/ready\.mjs --answer update_bot=<app\|pat\|session>/);
+  assert.match(r.fix, /--questions/);
+  const { text } = report(results, "https://x/start-checklist.md");
+  assert.match(text, /question `update_bot`/);
+});
+
+test("every template ships the same ready.mjs and deny.mjs, byte for byte (D6)", () => {
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  for (const rel of ["scripts/ready.mjs", "scripts/deny.mjs"]) {
+    const texts = ["template", "template-rust"].map((t) =>
+      readFileSync(join(root, t, "pieces/base/files", rel), "utf8"),
+    );
+    assert.equal(texts[1], texts[0], `${rel} differs between template and template-rust`);
+  }
+});

@@ -9,7 +9,7 @@ Run, in order, and keep going after a failure so every step reports:
 node scripts/agents-index.mjs --check
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo deny --locked check bans licenses sources
+node scripts/deny.mjs --locked check bans licenses sources
 cargo nextest run --workspace --locked --profile ci
 cargo test --workspace --doc --locked
 ```
