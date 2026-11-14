@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## unreleased
+## v0.10.1 — unreleased
 
 - `AGENTS.md` (seed) gains a "Ready for a PR" section (branch, commit prefixes, `pnpm run ci`,
   `gh pr create`, `gh pr merge --auto`) and the `workspace:*` rule. **Existing repos do not get it
