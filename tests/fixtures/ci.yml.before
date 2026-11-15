@@ -73,7 +73,7 @@ jobs:
         if: steps.affected.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile --prefer-offline
       # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM
-      - uses: keelstackhq/hoard@06291684834e8d8a82b8d3f5e7c9f5677497f4e2 # v0.4.0
+      - uses: keelstackhq/hoard@aa00c826f05dff5230caa7c5f0e2ac0615ebf788 # v0.6.0
         if: steps.affected.outputs.skip != 'true'
       - name: Rust affected?
         id: rust

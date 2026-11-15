@@ -127,6 +127,23 @@ Every other file the template writes is new (`create`). Pieces add more files un
 
 Channels-only repos skip steps 4-9 and start at step 10.
 
+## After `splice adopt`: what trips an existing repo
+
+Rehearsed with splice 0.5.0 on a repo with a root `package.json` and `src/`:
+
+- **Root `package.json` keeps your `name` and `scripts.test`** (the dry-run lists them as `conflict`,
+  and `adopt` exits non-zero). `pnpm test` then stays yours, not `turbo run test`: edit those keys to the template's values
+  if you want Turborepo's. Move root code into `apps/<name>` or
+  `packages/<name>` (each with a `package.json`) so Turborepo runs it: code outside a workspace
+  package passes `pnpm run ci` without being checked at all.
+- **Existing `README.md` is skipped** (seed): nothing to do. `AGENTS.md` is created; copy your old
+  notes into `docs/agents/project.md`.
+- **npm or yarn lockfiles stay**: run `pnpm import` if you want to keep versions, then delete
+  `package-lock.json` or `yarn.lock` and commit `pnpm-lock.yaml`.
+- **Your CI workflow** (`.github/workflows/ci.yml`) is an owned clash: take the template's, or keep
+  yours and rename the job `ci-ok`.
+- `splice adopt` from a local checkout needs `--ref <rev>` when the clone has no version tags.
+
 ## What stays the owner's
 
 - Existing CI the owner keeps: an owned workflow they keep is a refused clash; adopt it with the

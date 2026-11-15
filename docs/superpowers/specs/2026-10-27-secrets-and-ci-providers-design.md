@@ -662,10 +662,10 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    `when` binds honest configs only. Mitigation: the default branch skips every `restore_cache` in
    `ci-ok` and always builds clean; PRs reuse caches that only main (honest config, reviewed) saved;
    binaries are never taken from a cache (the tool rules in §6.4); jobs with secrets never restore
-   a cache or use hoard. **Open:** hoard.yml (byte-pinned vendored v0.4.0) restores `hoard-v1-main~`
-   inside `step: start` with no way to skip it; hoard needs a boolean parameter `restore` (default
-   true) guarding that `restore_cache`, which `ci-ok` would pass as false on the default branch.
-   Accepted until then because no repo uses the `circleci` piece yet and jobs with secrets never use
+   a cache or use hoard. **Open:** hoard.yml (byte-pinned vendored v0.6.0) now has the boolean
+   parameter `restore` (default true) guarding the `hoard-v1-main~` `restore_cache` inside
+   `step: start`; hoard recommends `restore: false` on the default branch (its Trust section), but
+   `ci-ok` still passes the default, so the restore runs on main. Accepted until then because no repo uses the `circleci` piece yet and jobs with secrets never use
    hoard; the step carries `TODO(hoard-restore)` (a test keeps it until the follow-up lands).
 16. The `pipeline.trigger_source` values `scheduled_pipeline` and `api` on GitHub App projects are
    unverified (CAN-1 checks them). The CircleCI `ci` workflow skips `scheduled_pipeline` (so the

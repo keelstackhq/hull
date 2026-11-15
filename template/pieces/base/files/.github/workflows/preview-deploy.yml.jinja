@@ -75,7 +75,7 @@ jobs:
           path: ${{ runner.temp }}/preview
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
-{% endraw %}{% if "secrets" in pieces %}{% raw %}      - uses: keelstackhq/hoist/secrets@24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f # v0.3.0
+{% endraw %}{% if "secrets" in pieces %}{% raw %}      - uses: keelstackhq/hoist/secrets@85cb17573f8a835a577bce1fdaa653ffca5723b1 # v0.5.0
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           PREVIEW_ARTIFACT: ${{ runner.temp }}/preview

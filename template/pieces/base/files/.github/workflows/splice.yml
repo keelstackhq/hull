@@ -39,7 +39,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-workflows: write
-      - uses: keelstackhq/splice/action@a3564c7154a091b9d130cab942cc24e2f8299e51 # v0.4.0
+      - uses: keelstackhq/splice/action@85c95b63f53836301f2405368767c6ae9138109f # v0.5.0
         with:
           scope: all
           token: ${{ steps.app.outputs.token || secrets.SPLICE_BOT_TOKEN || github.token }}

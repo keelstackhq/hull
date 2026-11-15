@@ -69,7 +69,7 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   assert.match(checkout.uses, /^actions\/checkout@/);
   assert.equal(checkout.with["persist-credentials"], false);
   // it receives a token with workflows: write, so it is pinned by commit SHA
-  assert.equal(bot.uses, "keelstackhq/splice/action@a3564c7154a091b9d130cab942cc24e2f8299e51");
+  assert.equal(bot.uses, "keelstackhq/splice/action@85c95b63f53836301f2405368767c6ae9138109f");
   assert.equal(bot.with.scope, "all");
   assert.equal(
     bot.with.token,
@@ -77,10 +77,10 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   );
 });
 
-test("hull ci.yml uses hoard (v0.4.0, SHA-pinned) for the turbo cache before dogfood, without --cache-dir", async () => {
+test("hull ci.yml uses hoard (v0.6.0, SHA-pinned) for the turbo cache before dogfood, without --cache-dir", async () => {
   const steps = await hullCi();
   const i = steps.findIndex((s) => s.uses?.startsWith("keelstackhq/hoard@"));
-  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.4.0, SHA-pinned)");
+  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.6.0, SHA-pinned)");
   assert.equal(steps[i].if, "steps.combos.outputs.args != ''");
   const df = steps.findIndex((s) => s.name === "Dogfood combos");
   assert.ok(i < df, "before dogfood");

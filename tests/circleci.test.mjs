@@ -97,12 +97,12 @@ test("every downloaded binary is pinned and checked with sha256sum -c", async ()
   assert.match(await read("config.yml"), /image: cimg\/base:[\d.]+@sha256:[0-9a-f]{64}/);
 });
 
-test("hoard command is the vendored v0.4.0 reference and is called with its pin", async () => {
+test("hoard command is the vendored v0.6.0 reference and is called with its pin", async () => {
   const hoard = await read("src/commands/hoard.yml");
-  // reference copy from keelstackhq/hoard v0.4.0 (circleci/hoard.yml), byte-identical
+  // reference copy from keelstackhq/hoard v0.6.0 (circleci/hoard.yml), byte-identical
   assert.equal(
     createHash("sha256").update(hoard).digest("hex"),
-    "b9916d9a4133c93900b79a56613d28209a4af4479b7f754be587e6ab09868b77",
+    "a5cab6191933c45f062f28066373ee81fec4bd4cb9b332d86dd6aa101b710ffa",
   );
   const cmd = YAML.parse(hoard);
   assert.deepEqual(cmd.parameters.storage.enum, ["fs", "r2"]);
@@ -113,12 +113,12 @@ test("hoard command is the vendored v0.4.0 reference and is called with its pin"
   const stop = cmd.steps.find((s) => s.when?.condition?.equal?.[0] === "stop").when.steps[0];
   assert.equal(stop.run.when, "always");
   assert.match(stop.run.command, /hoard stop/);
-  // callers: hoard 0.4.0 verified 2026-10-28, linux-x64 musl archive
+  // callers: hoard 0.6.0 verified 2026-11-15, linux-x64 musl archive
   assert.match(
     ciOk,
-    /step: start\n {6}version: 0\.4\.0\n {6}sha256: aade187a9a04f0273c8f382265116d77cba234977141f91aefe2072610a24484/,
+    /step: start\n {6}version: 0\.6\.0\n {6}sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd/,
   );
-  assert.match(ciOk, /step: stop\n {6}version: 0\.4\.0/);
+  assert.match(ciOk, /step: stop\n {6}version: 0\.6\.0/);
 });
 
 test("rendered .circleci/src packs to a well-formed config (structural check)", async () => {
