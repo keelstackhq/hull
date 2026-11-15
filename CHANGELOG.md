@@ -7,10 +7,17 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.12.0 — unreleased
+## v0.12.0 — 2026-11-15
 
 - Docs: `docs/adopt.md` lists what trips an existing repo after `splice adopt` (kept root keys, code
   outside workspaces, lockfiles, CI clash). hull renders and CI-checks with splice 0.5.0.
+- Pins: `keelstackhq/hoard` v0.6.0, `keelstackhq/hoist/secrets` v0.5.0 and `keelstackhq/splice/action`
+  v0.5.0 (SHA-pinned in the generated workflows, `docs/actions.md` and the CI plan).
+- The vendored hoard CircleCI command (`.circleci/src/commands/hoard.yml`) gains a `restore` boolean
+  parameter (default `true`): pass `false` to skip restoring the fs cache on start (default branch;
+  see `docs/circleci.md`, Trust). Existing repos get it with `splice update` (owned file).
+- The Claude Code start checklist makes the janitor routine optional: curator (and notify with Slack)
+  are the default routines; enable `[routines] janitor = true` only if the owner wants it.
 
 ## v0.11.0 — 2026-11-14
 

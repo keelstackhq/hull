@@ -103,6 +103,7 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 - 2026-11-14 · improve-round-2 · `fix(guard): …` cd/patch/find-exec gaps closed, ready output trimmed, stale BUILD_PROMPT removed; tests first. Dogfood "Exec format error" is this container's pnpm shim on PATH, not hull (put /usr/bin first).
 - 2026-11-14 · improve-round-3 · `fix(guard): …` chdir variants, glob cd, chain-made git diff patches; combos dogfooded with /usr/bin first on PATH; agent dry run notes in the PR.
 - 2026-11-14 · release · `release: v0.11.0` · CHANGELOG dated (guard hardening rounds 1-3, PR-ready AGENTS.md, compact `ready`, agents in base; changelog.d and progress.d folded). adopt.md URL v0.11.0 with the real sha256 of ready.mjs. Human: host assess/v0.11.0.mjs on keelstack.dev (as v0.10.0); release.yml tags v0.11.0 after the owner approves the `release` environment.
+- 2026-11-15 · release · `release: v0.12.0` · CHANGELOG dated (adopt notes, hoard 0.6.0, hoist 0.5.0, splice action 0.5.0 pins, hoard CircleCI `restore` param, optional janitor); spec version text fixed. `ready.mjs` unchanged (sha256 same as v0.11.0), adopt.md URL moved to v0.12.0 because a hull test pins the newest release. Human: host assess/v0.12.0.mjs on keelstack.dev; release.yml tags v0.12.0 after the owner approves the `release` environment; a later PR bumps the splice pins to v0.5.1.
 
 ## Measurements
 
