@@ -97,12 +97,12 @@ test("every downloaded binary is pinned and checked with sha256sum -c", async ()
   assert.match(await read("config.yml"), /image: cimg\/base:[\d.]+@sha256:[0-9a-f]{64}/);
 });
 
-test("hoard command is the vendored v0.4.0 reference and is called with its pin", async () => {
+test("hoard command is the vendored v0.6.0 reference and is called with its pin", async () => {
   const hoard = await read("src/commands/hoard.yml");
-  // reference copy from keelstackhq/hoard v0.4.0 (circleci/hoard.yml), byte-identical
+  // reference copy from keelstackhq/hoard v0.6.0 (circleci/hoard.yml), byte-identical
   assert.equal(
     createHash("sha256").update(hoard).digest("hex"),
-    "b9916d9a4133c93900b79a56613d28209a4af4479b7f754be587e6ab09868b77",
+    "a5cab6191933c45f062f28066373ee81fec4bd4cb9b332d86dd6aa101b710ffa",
   );
   const cmd = YAML.parse(hoard);
   assert.deepEqual(cmd.parameters.storage.enum, ["fs", "r2"]);
