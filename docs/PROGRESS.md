@@ -99,6 +99,10 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 - 2026-11-12 · release · `docs: release v0.9.0`
 - 2026-11-12 · deps · `chore(deps): vite-plus 1.5.1`
 - 2026-11-14 · release · `docs: release v0.10.0`
+- 2026-11-14 · audit-v0.10.0 · `fix(guard): …` one PR, 400-line cap waived by the owner · G1-G5, F1-F4, F5/F6, D1, S1/S2 of the v0.10.0 audit (see `changelog.d/guard-hardening.md`). Table tests for every guard form, red first. Spec §6.9/§9 and `docs/start-checklist.md` updated in the same PR. Human: the release must update `docs/adopt.md`'s URL and sha256 for the new `ready.mjs` and host the new assess file; a repo with rigging's `claude` piece updates the channel first, then the template; set the server-side branch ruleset (the guard is a rail, not a sandbox).
+- 2026-11-14 · improve-round-2 · `fix(guard): …` cd/patch/find-exec gaps closed, ready output trimmed, stale BUILD_PROMPT removed; tests first. Dogfood "Exec format error" is this container's pnpm shim on PATH, not hull (put /usr/bin first).
+- 2026-11-14 · improve-round-3 · `fix(guard): …` chdir variants, glob cd, chain-made git diff patches; combos dogfooded with /usr/bin first on PATH; agent dry run notes in the PR.
+- 2026-11-14 · release · `release: v0.11.0` · CHANGELOG dated (guard hardening rounds 1-3, PR-ready AGENTS.md, compact `ready`, agents in base; changelog.d and progress.d folded). adopt.md URL v0.11.0 with the real sha256 of ready.mjs. Human: host assess/v0.11.0.mjs on keelstack.dev (as v0.10.0); release.yml tags v0.11.0 after the owner approves the `release` environment.
 
 ## Measurements
 

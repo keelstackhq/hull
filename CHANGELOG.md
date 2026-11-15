@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.10.1 — unreleased
+## v0.11.0 — 2026-11-14
 
 - `AGENTS.md` (seed) gains a "Ready for a PR" section (branch, commit prefixes, `pnpm run ci`,
   `gh pr create`, `gh pr merge --auto`) and the `workspace:*` rule. **Existing repos do not get it
@@ -16,6 +16,58 @@ Keep `unreleased` while changes accumulate.
 - Upgrade note v0.10.0 to here: `splice update` adds `.claude/agents/*`, a new `guard.mjs`
   (denies default-branch push, tag push, `gh pr merge` without `--auto`) and the seed
   `docs/agents/index.md`; the post step `agents-index` fills it. No shared file changes.
+- Guard hook (`.claude/hooks/guard.mjs`, both templates) hardened from an audit of v0.10.0; every deny
+  names the allowed alternative.
+  - Denies `gh pr merge` unless `--auto`, `gh release`/`secret`/`repo edit|delete`, branch-protection
+    and ruleset `gh api` writes, `gh workflow run release*`, `gh auth token`.
+  - `release` is a publish verb (`pnpm|npm|yarn|bun [run] release`, `cargo release`, `make release|publish`).
+  - Indirection is refused when the text mentions push, publish or release: `eval`, `sh`/interpreter fed
+    from a pipe, `-c`/`-e` bodies, `$VAR` or `$(...)` as the command, `git -c alias.x=`, and the wrappers
+    `setsid`, `ionice`, `stdbuf`, `watch`, `busybox`, `doas` are looked through.
+  - Pushing to the default branch (`main`, `master`, origin/HEAD) is denied in every spelling
+    (`HEAD:main`, `refs/heads/x:refs/heads/main`, bare `git push` while on it, `--prune`), as are
+    `git branch -D|-f|-m main`, `checkout -B`/`switch -C` on it and `reset --hard` while on it.
+  - Secrets: `*.env`, `.envrc`, `*.pem`, `id_*`, `keys.txt`, `.age/`, `~/.aws|.ssh|.config/gh`,
+    `/proc/*/environ`, bare `env`/`printenv`/`export -p`, `echo $…KEY…`, `sops -d`, `age -d`,
+    `hoist secrets exec -- env|printenv|sh`.
+  - Protected files (`.claude/hooks/*`, `.claude/settings*.json`, `release*.yml`, `.splice/lock.toml`,
+    `.bosun/*`) deny Edit/Write and Bash write verbs regardless of the lock; so do `git config
+    core.hooksPath` and `alias.*`.
+  - An internal error denies (retry) when the call mentions push, publish, release, gh or secret;
+    otherwise it still allows.
+- Guard, review round: protected paths match case-insensitively and with trailing slashes, symlinks
+  into them are resolved, here-strings (`bash <<< 'cmd'`) are evaluated, `rsync`, `awk -i inplace`,
+  `ex`/`vi`, `patch` count as writes.
+- Owned-file `ask` names the alternative (`ci.yml` → `scripts/ci-extra.sh`, else `docs/agents/project.md`).
+- `ready` never blocks work: unanswered onboarding questions take defaults (update bot = session,
+  secrets = none, bosun by `.bosun/`, approvals per D-012, ci = github, release = no); only `pieces`
+  and `apps` stay manual; a missing plan is `warn`; manual items print once as one checklist.
+- `base` ships the four subagents (`.claude/agents/*.md`, owned, identical to rigging's `claude`
+  piece) and a seed `docs/agents/index.md` stub, so a plain render has no manual `splice channel add`
+  and `CLAUDE.md`'s index import resolves. `CLAUDE.md` lists every skill, `ready` included. Rigging's `claude`
+  piece is emptied in the same release (same id, no files, "moved to base"), so a repo that added it has
+  no claim conflict: update the channel first (`splice update --channel rigging`), then the template.
+- `settings.json`: no `model` pin; allow `git push`, `git branch|switch|checkout|stash|rebase`,
+  `gh pr create|view|checks`, `gh pr merge --auto`, `gh api`, `node scripts/*` (the guard still denies
+  the dangerous forms).
+- `AGENTS.md` rules trimmed (every session pays for them) and one line says the server-side branch
+  ruleset is the real fix.
+- Renovate preset: the `TURBO_VERSION` regex manager is dropped (it would bump the version without its
+  pinned `TURBO_SHA256`); `splice update` carries version and sha together.
+- Generated `ci.yml`: the turbo tarball is verified with a pinned sha256 (no `curl | tar`) and the job
+  `timeout-minutes` is 10 (was 15).
+- Guard: `cd`/`pushd`/`git -C` into a guarded dir, a persisted `cwd` inside one, `patch` / `git apply`
+  of a diff that names a protected path (or piped, unreadable input) and `find -exec sh -c '<publish>'`
+  no longer bypass the rail. Allowed: `git apply` or `patch` from a readable diff that touches other files.
+- `scripts/ready.mjs`: one `details` line instead of a `see:` line per item (less output per session).
+- Guard: `env -C/--chdir`, `tar -C`, `make -C`, `git --work-tree=`, `--prefix` and a `cd` with glob
+  characters that expands to a guarded dir are treated like `cd`. `git diff > x.diff && git apply -R x.diff`
+  is allowed (a patch the chain generated from the repo); a patch file any other command of the chain wrote
+  is still refused. Protected-path denies say to use paths from the repo root.
+- Guard (review): a chain-made patch is allowed only from `git diff|show|format-patch -- <paths>` with
+  explicit paths that hold no protected file; plain `diff`, `--no-index`, prefixes and a missing pathspec
+  are refused. Clustered `-xC`/`-iC`, `cp -t`, `unzip -d`, `curl -o` and `cd "$(...)"`/`cd $X` into or
+  under a guarded dir are refused.
 
 ## v0.10.0 — 2026-11-14
 

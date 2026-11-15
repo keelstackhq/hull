@@ -1,1 +1,0 @@
-- 2026-11-14 · improve-round-2 · `fix(guard): …` cd/patch/find-exec gaps closed, ready output trimmed, stale BUILD_PROMPT removed; tests first. Dogfood "Exec format error" is this container's pnpm shim on PATH, not hull (put /usr/bin first).
