@@ -465,7 +465,7 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   condition hoard.yml uses); every `restore_cache` in `ci-ok` is skipped on the default branch
   (`not: equal: [main, << pipeline.git.branch >>]`), so main always builds clean and only PRs reuse
   main's caches; **jobs with secrets (deploy, release) never restore a CircleCI cache or use hoard.**
-  pnpm store keyed on `pnpm-lock.yaml`; turbo via hoard `fs` in `~/.cache/hoard`, vendored hoard v0.4.0
+  pnpm store keyed on `pnpm-lock.yaml`; turbo via hoard `fs` in `~/.cache/hoard`, vendored hoard v0.6.0
   command: saves `hoard-v1-main~{{ .Revision }}` and restores the newest `hoard-v1-main~` prefix (P7);
   its restore still runs on main until hoard gains a parameter to skip it (open, §12 item 15). Rust:
   `~/.cargo/registry` and `target/` only (never `~/.cargo/bin`) keyed on the git-ignored file
