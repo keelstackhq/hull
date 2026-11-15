@@ -175,7 +175,10 @@ https://keelstack.dev/docs/greenfield-bosun/. In order:
    `risk-check`, `review-verdict`, `main-open`; then environment `splice-bot` (main only) with
    secret `SPLICE_BOT_TOKEN`, and `gh label create bosun:halt --color B60205`.
 4. Paste bosun's `docs/setup-script.sh` into the Claude Code environment (item 3) and create the
-   Routines (janitor, curator, notify), each hourly: the cloud minimum.
+   Routines: curator and, with Slack, notify, each hourly: the cloud minimum. The janitor is
+   optional: enable `[routines] janitor = true` in .bosun/bosun.toml only if the owner wants it,
+   then create it after confirming with the owner. Without it, `bosun reap` and
+   `bosun budget check` run only when a session runs them.
 
 Optional: `.bosun/approvers.toml` with the orchestrator's public key (role owner), enrolled by an
 R-gov PR the owner approves on GitHub; after that, approvals go through the Claude Code form.
