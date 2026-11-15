@@ -7,6 +7,11 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.12.0 — unreleased
+
+- Docs: `docs/adopt.md` lists what trips an existing repo after `splice adopt` (kept root keys, code
+  outside workspaces, lockfiles, CI clash). hull renders and CI-checks with splice 0.5.0.
+
 ## v0.11.0 — 2026-11-14
 
 - `AGENTS.md` (seed) gains a "Ready for a PR" section (branch, commit prefixes, `pnpm run ci`,
