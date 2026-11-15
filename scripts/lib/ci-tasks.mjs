@@ -100,7 +100,7 @@ const GITHUB_STEPS = [
     id: "turbo-cache",
     github: yml(
       "      # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM",
-      "      - uses: keelstackhq/hoard@06291684834e8d8a82b8d3f5e7c9f5677497f4e2 # v0.4.0",
+      "      - uses: keelstackhq/hoard@aa00c826f05dff5230caa7c5f0e2ac0615ebf788 # v0.6.0",
       `        if: ${notSkipped}`,
     ),
   },
@@ -270,11 +270,11 @@ const CIRCLECI = {
   ),
   "turbo-cache": yml(
     "  # TODO(hoard-restore): pass `restore: false` on the default branch once hoard has it (spec §12 item 15).",
-    "  # hoard 0.4.0, verified 2026-10-28; sha256 is the linux-x64 musl archive",
+    "  # hoard 0.6.0, verified 2026-11-15; sha256 is the linux-x64 musl archive",
     "  - hoard:",
     "      step: start",
-    "      version: 0.4.0",
-    "      sha256: aade187a9a04f0273c8f382265116d77cba234977141f91aefe2072610a24484",
+    "      version: 0.6.0",
+    "      sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd",
   ),
   "rust-affected": yml(
     "  - run:",
@@ -358,7 +358,7 @@ const CIRCLECI = {
   duration: yml(
     "  - hoard:",
     "      step: stop",
-    "      version: 0.4.0",
+    "      version: 0.6.0",
     "  - run:",
     "      name: Job duration",
     "      when: always",

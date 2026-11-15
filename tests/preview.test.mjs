@@ -240,7 +240,7 @@ test("preview-deploy with secrets: hoist secrets action, SHA-pinned, env preview
   assert.equal(withSecrets.jobs.deploy.environment, "preview");
   assert.doesNotMatch(JSON.stringify(withSecrets), /secrets\.CLOUDFLARE/);
   const src = SECRETS_SRC.split("\n").find((l) => l.includes("hoist/secrets@"));
-  assert.match(src, /@24b2dcbcd98ba0f0b8dd228e814bbcf3c7d4319f # v0\.3\.0$/);
+  assert.match(src, /@85cb17573f8a835a577bce1fdaa653ffca5723b1 # v0\.5\.0$/);
 });
 
 test("deployable pieces document previews, not a one-time first deploy", async () => {

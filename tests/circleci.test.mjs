@@ -113,12 +113,12 @@ test("hoard command is the vendored v0.4.0 reference and is called with its pin"
   const stop = cmd.steps.find((s) => s.when?.condition?.equal?.[0] === "stop").when.steps[0];
   assert.equal(stop.run.when, "always");
   assert.match(stop.run.command, /hoard stop/);
-  // callers: hoard 0.4.0 verified 2026-10-28, linux-x64 musl archive
+  // callers: hoard 0.6.0 verified 2026-11-15, linux-x64 musl archive
   assert.match(
     ciOk,
-    /step: start\n {6}version: 0\.4\.0\n {6}sha256: aade187a9a04f0273c8f382265116d77cba234977141f91aefe2072610a24484/,
+    /step: start\n {6}version: 0\.6\.0\n {6}sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd/,
   );
-  assert.match(ciOk, /step: stop\n {6}version: 0\.4\.0/);
+  assert.match(ciOk, /step: stop\n {6}version: 0\.6\.0/);
 });
 
 test("rendered .circleci/src packs to a well-formed config (structural check)", async () => {
