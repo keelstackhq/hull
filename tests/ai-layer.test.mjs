@@ -372,6 +372,33 @@ test("session-start finishes a pinned pnpm whose install.js was skipped (placeho
   assert.match(r.stdout, /session-start: ok/);
 });
 
+test("session-start looks for pinned pnpm tools under XDG_DATA_HOME when PNPM_HOME is unset", async () => {
+  const { dir } = await renderCombo(["base"]);
+  const xdg = await mkdtemp(join(tmpdir(), "hull-xdg-"));
+  const bin = join(xdg, "fake-bin");
+  await mkdir(bin);
+  await writeFile(join(bin, "pnpm"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  const d = join(xdg, "pnpm/.tools/pnpm/12.11.2/node_modules/pnpm");
+  await mkdir(d, { recursive: true });
+  await writeFile(
+    join(d, "pnpm"),
+    "# pnpm's native binary replaces this file during installation\n",
+  );
+  await writeFile(join(d, "install.js"), 'require("fs").writeFileSync("installed", "")\n');
+  const r = spawnSync("/bin/bash", [join(dir, ".claude/hooks/session-start.sh")], {
+    cwd: dir,
+    env: {
+      PATH: `${bin}:${process.env.PATH}`,
+      XDG_DATA_HOME: xdg,
+      HOME: dir,
+      CLAUDE_PROJECT_DIR: dir,
+    },
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0);
+  assert.ok(existsSync(join(d, "installed")), "placeholder under $XDG_DATA_HOME/pnpm is finished");
+});
+
 test("session-start runs repo-local hooks in session-start.d and survives their failure", async () => {
   const { dir } = await renderCombo(["base"]);
   const d = join(dir, ".claude/hooks/session-start.d");

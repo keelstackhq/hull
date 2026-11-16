@@ -7,7 +7,7 @@ if command -v pnpm >/dev/null 2>&1; then
   # A pnpm older than the packageManager pin installs the pinned pnpm under $PNPM_HOME/.tools without
   # running its install.js; its bins stay shebang-less placeholders and turbo execs them directly
   # (ENOEXEC, "Exec format error"). Finish that install.
-  for dir in "${PNPM_HOME:-$HOME/.local/share/pnpm}"/.tools/pnpm/*/node_modules/pnpm; do
+  for dir in "${PNPM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/pnpm}"/.tools/pnpm/*/node_modules/pnpm; do
     [ -f "$dir/install.js" ] || continue
     [ -f "$dir/pnpm" ] || continue
     head -c 32 "$dir/pnpm" | grep -q "^# pnpm's native binary" || continue
