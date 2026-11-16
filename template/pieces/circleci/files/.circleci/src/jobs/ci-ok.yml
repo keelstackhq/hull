@@ -70,12 +70,25 @@ steps:
           key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
           paths: [~/.local/share/pnpm/store]
   # step: turbo-cache
-  # TODO(hoard-restore): pass `restore: false` on the default branch once hoard has it (spec §12 item 15).
   # hoard 0.6.0, verified 2026-11-15; sha256 is the linux-x64 musl archive
-  - hoard:
-      step: start
-      version: 0.6.0
-      sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd
+  - when:
+      condition:
+        equal: [main, << pipeline.git.branch >>]
+      steps:
+      - hoard:
+          step: start
+          version: 0.6.0
+          sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd
+          restore: false
+  - when:
+      condition:
+        not:
+          equal: [main, << pipeline.git.branch >>]
+      steps:
+      - hoard:
+          step: start
+          version: 0.6.0
+          sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd
   # step: rust-affected
   - run:
       name: Rust affected?
