@@ -116,7 +116,7 @@ test("hoard command is the vendored v0.6.0 reference and is called with its pin"
   // callers: hoard 0.6.0 verified 2026-11-15, linux-x64 musl archive
   assert.match(
     ciOk,
-    /step: start\n {6}version: 0\.6\.0\n {6}sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd/,
+    /step: start\n {6,10}version: 0\.6\.0\n {6,10}sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd/,
   );
   assert.match(ciOk, /step: stop\n {6}version: 0\.6\.0/);
 });
@@ -311,13 +311,36 @@ test("cargo-nextest comes from the pinned release tarball, verified unconditiona
   assert.match(lines[dl], /cargo-nextest-0\.9\.148-x86_64-unknown-linux-gnu\.tar\.gz/);
 });
 
-test("the hoard start step carries TODO(hoard-restore) until hoard can skip its restore on main", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const yml = await readFile(
-    new URL("../template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml", import.meta.url),
-    "utf8",
-  );
-  assert.match(yml, /# TODO\(hoard-restore\)[^\n]*\n(?:\s*#[^\n]*\n)*\s*- hoard:\n\s*step: start/);
+test("hoard start skips its restore on the default branch and restores on PRs", () => {
+  assert.doesNotMatch(ciOk, /TODO\(hoard-restore\)/);
+  // Expand ci-ok's `when` blocks for one branch and collect the hoard start calls that run.
+  const starts = (branch) => {
+    const out = [];
+    const holds = (c) =>
+      c.not
+        ? !holds(c.not)
+        : c.equal[1] === "<< pipeline.git.branch >>"
+          ? c.equal[0] === branch
+          : assert.fail(`unexpected condition ${JSON.stringify(c)}`);
+    const walk = (steps) => {
+      for (const step of steps ?? []) {
+        if (step?.hoard?.step === "start") out.push(step.hoard);
+        if (step?.when && holds(step.when.condition)) walk(step.when.steps);
+      }
+    };
+    walk(YAML.parse(ciOk).steps);
+    return out;
+  };
+  const main = starts("main");
+  assert.equal(main.length, 1, "one hoard start on main");
+  assert.equal(main[0].restore, false);
+  const pr = starts("feature");
+  assert.equal(pr.length, 1, "one hoard start on a PR branch");
+  assert.ok(pr[0].restore === undefined || pr[0].restore === true, "PRs restore main's cache");
+  for (const call of [...main, ...pr]) {
+    assert.equal(call.version, "0.6.0");
+    assert.equal(call.sha256, "b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd");
+  }
 });
 
 test("ci-ok.yml runs the ci-extra hook after the affected halt, guarded, last before duration", () => {
