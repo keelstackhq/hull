@@ -688,7 +688,7 @@ upstream.
   4. `pnpm/action-setup` (version from `packageManager`), `actions/setup-node` with
      `node-version-file: .node-version`, `cache: pnpm`.
   5. `pnpm install --frozen-lockfile --prefer-offline`.
-  6. Turbo cache: `uses: keelstackhq/hoard` (v0.6.0, SHA-pinned; since 2026-10-22, hoard 0.1.0): a Turborepo
+  6. Turbo cache: `uses: keelstackhq/hoard` (v0.6.1, SHA-pinned; since 2026-10-22, hoard 0.1.0): a Turborepo
      remote cache in the GitHub Actions cache; it exports `TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`
      for the `turbo run` step. No `actions/cache` step.
   6. Rust (present in the plain `ci.yml`, guarded at runtime by
@@ -954,7 +954,7 @@ heading fails the run. `scripts/release-tag.mjs` decides (`changelogRelease`, `r
   unchanged, the user's dependency kept, the owned file replaced, `splice check` exit 0 at the end.
   Both skip with a message when `SPLICE_BIN` is unset.
 - **hoard 0.1.0** (done 2026-10-22; the Action's moving tag is `v0`, not `v1`): the
-  `actions/cache` turbo step became `uses: keelstackhq/hoard` (SHA-pinned v0.6.0) in the generated `ci.yml` and in
+  `actions/cache` turbo step became `uses: keelstackhq/hoard` (SHA-pinned v0.6.1) in the generated `ci.yml` and in
   hull's CI.
 
 ## 12. Testing

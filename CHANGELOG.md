@@ -17,6 +17,9 @@ Keep `unreleased` while changes accumulate.
 - Base: `session-start.sh` runs `install.js` for a pinned pnpm under `$PNPM_HOME/.tools` (default
   `${XDG_DATA_HOME:-~/.local/share}/pnpm`) whose bin is still the shebang-less placeholder; an older
   pnpm leaves it that way and turbo then fails every task with `Exec format error`.
+- Pins: `keelstackhq/hoard` v0.6.1 (SHA-pinned `4a6d185f` in the generated `ci.yml`, `docs/actions.md`
+  and the CI plan; CircleCI `version` + linux-x64 musl `sha256`). The vendored hoard CircleCI command is
+  unchanged.
 
 ## v0.12.0 — 2026-11-15
 

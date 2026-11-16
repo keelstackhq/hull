@@ -70,15 +70,15 @@ steps:
           key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
           paths: [~/.local/share/pnpm/store]
   # step: turbo-cache
-  # hoard 0.6.0, verified 2026-11-15; sha256 is the linux-x64 musl archive
+  # hoard 0.6.1, verified 2026-11-16; sha256 is the linux-x64 musl archive
   - when:
       condition:
         equal: [main, << pipeline.git.branch >>]
       steps:
       - hoard:
           step: start
-          version: 0.6.0
-          sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd
+          version: 0.6.1
+          sha256: c7702f33f1167919634bdffe0d61aa9cc82b66b5c7bcb4f500eb70bec240bf75
           restore: false
   - when:
       condition:
@@ -87,8 +87,8 @@ steps:
       steps:
       - hoard:
           step: start
-          version: 0.6.0
-          sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd
+          version: 0.6.1
+          sha256: c7702f33f1167919634bdffe0d61aa9cc82b66b5c7bcb4f500eb70bec240bf75
   # step: rust-affected
   - run:
       name: Rust affected?
@@ -172,7 +172,7 @@ steps:
   # step: duration
   - hoard:
       step: stop
-      version: 0.6.0
+      version: 0.6.1
   - run:
       name: Job duration
       when: always

@@ -99,7 +99,7 @@ test("install is frozen and prefer-offline; setup-node caches pnpm", () => {
 
 test("hoard is the turbo remote cache: after install, before turbo run, no actions/cache", () => {
   const i = steps.findIndex((s) => s.uses?.startsWith("keelstackhq/hoard@"));
-  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.6.0, SHA-pinned)");
+  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.6.1, SHA-pinned)");
   assert.match(steps[i].if, /steps\.affected\.outputs\.skip != 'true'/);
   const install = steps.findIndex((s) => s.run?.startsWith("pnpm install"));
   const turbo = steps.findIndex((s) => s.run?.startsWith("pnpm turbo run"));
