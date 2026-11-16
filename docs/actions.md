@@ -21,7 +21,7 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/upload-artifact` | v5.0.0 | `330a01c490aca151604b8cf639adc76d48f6c5d4` |
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
 | `dtolnay/rust-toolchain` | stable branch, 2026-10-28 | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` |
-| `keelstackhq/hoard` | v0.6.0 | `aa00c826f05dff5230caa7c5f0e2ac0615ebf788` |
+| `keelstackhq/hoard` | v0.6.1 | `4a6d185fb73af3d973eaa256a88bc0d02c68b63a` |
 | `keelstackhq/hoist/secrets` | v0.5.0 | `85cb17573f8a835a577bce1fdaa653ffca5723b1` |
 | `keelstackhq/splice/action` | v0.5.0 | `85c95b63f53836301f2405368767c6ae9138109f` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
@@ -48,7 +48,7 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/upload-artifact` | v5.0.0 | `330a01c490aca151604b8cf639adc76d48f6c5d4` |
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` |
 | `dtolnay/rust-toolchain` | stable branch, 2026-10-28 | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` |
-| `keelstackhq/hoard` | v0.6.0 | `aa00c826f05dff5230caa7c5f0e2ac0615ebf788` |
+| `keelstackhq/hoard` | v0.6.1 | `4a6d185fb73af3d973eaa256a88bc0d02c68b63a` |
 | `keelstackhq/hoist/secrets` | v0.5.0 | `85cb17573f8a835a577bce1fdaa653ffca5723b1` |
 | `keelstackhq/splice/action` | v0.5.0 | `85c95b63f53836301f2405368767c6ae9138109f` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
@@ -151,7 +151,7 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
 | `actions/setup-node` | v5.0.0 | `a0853c24544627f65ddf259abe73b1d18a591444` |
 | `dtolnay/rust-toolchain` | stable branch, 2026-10-28 | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` |
-| `keelstackhq/hoard` | v0.6.0 | `aa00c826f05dff5230caa7c5f0e2ac0615ebf788` |
+| `keelstackhq/hoard` | v0.6.1 | `4a6d185fb73af3d973eaa256a88bc0d02c68b63a` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
 | `Swatinem/rust-cache` | v2.9.3 | `d1527c8f67ef9af357290475d4af4b0fab8f12e0` |
 | `taiki-e/install-action` | v2.87.32 | `5488ac5a951645ce95062214902ac4b6bc1a1037` |

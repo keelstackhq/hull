@@ -465,7 +465,7 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   condition hoard.yml uses); every `restore_cache` in `ci-ok` is skipped on the default branch
   (`not: equal: [main, << pipeline.git.branch >>]`), so main always builds clean and only PRs reuse
   main's caches; **jobs with secrets (deploy, release) never restore a CircleCI cache or use hoard.**
-  pnpm store keyed on `pnpm-lock.yaml`; turbo via hoard `fs` in `~/.cache/hoard`, vendored hoard v0.6.0
+  pnpm store keyed on `pnpm-lock.yaml`; turbo via hoard `fs` in `~/.cache/hoard`, vendored hoard v0.6.1
   command: saves `hoard-v1-main~{{ .Revision }}` and restores the newest `hoard-v1-main~` prefix (P7);
   `ci-ok` passes `restore: false` to its `step: start` on main (hoard's Trust rule), so that restore
   runs on PRs only (§12 item 15). Rust:
@@ -663,7 +663,7 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    `when` binds honest configs only. Mitigation: the default branch skips every `restore_cache` in
    `ci-ok` and always builds clean; PRs reuse caches that only main (honest config, reviewed) saved;
    binaries are never taken from a cache (the tool rules in §6.4); jobs with secrets never restore
-   a cache or use hoard. hoard.yml (byte-pinned vendored v0.6.0) has the boolean parameter `restore`
+   a cache or use hoard. hoard.yml (byte-pinned vendored v0.6.1) has the boolean parameter `restore`
    (default true) guarding the `hoard-v1-main~` `restore_cache` inside `step: start`; `ci-ok` calls
    `step: start` twice under the same `when` pair, `restore: false` on main and the default on PRs,
    as hoard's Trust section recommends (a test expands both branches).

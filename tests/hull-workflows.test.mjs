@@ -77,10 +77,10 @@ test("hull splice.yml runs the splice update bot on all sources", async () => {
   );
 });
 
-test("hull ci.yml uses hoard (v0.6.0, SHA-pinned) for the turbo cache before dogfood, without --cache-dir", async () => {
+test("hull ci.yml uses hoard (v0.6.1, SHA-pinned) for the turbo cache before dogfood, without --cache-dir", async () => {
   const steps = await hullCi();
   const i = steps.findIndex((s) => s.uses?.startsWith("keelstackhq/hoard@"));
-  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.6.0, SHA-pinned)");
+  assert.ok(i >= 0, "uses keelstackhq/hoard (v0.6.1, SHA-pinned)");
   assert.equal(steps[i].if, "steps.combos.outputs.args != ''");
   const df = steps.findIndex((s) => s.name === "Dogfood combos");
   assert.ok(i < df, "before dogfood");

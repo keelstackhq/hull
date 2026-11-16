@@ -100,7 +100,7 @@ const GITHUB_STEPS = [
     id: "turbo-cache",
     github: yml(
       "      # Turborepo remote cache in the GitHub Actions cache; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM",
-      "      - uses: keelstackhq/hoard@aa00c826f05dff5230caa7c5f0e2ac0615ebf788 # v0.6.0",
+      "      - uses: keelstackhq/hoard@4a6d185fb73af3d973eaa256a88bc0d02c68b63a # v0.6.1",
       `        if: ${notSkipped}`,
     ),
   },
@@ -203,8 +203,8 @@ const offDefault = (...steps) => [
 const hoardStart = [
   "  - hoard:",
   "      step: start",
-  "      version: 0.6.0",
-  "      sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd",
+  "      version: 0.6.1",
+  "      sha256: c7702f33f1167919634bdffe0d61aa9cc82b66b5c7bcb4f500eb70bec240bf75",
 ];
 const rustOnly = '[ "$RUST" = true ] || exit 0';
 const CIRCLECI = {
@@ -277,7 +277,7 @@ const CIRCLECI = {
   // hoard's Trust rule (docs/circleci.md): the default branch skips the cache restore and builds
   // clean (`restore: false`); PRs restore what main saved (spec §12 item 15).
   "turbo-cache": yml(
-    "  # hoard 0.6.0, verified 2026-11-15; sha256 is the linux-x64 musl archive",
+    "  # hoard 0.6.1, verified 2026-11-16; sha256 is the linux-x64 musl archive",
     ...onDefault(...hoardStart, "      restore: false"),
     ...offDefault(...hoardStart),
   ),
@@ -363,7 +363,7 @@ const CIRCLECI = {
   duration: yml(
     "  - hoard:",
     "      step: stop",
-    "      version: 0.6.0",
+    "      version: 0.6.1",
     "  - run:",
     "      name: Job duration",
     "      when: always",

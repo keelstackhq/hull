@@ -97,9 +97,9 @@ test("every downloaded binary is pinned and checked with sha256sum -c", async ()
   assert.match(await read("config.yml"), /image: cimg\/base:[\d.]+@sha256:[0-9a-f]{64}/);
 });
 
-test("hoard command is the vendored v0.6.0 reference and is called with its pin", async () => {
+test("hoard command is the vendored v0.6.1 reference and is called with its pin", async () => {
   const hoard = await read("src/commands/hoard.yml");
-  // reference copy from keelstackhq/hoard v0.6.0 (circleci/hoard.yml), byte-identical
+  // reference copy from keelstackhq/hoard v0.6.1 (circleci/hoard.yml), byte-identical
   assert.equal(
     createHash("sha256").update(hoard).digest("hex"),
     "a5cab6191933c45f062f28066373ee81fec4bd4cb9b332d86dd6aa101b710ffa",
@@ -113,12 +113,12 @@ test("hoard command is the vendored v0.6.0 reference and is called with its pin"
   const stop = cmd.steps.find((s) => s.when?.condition?.equal?.[0] === "stop").when.steps[0];
   assert.equal(stop.run.when, "always");
   assert.match(stop.run.command, /hoard stop/);
-  // callers: hoard 0.6.0 verified 2026-11-15, linux-x64 musl archive
+  // callers: hoard 0.6.1 verified 2026-11-16, linux-x64 musl archive
   assert.match(
     ciOk,
-    /step: start\n {6,10}version: 0\.6\.0\n {6,10}sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd/,
+    /step: start\n {6,10}version: 0\.6\.1\n {6,10}sha256: c7702f33f1167919634bdffe0d61aa9cc82b66b5c7bcb4f500eb70bec240bf75/,
   );
-  assert.match(ciOk, /step: stop\n {6}version: 0\.6\.0/);
+  assert.match(ciOk, /step: stop\n {6}version: 0\.6\.1/);
 });
 
 test("rendered .circleci/src packs to a well-formed config (structural check)", async () => {
@@ -338,8 +338,8 @@ test("hoard start skips its restore on the default branch and restores on PRs", 
   assert.equal(pr.length, 1, "one hoard start on a PR branch");
   assert.ok(pr[0].restore === undefined || pr[0].restore === true, "PRs restore main's cache");
   for (const call of [...main, ...pr]) {
-    assert.equal(call.version, "0.6.0");
-    assert.equal(call.sha256, "b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd");
+    assert.equal(call.version, "0.6.1");
+    assert.equal(call.sha256, "c7702f33f1167919634bdffe0d61aa9cc82b66b5c7bcb4f500eb70bec240bf75");
   }
 });
 

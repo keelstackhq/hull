@@ -98,7 +98,7 @@ jobs:
         with:
           tool: cargo-nextest@0.9.148,cargo-deny@0.20.2
       # Turborepo remote cache for the combos; exports TURBO_API/TURBO_TOKEN/TURBO_TEAM
-      - uses: keelstackhq/hoard@aa00c826f05dff5230caa7c5f0e2ac0615ebf788 # v0.6.0
+      - uses: keelstackhq/hoard@4a6d185fb73af3d973eaa256a88bc0d02c68b63a # v0.6.1
         if: steps.combos.outputs.args != ''
       - name: Dogfood combos
         if: steps.combos.outputs.args != ''

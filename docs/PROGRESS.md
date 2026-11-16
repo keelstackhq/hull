@@ -107,6 +107,7 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 - 2026-11-16 · hoard-restore · `fix(circleci): hoard skips its cache restore on main` · `restore: false` on main, default on PRs; TODO removed; test expands both branches; spec §6.4/§12.15
 - 2026-11-16 · pnpm-placeholder · `fix(base): session-start finishes a pinned pnpm whose install.js was skipped` · loop over `$PNPM_HOME/.tools/pnpm/*` (XDG fallback), placeholder + XDG tests; reproduced ENOEXEC → ok here; spec §6
 - 2026-11-16 · contract-29 · `docs: contract rule 29 kept keys (sync with splice)` · template-format.md sha256 d59eb700… = splice dfd749c; no renderer change (no lock)
+- 2026-11-16 · hoard-0.6.1 · `chore: pin hoard 0.6.1` · Actions pin 4a6d185f… (tag commit), CircleCI version + linux-x64 musl sha256 c7702f33…; vendored hoard.yml unchanged (blob d61fec53…); gen-ci, golden fixture + workflow sha256 snapshot (pin line only)
 
 ## Measurements
 
