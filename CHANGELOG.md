@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.12.1 — unreleased
+## v0.12.1 — 2026-11-16
 
 - Contract: `docs/template-format.md` gains rule 29 "Kept keys" (the lock records the dotted key
   paths a `json`/`yaml` merge kept as `kept`; `format` stays 1), byte-identical to
