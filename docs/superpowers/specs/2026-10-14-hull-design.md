@@ -460,8 +460,10 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   bytes; agent-layer spec §3.5.
 - `.claude/loop.md`: default `/loop` prompt — run `verify`; fix the first failure; repeat until
   green; then stop and summarise in ≤ 5 lines.
-- `.claude/hooks/session-start.sh`: `pnpm install --prefer-offline` (quiet), then
-  `pnpm exec docspack sync` and `docspack index --repo` if docspack is installed, then runs every
+- `.claude/hooks/session-start.sh`: `pnpm install --prefer-offline` (quiet), then runs `install.js`
+  for each pinned pnpm under `$PNPM_HOME/.tools` whose bin is still the shebang-less placeholder (an
+  older pnpm self-installs the `packageManager` pin without it, and turbo then fails every task with
+  ENOEXEC), then `pnpm exec docspack sync` and `docspack index --repo` if docspack is installed, then runs every
   `.claude/hooks/session-start.d/*.sh` (repo-local, not owned by the template; a failing one is
   reported and ignored), so a repo can add session-start work without editing owned files. Exits 0
   on any failure (never blocks a session), prints one status line plus whatever local hooks print.

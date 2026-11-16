@@ -343,6 +343,35 @@ test("session-start exits 0 even when pnpm is missing", async () => {
   assert.equal(r.stdout.trim().split("\n").length, 1);
 });
 
+test("session-start finishes a pinned pnpm whose install.js was skipped (placeholder bins only)", async () => {
+  const { dir } = await renderCombo(["base"]);
+  const home = await mkdtemp(join(tmpdir(), "hull-pnpm-home-"));
+  const bin = join(home, "fake-bin");
+  await mkdir(bin);
+  await writeFile(join(bin, "pnpm"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  const tool = async (version, head) => {
+    const d = join(home, ".tools/pnpm", version, "node_modules/pnpm");
+    await mkdir(d, { recursive: true });
+    await writeFile(join(d, "pnpm"), `${head}\nexec node bin/pnpm.mjs "$@"\n`);
+    await writeFile(join(d, "install.js"), 'require("fs").writeFileSync("installed", "")\n');
+    return d;
+  };
+  const placeholder = await tool(
+    "12.11.2",
+    "# pnpm's native binary replaces this file during installation (see",
+  );
+  const native = await tool("12.0.0", "\x7fELF native binary stand-in");
+  const r = spawnSync("/bin/bash", [join(dir, ".claude/hooks/session-start.sh")], {
+    cwd: dir,
+    env: { PATH: `${bin}:${process.env.PATH}`, PNPM_HOME: home, CLAUDE_PROJECT_DIR: dir },
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0);
+  assert.ok(existsSync(join(placeholder, "installed")), "placeholder pnpm gets its install.js run");
+  assert.ok(!existsSync(join(native, "installed")), "an installed native pnpm is left alone");
+  assert.match(r.stdout, /session-start: ok/);
+});
+
 test("session-start runs repo-local hooks in session-start.d and survives their failure", async () => {
   const { dir } = await renderCombo(["base"]);
   const d = join(dir, ".claude/hooks/session-start.d");
