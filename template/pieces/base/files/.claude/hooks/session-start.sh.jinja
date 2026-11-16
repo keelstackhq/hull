@@ -4,6 +4,15 @@ cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || true
 status="ok"
 if command -v pnpm >/dev/null 2>&1; then
   pnpm install --prefer-offline --silent >/dev/null 2>&1 || status="install failed"
+  # A pnpm older than the packageManager pin installs the pinned pnpm under $PNPM_HOME/.tools without
+  # running its install.js; its bins stay shebang-less placeholders and turbo execs them directly
+  # (ENOEXEC, "Exec format error"). Finish that install.
+  for dir in "${PNPM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/pnpm}"/.tools/pnpm/*/node_modules/pnpm; do
+    [ -f "$dir/install.js" ] || continue
+    [ -f "$dir/pnpm" ] || continue
+    head -c 32 "$dir/pnpm" | grep -q "^# pnpm's native binary" || continue
+    (cd "$dir" && node install.js) >/dev/null 2>&1 || status="pnpm native install failed"
+  done
 {% if "docs" in pieces %}  if [ -x node_modules/.bin/docspack ]; then
     pnpm exec docspack sync >/dev/null 2>&1 || status="docspack sync failed"
     pnpm exec docspack index --repo >/dev/null 2>&1 || status="docspack index failed"

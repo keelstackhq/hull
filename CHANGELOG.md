@@ -11,6 +11,9 @@ Keep `unreleased` while changes accumulate.
 
 - CircleCI: `ci-ok` passes `restore: false` to hoard's `step: start` on the default branch, so main
   builds clean and only PRs restore main's turbo cache (hoard Trust rule; secrets spec §12 item 15).
+- Base: `session-start.sh` runs `install.js` for a pinned pnpm under `$PNPM_HOME/.tools` (default
+  `${XDG_DATA_HOME:-~/.local/share}/pnpm`) whose bin is still the shebang-less placeholder; an older
+  pnpm leaves it that way and turbo then fails every task with `Exec format error`.
 
 ## v0.12.0 — 2026-11-15
 
