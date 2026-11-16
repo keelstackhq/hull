@@ -200,6 +200,12 @@ const offDefault = (...steps) => [
   "      steps:",
   ...steps.map((l) => `    ${l}`),
 ];
+const hoardStart = [
+  "  - hoard:",
+  "      step: start",
+  "      version: 0.6.0",
+  "      sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd",
+];
 const rustOnly = '[ "$RUST" = true ] || exit 0';
 const CIRCLECI = {
   timer: yml('  - run: echo "export CI_START=$(date +%s)" >> "$BASH_ENV"'),
@@ -268,13 +274,12 @@ const CIRCLECI = {
       "      paths: [~/.local/share/pnpm/store]",
     ),
   ),
+  // hoard's Trust rule (docs/circleci.md): the default branch skips the cache restore and builds
+  // clean (`restore: false`); PRs restore what main saved (spec §12 item 15).
   "turbo-cache": yml(
-    "  # TODO(hoard-restore): pass `restore: false` on the default branch once hoard has it (spec §12 item 15).",
     "  # hoard 0.6.0, verified 2026-11-15; sha256 is the linux-x64 musl archive",
-    "  - hoard:",
-    "      step: start",
-    "      version: 0.6.0",
-    "      sha256: b7216e27d47b64b8c0ff57f237199887a68861523920258d38c26fe140b9d7dd",
+    ...onDefault(...hoardStart, "      restore: false"),
+    ...offDefault(...hoardStart),
   ),
   "rust-affected": yml(
     "  - run:",

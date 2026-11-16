@@ -7,6 +7,11 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.12.1 — unreleased
+
+- CircleCI: `ci-ok` passes `restore: false` to hoard's `step: start` on the default branch, so main
+  builds clean and only PRs restore main's turbo cache (hoard Trust rule; secrets spec §12 item 15).
+
 ## v0.12.0 — 2026-11-15
 
 - Docs: `docs/adopt.md` lists what trips an existing repo after `splice adopt` (kept root keys, code

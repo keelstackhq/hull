@@ -467,7 +467,8 @@ used: no orbs, P8). The bosun channel adds `.circleci/src/jobs/bosun-ok.yml` and
   main's caches; **jobs with secrets (deploy, release) never restore a CircleCI cache or use hoard.**
   pnpm store keyed on `pnpm-lock.yaml`; turbo via hoard `fs` in `~/.cache/hoard`, vendored hoard v0.6.0
   command: saves `hoard-v1-main~{{ .Revision }}` and restores the newest `hoard-v1-main~` prefix (P7);
-  its restore still runs on main until hoard gains a parameter to skip it (open, §12 item 15). Rust:
+  `ci-ok` passes `restore: false` to its `step: start` on main (hoard's Trust rule), so that restore
+  runs on PRs only (§12 item 15). Rust:
   `~/.cargo/registry` and `target/` only (never `~/.cargo/bin`) keyed on the git-ignored file
   `.rust-cache-key` (`rust-v2-{{ checksum ".rust-cache-key" }}`), written by the rust-affected step (docs-only in template-rust): the
   literal `skip` when no Rust work, else a hash of `Cargo.lock` + `rust-toolchain.toml` (either may be
@@ -662,11 +663,10 @@ GitHub minutes in circleci mode: governance runs as today plus ≈ 1 min per pip
    `when` binds honest configs only. Mitigation: the default branch skips every `restore_cache` in
    `ci-ok` and always builds clean; PRs reuse caches that only main (honest config, reviewed) saved;
    binaries are never taken from a cache (the tool rules in §6.4); jobs with secrets never restore
-   a cache or use hoard. **Open:** hoard.yml (byte-pinned vendored v0.6.0) now has the boolean
-   parameter `restore` (default true) guarding the `hoard-v1-main~` `restore_cache` inside
-   `step: start`; hoard recommends `restore: false` on the default branch (its Trust section), but
-   `ci-ok` still passes the default, so the restore runs on main. Accepted until then because no repo uses the `circleci` piece yet and jobs with secrets never use
-   hoard; the step carries `TODO(hoard-restore)` (a test keeps it until the follow-up lands).
+   a cache or use hoard. hoard.yml (byte-pinned vendored v0.6.0) has the boolean parameter `restore`
+   (default true) guarding the `hoard-v1-main~` `restore_cache` inside `step: start`; `ci-ok` calls
+   `step: start` twice under the same `when` pair, `restore: false` on main and the default on PRs,
+   as hoard's Trust section recommends (a test expands both branches).
 16. The `pipeline.trigger_source` values `scheduled_pipeline` and `api` on GitHub App projects are
    unverified (CAN-1 checks them). The CircleCI `ci` workflow skips `scheduled_pipeline` (so the
    weekly desktop pipeline does not run `ci-ok` or save caches on main); the desktop workflow runs
