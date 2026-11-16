@@ -106,6 +106,7 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 - 2026-11-15 · release · `release: v0.12.0` · CHANGELOG dated (adopt notes, hoard 0.6.0, hoist 0.5.0, splice action 0.5.0 pins, hoard CircleCI `restore` param, optional janitor); spec version text fixed. `ready.mjs` unchanged (sha256 same as v0.11.0), adopt.md URL moved to v0.12.0 because a hull test pins the newest release. Human: host assess/v0.12.0.mjs on keelstack.dev; release.yml tags v0.12.0 after the owner approves the `release` environment; a later PR bumps the splice pins to v0.5.1.
 - 2026-11-16 · hoard-restore · `fix(circleci): hoard skips its cache restore on main` · `restore: false` on main, default on PRs; TODO removed; test expands both branches; spec §6.4/§12.15
 - 2026-11-16 · pnpm-placeholder · `fix(base): session-start finishes a pinned pnpm whose install.js was skipped` · loop over `$PNPM_HOME/.tools/pnpm/*` (XDG fallback), placeholder + XDG tests; reproduced ENOEXEC → ok here; spec §6
+- 2026-11-16 · contract-29 · `docs: contract rule 29 kept keys (sync with splice)` · template-format.md sha256 d59eb700… = splice dfd749c; no renderer change (no lock)
 
 ## Measurements
 

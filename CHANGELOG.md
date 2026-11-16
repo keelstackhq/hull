@@ -9,6 +9,9 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.12.1 — unreleased
 
+- Contract: `docs/template-format.md` gains rule 29 "Kept keys" (the lock records the dotted key
+  paths a `json`/`yaml` merge kept as `kept`; `format` stays 1), byte-identical to
+  keelstackhq/splice dfd749c (D-003). The dev renderer writes no lock, so nothing else changes.
 - CircleCI: `ci-ok` passes `restore: false` to hoard's `step: start` on the default branch, so main
   builds clean and only PRs restore main's turbo cache (hoard Trust rule; secrets spec §12 item 15).
 - Base: `session-start.sh` runs `install.js` for a pinned pnpm under `$PNPM_HOME/.tools` (default
