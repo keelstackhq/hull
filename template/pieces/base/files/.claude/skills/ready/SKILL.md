@@ -11,6 +11,7 @@ Never blocks: start the task, run this beside it.
    `manual` or `skipped`, with the fix step and a link to the item in hull's `docs/start-checklist.md`.
    Onboarding questions have defaults (update bot = session, secrets = none, bosun by `.bosun/`,
    approvals per D-012): do not ask them up front.
+   `bosun` not on PATH (Claude in Slack or cloud): run `npx -y @keelstackhq/bosun@$(cat .bosun/version) <cmd>`.
 2. Print every `manual` item once as one checklist (D-009): mark each phone or computer and say how
    an agent verifies it, computer steps first. Then continue; do not wait for the owner.
 3. Agent steps (`fail`, `warn`): fix them as part of the task (a missing plan is a warning: write

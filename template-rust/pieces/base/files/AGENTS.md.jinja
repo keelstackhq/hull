@@ -23,7 +23,7 @@ Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
 ## Rules
 
 - Test first: failing test, then implement; verify with real output before saying a task is done.
-- One task per change; small focused files; no drive-by refactors.
+- One task per change; small focused files; no drive-by refactors; docs-only PRs need no changelog/progress fragment.
 - Dependencies are exact pins (`=x.y.z`); `--locked` everywhere; no `unsafe` (workspace lint).
 - Template-owned files (configs, workflows, `.claude/`) change via `splice update --all`; local changes go
   in seed files, `docs/agents/project.md` or a crate's `AGENTS.md`.

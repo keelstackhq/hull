@@ -81,6 +81,7 @@ Files (shared):
 
 Files (seed):
 
+- `CHANGELOG.md`
 - `docs/agents/index.md`
 - `AGENTS.md`
 - `docs/agents/onboarding.toml`

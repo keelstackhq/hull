@@ -15,3 +15,4 @@ Distributable CLI in the root Cargo workspace; the binary is named like the crat
 - Pin dependencies `=x.y.z`; run one crate with `-p <crate>`, always `--locked`.
 - Releases: the crate is `publish = false` until a human enables it (`docs/agents/project.md`);
   then hoist's release PR bumps `version`, and merging it releases `dist/<bin>-<target>` binaries.
+- One integration-test binary per crate: add `mod`s under `tests/`, not new top-level `tests/*.rs` files (each links its own binary and slows CI).

@@ -541,7 +541,7 @@ export const CLASH = {
       "packages/shared/tsconfig.json packages/shared/vite.config.ts",
     shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
     seed:
-      "AGENTS.md README.md docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md " +
+      "AGENTS.md CHANGELOG.md README.md docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md " +
       "scripts/ci-pre.sh scripts/ci-extra.sh packages/shared/src/**",
   },
   "template-rust": {
@@ -556,7 +556,7 @@ export const CLASH = {
       "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/ready.mjs",
     shared: "Cargo.toml crates/common/Cargo.toml",
     seed:
-      "AGENTS.md README.md deny.local.toml docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
+      "AGENTS.md CHANGELOG.md README.md deny.local.toml docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
       "scripts/ci-pre.sh scripts/ci-extra.sh crates/common/src/**",
   },
 };
