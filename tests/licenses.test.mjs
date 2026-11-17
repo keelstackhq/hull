@@ -17,6 +17,8 @@ const RUST_SCRIPT = fileURLToPath(
   new URL("../template-rust/pieces/base/files/scripts/licenses.mjs", import.meta.url),
 );
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const { platformBuilds } = await import(SCRIPT);
+const INPUTS = (lock) => [lock, "scripts/licenses.mjs"];
 const FIX = "run `node scripts/licenses.mjs`";
 
 const put = async (root, rel, text) => {
@@ -27,7 +29,8 @@ const lic = (cwd, ...a) => spawnSync("node", [SCRIPT, ...a], { cwd, encoding: "u
 const crate = (name, version, extra = "") =>
   `[package]\nname = "${name}"\nversion = "${version}"\nedition = "2021"\n${extra}`;
 
-// Cargo workspace with path deps outside it (no network): app -> a (MIT) -> c; app -dev-> b (none)
+// Cargo workspace with path deps outside it (no network): app -> a (MIT) -> c -> d (license-file);
+// app -dev-> b (none)
 async function cargoFixture() {
   const d = await mkdtemp(join(tmpdir(), "lic-"));
   const ws = join(d, "ws");
@@ -41,8 +44,14 @@ async function cargoFixture() {
     ),
   );
   await put(d, "b/Cargo.toml", crate("b", "0.1.0"));
-  await put(d, "c/Cargo.toml", crate("c", "0.2.0", 'license = "Apache-2.0 OR MIT"\n'));
-  for (const c of ["a", "b", "c", "ws/crates/app"]) await put(d, `${c}/src/lib.rs`, "");
+  await put(
+    d,
+    "c/Cargo.toml",
+    crate("c", "0.2.0", 'license = "Apache-2.0 OR MIT"\n[dependencies]\nd = { path = "../d" }\n'),
+  );
+  await put(d, "d/Cargo.toml", crate("d", "0.3.0", 'license-file = "LICENSE.txt"\n'));
+  await put(d, "d/LICENSE.txt", "custom\n");
+  for (const c of ["a", "b", "c", "d", "ws/crates/app"]) await put(d, `${c}/src/lib.rs`, "");
   await put(ws, "Cargo.toml", '[workspace]\nmembers = ["crates/*"]\nresolver = "2"\n');
   await put(
     ws,
@@ -67,7 +76,7 @@ test("cargo: every non-member package, sorted, with direct/dev and UNKNOWN repor
     /warning: 1 dependencies declare no license \(listed as UNKNOWN\): b@0\.1\.0/,
   );
   const j = JSON.parse(await readFile(join(ws, "third-party-licenses.json"), "utf8"));
-  assert.deepEqual(Object.keys(j.lockfiles), ["Cargo.lock"]);
+  assert.deepEqual(Object.keys(j.inputs), INPUTS("Cargo.lock"));
   assert.deepEqual(j.packages, [
     {
       ecosystem: "cargo",
@@ -92,6 +101,15 @@ test("cargo: every non-member package, sorted, with direct/dev and UNKNOWN repor
       name: "c",
       version: "0.2.0",
       license: "Apache-2.0 OR MIT",
+      source: "",
+      direct: false,
+      dev: false,
+    },
+    {
+      ecosystem: "cargo",
+      name: "d",
+      version: "0.3.0",
+      license: "LicenseRef-file:LICENSE.txt",
       source: "",
       direct: false,
       dev: false,
@@ -125,6 +143,94 @@ test("--check passes when current, fails naming the command when a lockfile chan
   assert.equal(lic(ws, "--check").status, 1);
 });
 
+test("--check fails when the script changed since the list was written", async () => {
+  const ws = await cargoFixture();
+  await put(ws, "scripts/licenses.mjs", readFileSync(SCRIPT, "utf8"));
+  const run = (...a) =>
+    spawnSync("node", ["scripts/licenses.mjs", ...a], { cwd: ws, encoding: "utf8" });
+  assert.equal(run().status, 0);
+  assert.equal(run("--check").status, 0);
+  await appendFile(join(ws, "scripts/licenses.mjs"), "// changed\n");
+  const r = run("--check");
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /the script changed/);
+});
+
+test("fails, writing nothing, when every license is UNKNOWN (a broken read)", async () => {
+  const d = await mkdtemp(join(tmpdir(), "lic-"));
+  for (const c of ["x", "y"]) {
+    await put(d, `${c}/Cargo.toml`, crate(c, "1.0.0"));
+    await put(d, `${c}/src/lib.rs`, "");
+  }
+  await put(d, "ws/Cargo.toml", '[workspace]\nmembers = ["app"]\nresolver = "2"\n');
+  await put(d, "ws/app/src/lib.rs", "");
+  await put(
+    d,
+    "ws/app/Cargo.toml",
+    crate("app", "0.0.0", '[dependencies]\nx = { path = "../../x" }\ny = { path = "../../y" }\n'),
+  );
+  const ws = join(d, "ws");
+  spawnSync("cargo", ["generate-lockfile", "--offline"], { cwd: ws });
+  const r = lic(ws);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /every cargo license is UNKNOWN/);
+  assert.ok(r.stderr.includes(FIX));
+  assert.equal(lic(ws, "--check").status, 1, "nothing written");
+});
+
+test("npm: fails, writing nothing, when node_modules is missing", async () => {
+  const d = await mkdtemp(join(tmpdir(), "lic-"));
+  await put(d, "pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+  const r = lic(d);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /node_modules is missing: run pnpm install/);
+  assert.equal(lic(d, "--check").status, 1, "nothing written");
+});
+
+test("platformBuilds: cpu/os/libc lockfile packages mapped to their optionalDependencies parent", () => {
+  const lock = [
+    "lockfileVersion: '9.0'",
+    "",
+    "packages:",
+    "",
+    "  '@t/linux-64@2.0.0':",
+    "    resolution: {integrity: sha512-x}",
+    "    cpu: [x64]",
+    "    os: [linux]",
+    "",
+    "  fsevents@2.3.3:",
+    "    resolution: {integrity: sha512-y}",
+    "    os: [darwin]",
+    "",
+    "  only-darwin@1.0.0:",
+    "    resolution: {integrity: sha512-w}",
+    "    os: [darwin]",
+    "",
+    "  t@2.0.0:",
+    "    resolution: {integrity: sha512-z}",
+    "",
+    "snapshots:",
+    "",
+    "  t@2.0.0(peer@1.0.0):",
+    "    dependencies:",
+    "      fsevents-not-optional: 1.0.0",
+    "    optionalDependencies:",
+    "      '@t/linux-64': 2.0.0",
+    "      fsevents: 2.3.3",
+    "",
+    "  '@t/linux-64@2.0.0':",
+    "    optional: true",
+    "",
+  ].join("\r\n");
+  assert.deepEqual(
+    [...platformBuilds(lock)],
+    [
+      ["@t/linux-64@2.0.0", "t"],
+      ["fsevents@2.3.3", "t"],
+    ],
+  );
+});
+
 test("--check passes with no lockfile and no list", async () => {
   const d = await mkdtemp(join(tmpdir(), "lic-"));
   assert.equal(lic(d, "--check").status, 0);
@@ -153,7 +259,7 @@ test("npm: prod and dev deps from pnpm, direct flagged", async () => {
   assert.equal(i.status, 0, i.stderr + i.stdout);
   assert.equal(lic(ws).status, 0);
   const j = JSON.parse(await readFile(join(ws, "third-party-licenses.json"), "utf8"));
-  assert.deepEqual(Object.keys(j.lockfiles), ["pnpm-lock.yaml"]);
+  assert.deepEqual(Object.keys(j.inputs), INPUTS("pnpm-lock.yaml"));
   assert.deepEqual(
     j.packages.map((p) => [p.ecosystem, p.name, p.license, p.direct, p.dev]),
     [
@@ -175,7 +281,10 @@ test("both templates own the script and write the list on new", async () => {
   ]) {
     const base = (await loadTemplate(join(ROOT, dir))).pieces.get("base");
     assert.ok(base.files.owned.includes("scripts/licenses.mjs"), dir);
-    assert.deepEqual(base.post.at(-1), { run: "node scripts/licenses.mjs", when }, dir);
+    assert.ok(
+      base.post.some((p) => p.run === "node scripts/licenses.mjs" && `${p.when}` === `${when}`),
+      dir,
+    );
   }
   // rust pieces change Cargo.lock after base's post may have run; chained in the same post
   // because splice ran an identical command (base's) only once (dogfood cli, 2026-11-17)
@@ -183,7 +292,7 @@ test("both templates own the script and write the list on new", async () => {
     loadTemplate(join(ROOT, dir)).then((t) => t.pieces.get(id).post.map((p) => p.run));
   for (const id of ["rust-tool", "rust-cli"])
     assert.deepEqual(await runs("template", id), [
-      "cargo generate-lockfile && node scripts/licenses.mjs",
+      "cargo generate-lockfile && { node scripts/licenses.mjs || true; }",
       "cargo update --workspace && { node scripts/licenses.mjs || true; }",
     ]);
   assert.deepEqual(await runs("template-rust", "rust-cli"), [

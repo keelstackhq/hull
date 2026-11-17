@@ -2,10 +2,11 @@
 // Writes THIRD_PARTY_LICENSES.md and third-party-licenses.json: the license of every dependency in
 // pnpm-lock.yaml (`pnpm licenses list`, needs `pnpm install`) and Cargo.lock (`cargo metadata`).
 // Sorted, no timestamps: a diff shows only real changes. `--check` needs no install: it exits 1
-// when a lockfile changed since the list was written (the JSON records their sha256).
+// when a lockfile or this script changed since the list was written (the JSON records sha256s).
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const JSON_FILE = "third-party-licenses.json";
 const MD_FILE = "THIRD_PARTY_LICENSES.md";
@@ -15,6 +16,14 @@ const FIX = `run \`node scripts/licenses.mjs\` (after installing) and commit ${M
 const sha = (f) =>
   createHash("sha256").update(readFileSync(f, "utf8").replaceAll("\r\n", "\n")).digest("hex");
 const lockHashes = () => Object.fromEntries(LOCKS.filter(existsSync).map((f) => [f, sha(f)]));
+const inputs = () => ({
+  ...lockHashes(),
+  "scripts/licenses.mjs": sha(fileURLToPath(import.meta.url)),
+});
+const fail = (msg) => {
+  process.stderr.write(`licenses: ${msg}; ${FIX}\n`);
+  process.exit(1);
+};
 // pnpm is a .cmd on Windows, which execFileSync starts only through a shell (args are constant).
 function run(cmd, args) {
   try {
@@ -22,15 +31,42 @@ function run(cmd, args) {
     return execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 1 << 28, shell });
   } catch (e) {
     const why = e.code === "ENOENT" ? "not found" : `failed (${(e.stderr ?? "").trim()})`;
-    process.stderr.write(`licenses: \`${cmd} ${args.join(" ")}\` ${why}; ${FIX}\n`);
-    process.exit(1);
+    fail(`\`${cmd} ${args.join(" ")}\` ${why}`);
   }
 }
 const license = (l) => (typeof l === "string" && l && !/^unknown$/i.test(l) ? l : "UNKNOWN");
 
-// Optional deps are left out: pnpm lists only the installed platform's binaries, which would make
-// the list differ between machines.
+// Platform builds (lockfile `packages` entries with cpu/os/libc) mapped to the package that lists
+// them under `optionalDependencies` in `snapshots`. pnpm installs only this machine's, so they
+// are listed from the lockfile with the parent's license: the same list on every machine.
+export function platformBuilds(text) {
+  const builds = new Map();
+  const parentOf = new Map();
+  let section = "";
+  let key = "";
+  let optional = false;
+  const nameOf = (k) => k.slice(0, k.indexOf("@", 1));
+  for (const line of text.split(/\r?\n/)) {
+    let m;
+    if (/^\S/.test(line)) section = line.replace(/:.*$/, "");
+    else if ((m = /^  '?([^' ][^']*?)'?:$/.exec(line))) [key, optional] = [m[1], false];
+    else if (/^    \S/.test(line)) {
+      optional = line === "    optionalDependencies:";
+      if (section === "packages" && /^    (cpu|os|libc):/.test(line)) builds.set(key, null);
+    } else if (optional && (m = /^      '?([^':]+)'?: ([^(\s]+)/.exec(line))) {
+      const child = `${m[1]}@${m[2]}`;
+      if (!parentOf.has(child)) parentOf.set(child, nameOf(key));
+    }
+  }
+  // no parent (a direct optional dep, an os-restricted dep): pnpm's own entry stays
+  return new Map(
+    [...builds.keys()].filter((k) => parentOf.has(k)).map((k) => [k, parentOf.get(k)]),
+  );
+}
+
 function npmPackages() {
+  if (!existsSync("node_modules/.modules.yaml")) fail("node_modules is missing: run pnpm install");
+  const builds = platformBuilds(readFileSync("pnpm-lock.yaml", "utf8"));
   // direct: name@version from a workspace package's manifest; a local (file:) dep by name
   const direct = new Set();
   const local = new Set();
@@ -40,20 +76,14 @@ function npmPackages() {
         (direct.add(`${n}@${d.version}`), local.add(n));
   const out = new Map();
   for (const dev of [false, true]) {
-    const text = run("pnpm", [
-      "licenses",
-      "list",
-      "--json",
-      "--no-optional",
-      dev ? "--dev" : "--prod",
-    ]);
+    const text = run("pnpm", ["licenses", "list", "--json", dev ? "--dev" : "--prod"]);
     const byLicense = text.trim().startsWith("{") ? JSON.parse(text) : {};
     for (const list of Object.values(byLicense))
       for (const p of list)
         for (const v of p.versions) {
           const version = v ?? "local";
           const key = `${p.name}@${version}`;
-          if (out.has(key)) continue;
+          if (out.has(key) || builds.has(key)) continue;
           const source = p.homepage ?? "";
           const lic = license(p.license);
           out.set(key, {
@@ -66,6 +96,20 @@ function npmPackages() {
             dev,
           });
         }
+  }
+  const byName = new Map([...out.values()].map((p) => [p.name, p]));
+  for (const [key, parent] of builds) {
+    const of = byName.get(parent);
+    const at = key.indexOf("@", 1);
+    out.set(key, {
+      ecosystem: "npm",
+      name: key.slice(0, at),
+      version: key.slice(at + 1),
+      license: of?.license ?? "UNKNOWN",
+      source: `platform build of ${parent}`,
+      direct: false,
+      dev: of?.dev ?? true,
+    });
   }
   return [...out.values()];
 }
@@ -96,7 +140,8 @@ function cargoPackages() {
       ecosystem: "cargo",
       name: p.name,
       version: p.version,
-      license: license(p.license),
+      license:
+        p.license_file && !p.license ? `LicenseRef-file:${p.license_file}` : license(p.license),
       source: p.repository ?? p.source ?? "",
       direct: direct.has(p.id),
       dev: !prod.has(p.id),
@@ -130,15 +175,27 @@ function markdown(locks, packages) {
   ].join("\n");
 }
 
-if (process.argv.includes("--check")) {
+/** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
+const isMain = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (!isMain()) {
+  // imported (tests): export only
+} else if (process.argv.includes("--check")) {
   const locks = lockHashes();
   let recorded = null;
   try {
-    recorded = JSON.parse(readFileSync(JSON_FILE, "utf8")).lockfiles;
+    recorded = JSON.parse(readFileSync(JSON_FILE, "utf8")).inputs;
   } catch {}
   const fresh = Object.keys(locks).length === 0 && recorded === null;
-  if (!fresh && (JSON.stringify(recorded) !== JSON.stringify(locks) || !existsSync(MD_FILE))) {
-    process.stdout.write(`${MD_FILE} is stale (a lockfile changed); ${FIX}\n`);
+  if (!fresh && (JSON.stringify(recorded) !== JSON.stringify(inputs()) || !existsSync(MD_FILE))) {
+    process.stdout.write(`${MD_FILE} is stale (a lockfile or the script changed); ${FIX}\n`);
     process.exitCode = 1;
   }
 } else {
@@ -149,8 +206,14 @@ if (process.argv.includes("--check")) {
   ].sort(
     (a, b) => cmp(a.ecosystem, b.ecosystem) || cmp(a.name, b.name) || cmp(a.version, b.version),
   );
+  // every license UNKNOWN means nothing was read (e.g. a broken install), not a real answer
+  for (const eco of ["npm", "cargo"]) {
+    const list = packages.filter((p) => p.ecosystem === eco);
+    if (list.length > 1 && list.every((p) => p.license === "UNKNOWN"))
+      fail(`every ${eco} license is UNKNOWN; is the install complete?`);
+  }
   const note = `generated by scripts/licenses.mjs; do not edit; ${FIX.replace("run", "to refresh, run")}`;
-  writeFileSync(JSON_FILE, `${JSON.stringify({ note, lockfiles: locks, packages }, null, 2)}\n`);
+  writeFileSync(JSON_FILE, `${JSON.stringify({ note, inputs: inputs(), packages }, null, 2)}\n`);
   writeFileSync(MD_FILE, markdown(locks, packages));
   const unknown = packages.filter((p) => p.license === "UNKNOWN");
   if (unknown.length)

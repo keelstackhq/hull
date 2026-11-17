@@ -109,7 +109,7 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 - 2026-11-16 · contract-29 · `docs: contract rule 29 kept keys (sync with splice)` · template-format.md sha256 d59eb700… = splice dfd749c; no renderer change (no lock)
 - 2026-11-16 · hoard-0.6.1 · `chore: pin hoard 0.6.1` · Actions pin 4a6d185f… (tag commit), CircleCI version + linux-x64 musl sha256 c7702f33…; vendored hoard.yml unchanged (blob d61fec53…); gen-ci, golden fixture + workflow sha256 snapshot (pin line only)
 - 2026-11-16 · release · `release: v0.12.1` · CHANGELOG dated (CircleCI hoard restore skip on main, session-start pnpm placeholder fix, contract rule 29 kept keys, hoard 0.6.1 pin). `ready.mjs` unchanged (sha256 same as v0.12.0), adopt.md URL moved to v0.12.1 (a hull test pins the newest release). Human: host assess/v0.12.1.mjs on keelstack.dev; release.yml tags v0.12.1 after the owner approves the `release` environment.
-- 2026-11-17 · licenses · `feat: third-party licenses list in generated repos` · `scripts/licenses.mjs` (both templates) writes THIRD_PARTY_LICENSES.md + third-party-licenses.json (pnpm licenses / cargo metadata); CI step `licenses` = lockfile sha256 gate (~0.05 s, no install); dogfood base, cli, rust green via splice 0.4.0 (cli: 76 npm + 79 cargo, 0 UNKNOWN; generation 1.4 s)
+- 2026-11-17 · licenses · `feat: third-party licenses list in generated repos` · `scripts/licenses.mjs` (both templates) writes THIRD_PARTY_LICENSES.md + third-party-licenses.json (pnpm licenses / cargo metadata); CI step `licenses` = lockfile sha256 gate (~0.05 s, no install); dogfood base, cli, rust green via splice 0.4.0 (cli: 194 npm incl. 116 platform builds + 79 cargo; 14 UNKNOWN = pnpm's own @pnpm/exe.* builds)
 
 ## Measurements
 

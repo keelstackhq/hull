@@ -11,8 +11,9 @@ Keep `unreleased` while changes accumulate.
 
 - Base (both templates): `scripts/licenses.mjs` writes `THIRD_PARTY_LICENSES.md` and
   `third-party-licenses.json` (license of every npm and cargo dependency, direct/dev flagged,
-  `UNKNOWN` reported) on `new`; CI step `licenses` fails when a lockfile changed since
-  (`node scripts/licenses.mjs` fixes it). Spec `2026-11-17-third-party-licenses-design.md`.
+  `UNKNOWN` reported; platform builds from the lockfile) on `new` and `update` (so splice bot
+  PRs carry it); CI step `licenses` fails when a lockfile or the script changed since
+  (`node scripts/licenses.mjs` fixes it; Renovate PRs need it run). Spec `2026-11-17-third-party-licenses-design.md`.
 
 ## v0.12.1 — 2026-11-16
 

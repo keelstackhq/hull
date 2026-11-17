@@ -26,8 +26,13 @@ when = ["update"]
 run = "node scripts/agents-index.mjs"
 when = ["new", "add", "update"]
 
-# THIRD_PARTY_LICENSES.md + third-party-licenses.json; needs node_modules, so not on update (CI's
-# check names the command).
+# THIRD_PARTY_LICENSES.md + third-party-licenses.json; needs node_modules.
 [[post]]
 run = "node scripts/licenses.mjs"
 when = ["new"]
+
+# The splice bot's PR carries the refreshed list. On failure the script writes nothing and says
+# why; the list stays stale and CI's check names the command, so the update itself still succeeds.
+[[post]]
+run = "pnpm install --frozen-lockfile --ignore-scripts --prefer-offline && node scripts/licenses.mjs || true"
+when = ["update"]

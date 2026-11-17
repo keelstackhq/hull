@@ -17,8 +17,9 @@ seed = ["deny.local.toml", "src/**", "tests/**", "CLAUDE.md"]
 "package.json" = "json"
 
 [[post]]
-# Chained, not a separate post: splice ran an identical command (base's) only once.
-run = "cargo generate-lockfile && node scripts/licenses.mjs"
+# Chained, not a separate post: splice ran an identical command (base's) only once. `|| true`:
+# run before base's pnpm install it fails, writing nothing, and base's own post writes the list.
+run = "cargo generate-lockfile && { node scripts/licenses.mjs || true; }"
 when = ["new"]
 
 [[post]]
