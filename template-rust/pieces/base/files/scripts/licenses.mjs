@@ -46,7 +46,11 @@ export function platformBuilds(text) {
   let key = "";
   let optional = false;
   const nameOf = (k) => k.slice(0, k.indexOf("@", 1));
-  for (const line of text.split(/\r?\n/)) {
+  // the last YAML doc: pnpm 12 puts the packageManager env (pnpm's own builds) in a first one
+  for (const line of text
+    .split(/^---\r?$/m)
+    .at(-1)
+    .split(/\r?\n/)) {
     let m;
     if (/^\S/.test(line)) section = line.replace(/:.*$/, "");
     else if ((m = /^  '?([^' ][^']*?)'?:$/.exec(line))) [key, optional] = [m[1], false];

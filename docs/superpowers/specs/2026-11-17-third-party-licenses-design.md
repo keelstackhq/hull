@@ -19,7 +19,7 @@ of its dependencies' licenses, for when rights are in doubt.
 - **dev/prod**: npm, as pnpm's `--prod`/`--dev` split (prod wins); cargo, a crate is prod when a
   workspace member reaches it without a dev-dependency edge. Workspace members are not listed.
 - **Platform builds** (lockfile `packages` entries with `cpu`/`os`/`libc`: turbo, oxlint, oxfmt,
-  lightningcss, vite-plus bindings, fsevents, …) come from `pnpm-lock.yaml`, not pnpm (which
+  lightningcss, vite-plus bindings, fsevents, …) come from `pnpm-lock.yaml` (its last doc; pnpm 12's env doc is pnpm itself), not pnpm (which
   lists only the installed platform's): the parent's license (the package naming it under
   `optionalDependencies`), source `platform build of <parent>`, so every machine writes the same
   list. Other optional deps come from pnpm. Cargo lists all targets (deterministic).

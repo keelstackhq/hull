@@ -188,7 +188,24 @@ test("npm: fails, writing nothing, when node_modules is missing", async () => {
 });
 
 test("platformBuilds: cpu/os/libc lockfile packages mapped to their optionalDependencies parent", () => {
+  // pnpm 12 writes the packageManager env (pnpm's own builds) as a first YAML doc: not project deps
+  const env = [
+    "---",
+    "packages:",
+    "",
+    "  '@pnpm/exe.linux-x64@12.11.2':",
+    "    os: [linux]",
+    "",
+    "snapshots:",
+    "",
+    "  pnpm@12.11.2:",
+    "    optionalDependencies:",
+    "      '@pnpm/exe.linux-x64': 12.11.2",
+    "",
+    "---",
+  ];
   const lock = [
+    ...env,
     "lockfileVersion: '9.0'",
     "",
     "packages:",
