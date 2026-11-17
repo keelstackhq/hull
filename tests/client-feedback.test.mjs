@@ -48,7 +48,7 @@ test("Rust crate notes: one integration-test binary per crate", async () => {
   const re = /one integration-test binary per crate/i;
   const { dir } = await renderCombo(["base", "rust-tool:tool"]);
   assert.match(await read(dir, "crates/tool/AGENTS.md"), re);
-  const c = await renderCombo(["base", "rust-cli:cli"], { crate: "cli" }).catch(() => null);
-  if (c) assert.match(await read(c.dir, "crates/cli/AGENTS.md"), re);
+  const c = await renderCombo(["base", "rust-cli:cli"]);
+  assert.match(await read(c.dir, "crates/cli/AGENTS.md"), re);
   assert.match(await read(await renderRust(["base", "rust-cli:cli"]), "crates/cli/AGENTS.md"), re);
 });

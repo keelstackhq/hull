@@ -27,7 +27,7 @@ const varsFor = (pieces) => ({
   ...(pieces.includes("secrets") ? { context_prefix: "hullci" } : {}),
 });
 /** Always-loaded bytes ceiling (max measured 4,329: base + rust-cli + npm-cli, with the fragment and test-binary lines, 2026-11-17). */
-const CEILING = 4400;
+const CEILING = 4340;
 
 /** Parse flat `key: value` frontmatter. */
 function frontmatter(text) {

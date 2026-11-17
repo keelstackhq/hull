@@ -12,6 +12,7 @@ This document is the source of truth. The template layout follows the shared con
 ## 1. Goals and non-goals
 
 Goals:
+
 1. Bootstrap a repo by choosing pieces: `splice new gh:keelstackhq/hull//template my-repo`.
 2. Keep generated repos current: owned files are replaced, shared files merged, seed files never touched.
 3. CI in seconds: ≤ 45 s for a typical PR, ≤ 15 s for a docs-only PR, on GitHub's own runners.
@@ -92,11 +93,11 @@ on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, 
 
 ### 4.2 Ownership policy
 
-| Class | What | Examples |
-|---|---|---|
-| `owned` | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `CLAUDE.md`, `<target>/AGENTS.md`, `renovate.json` |
-| `shared` | files both sides edit | root and package `package.json` (json), `turbo.json` (json), `pnpm-workspace.yaml` (yaml), crate `Cargo.toml` (toml), `tauri.conf.json` (json), `wrangler.jsonc` (text: has comments), `docs/packs.json` (json) |
-| `seed` | app source, user docs | `src/**`, `index.html`, `README.md`, root `AGENTS.md` (§14), `docs/agents/project.md`, `<target>/CLAUDE.md`, stories, tests |
+| Class    | What                                         | Examples                                                                                                                                                                                                                   |
+| -------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `owned`  | configs, workflows, AI layer, hull glue code | `vite.config.ts`, `tsconfig.json`, `.github/workflows/*`, `.claude/**`, `CLAUDE.md`, `<target>/AGENTS.md`, `renovate.json`                                                                                                 |
+| `shared` | files both sides edit                        | root and package `package.json` (json), `turbo.json` (json), `pnpm-workspace.yaml` (yaml), crate `Cargo.toml` (toml), `tauri.conf.json` (json), `wrangler.jsonc` (text: has comments), `docs/packs.json` (json)            |
+| `seed`   | app source, user docs                        | `src/**`, `index.html`, `README.md`, root `CHANGELOG.md` (both templates; `## unreleased` heading so bosun's fold-fragments works), root `AGENTS.md` (§14), `docs/agents/project.md`, `<target>/CLAUDE.md`, stories, tests |
 
 The AI layer is owned, except the root `AGENTS.md`, which is seed so that splice channels can
 add sections to it (§14). Project-specific notes for agents go in the seed file
@@ -155,19 +156,19 @@ repo secrets or wrangler vars, not template vars.
 
 ## 6. Pieces
 
-| id | multiple | target | requires | default name |
-|---|---|---|---|---|
-| `base` | no | — (root) | — | — |
-| `preact-app` | yes | `apps/{{ name }}` | base | `web` |
-| `ui-storybook` | no | `packages/ui` | base | — |
-| `astro-site` | yes | `apps/{{ name }}` | base | `site` |
-| `hono-worker` | yes | `apps/{{ name }}` | base | `api` |
-| `rust-tool` | yes | `crates/{{ name }}` | base | `tool` |
-| `rust-cli` | yes | `crates/{{ name }}` | base | `cli` |
-| `tauri-app` | yes | `apps/{{ name }}` | base, preact-app | `desktop` |
-| `ts-lib` | yes | `packages/{{ name }}` | base | `lib` |
-| `npm-cli` | yes | `packages/{{ name }}` | base, rust-cli | `cli` |
-| `docs` | no | — (root) | base | — |
+| id             | multiple | target                | requires         | default name |
+| -------------- | -------- | --------------------- | ---------------- | ------------ |
+| `base`         | no       | — (root)              | —                | —            |
+| `preact-app`   | yes      | `apps/{{ name }}`     | base             | `web`        |
+| `ui-storybook` | no       | `packages/ui`         | base             | —            |
+| `astro-site`   | yes      | `apps/{{ name }}`     | base             | `site`       |
+| `hono-worker`  | yes      | `apps/{{ name }}`     | base             | `api`        |
+| `rust-tool`    | yes      | `crates/{{ name }}`   | base             | `tool`       |
+| `rust-cli`     | yes      | `crates/{{ name }}`   | base             | `cli`        |
+| `tauri-app`    | yes      | `apps/{{ name }}`     | base, preact-app | `desktop`    |
+| `ts-lib`       | yes      | `packages/{{ name }}` | base             | `lib`        |
+| `npm-cli`      | yes      | `packages/{{ name }}` | base, rust-cli   | `cli`        |
+| `docs`         | no       | — (root)              | base             | —            |
 
 Every JS package has the scripts the CI runs: `lint`, `format:check`, `typecheck`, `test`, `build`
 (a missing script is skipped by turbo). Package names are `@{{ scope }}/{{ name }}`.
@@ -307,6 +308,7 @@ Files: `src/index.ts` [seed] (the app; imports hull glue), `src/hull/logging.ts`
 `src/hull/sentry.ts` [owned], `src/index.test.ts` [seed], `src/hull/logging.test.ts` [owned].
 
 Logging contract (`src/hull/logging.ts`):
+
 - `jsonLogger(): MiddlewareHandler` — use after Hono's `requestId()`. After `await next()` it
   writes exactly one `console.log(JSON.stringify(line))` per request, with
   `line = { level: "info"|"warn"|"error", msg: "request", requestId, method, path, status,
@@ -386,8 +388,16 @@ blocks in base files (`docspack` devDependency, SessionStart sync, `docs-lookup`
     "keelstack": { "package": "@keelstackhq/docspack", "source": "vendor", "version": "0.1.1" },
     "cascivo": { "package": "@cascivo/docspack", "source": "vendor" },
     "hono": { "package": "@docspack-community/hono", "source": "community", "build": "hono" },
-    "cloudflare": { "package": "@docspack-community/cloudflare", "source": "community", "build": "cloudflare" },
-    "vite-plus": { "package": "@docspack-community/vite-plus", "source": "community", "recipe": "gh:keelstackhq/hull//community-packs/vite-plus" }
+    "cloudflare": {
+      "package": "@docspack-community/cloudflare",
+      "source": "community",
+      "build": "cloudflare"
+    },
+    "vite-plus": {
+      "package": "@docspack-community/vite-plus",
+      "source": "community",
+      "recipe": "gh:keelstackhq/hull//community-packs/vite-plus"
+    }
   }
 }
 ```
@@ -430,15 +440,16 @@ The root `AGENTS.md` is seed since 2026-10-18 (§14); everything else listed her
   `docs/agents/index.md` is a seed stub, so the `CLAUDE.md` import resolves before
   `agents-index.mjs` first runs:
 
-| Agent | Model | Tools | Use |
-|---|---|---|---|
-| `Explore` | haiku | Read, Grep, Glob | "Use proactively" for search and reading; returns paths and ≤ 15-line summaries |
-| `implementer` | sonnet | Read, Edit, Write, Bash, Grep, Glob | one task, test first, runs `verify` |
-| `reviewer` | opus | Read, Grep, Glob, Bash | read-only review against task and AGENTS.md; never edits |
-| `ci-fixer` | sonnet | Read, Edit, Write, Bash, Grep, Glob | reads `gh run view --log-failed`, reproduces, fixes |
+| Agent         | Model  | Tools                               | Use                                                                             |
+| ------------- | ------ | ----------------------------------- | ------------------------------------------------------------------------------- |
+| `Explore`     | haiku  | Read, Grep, Glob                    | "Use proactively" for search and reading; returns paths and ≤ 15-line summaries |
+| `implementer` | sonnet | Read, Edit, Write, Bash, Grep, Glob | one task, test first, runs `verify`                                             |
+| `reviewer`    | opus   | Read, Grep, Glob, Bash              | read-only review against task and AGENTS.md; never edits                        |
+| `ci-fixer`    | sonnet | Read, Edit, Write, Bash, Grep, Glob | reads `gh run view --log-failed`, reproduces, fixes                             |
 
-  Claude Code has no complexity-based routing; fixed models per agent are the convention, and
-  settings pin no main-session model (the session's own choice stands).
+Claude Code has no complexity-based routing; fixed models per agent are the convention, and
+settings pin no main-session model (the session's own choice stands).
+
 - `.claude/skills/verify/SKILL.md`: run `pnpm turbo run lint format:check typecheck test --affected
   --output-logs=errors-only`, report ≤ 10 lines (pass/fail per task, first error per failure).
 - `.claude/skills/add-piece/SKILL.md`: `pnpm dlx @keelstackhq/splice add <id> [--name <name>] --data <k>=<v> --yes --json` (contract §9.14),
@@ -611,39 +622,39 @@ the README still tells a user who publishes by other means to set it (the file i
 
 Checked with `npm view` on 2026-10-14.
 
-| Package | Pin | Note |
-|---|---|---|
-| `vite-plus` | 1.5.1 | security release, published 2026-11-09 (checked 2026-11-12); 1.6.0 (2026-11-11) waits for `minimumReleaseAge` |
-| `@voidzero-dev/vite-plus-core` | 1.5.1 | via the `vite` override; always the same version as vite-plus |
-| `turbo` | 2.11.10 | |
-| `typescript` | 7.0.2 | native compiler, binary `tsc` |
-| `@types/node` | 24.19.2 | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line |
-| `preact` | 11.2.0 | 11.2.0 published 2026-11-06; `@astrojs/preact` 6.1.2 peers `^10.6.5 || ^11.0.0` |
-| `@preact/preset-vite` | 2.10.6 | |
-| `astro` | 7.4.7 | depends on `vite ^8.3.1` |
-| `@astrojs/preact` | 6.1.2 | |
-| `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.6 | |
-| `hono` | 4.13.16 | |
-| `wrangler` | 4.158.0 | |
-| `@cloudflare/workers-types` | 5.20261106.1 | |
-| `@sentry/cloudflare` | 11.11.0 | |
-| `@tauri-apps/cli` | 2.12.4 | `@tauri-apps/api` 2.12.4; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7) |
-| `@cascivo/react` / `@cascivo/themes` | 1.9.0 / 1.0.3 | published 2026-10-09; Preact path via `preact/compat` (§6.2) |
-| `@preact/signals-react` | 3.12.0 | cascivo peer |
-| `react`, `react-dom` | 19.3.1 | dev-only cascivo peers, aliased to `preact/compat`; 19.3.1 published 2026-10-14 |
-| `happy-dom` | 21.0.4 | DOM environment for component tests; published 2026-10-20 |
-| `docspack` | 1.5.0 | |
-| `publint` | 0.3.25 | ts-lib `build`; checked with `npm view` 2026-10-17 |
-| `@arethetypeswrong/cli` | 0.18.5 | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17 |
-| pnpm / Node | 12.11.2 / 24 | Node 24 is the active LTS |
-| crates `clap` / `clap_complete` / `clap_mangen` | 4.6.7 / 4.6.11 / 0.3.3 | rust-cli `Cargo.toml` (not in the pnpm catalog); crates.io publish dates 2026-09-14 / 2026-09-15 / 2026-08-12 |
-| crates `thiserror` / `serde` / `serde_json` | 2.0.21 / 1.0.229 / 1.0.154 | rust-cli; 2026-09-23 / 2026-07-18 / 2026-10-11 |
-| crates `tracing` / `tracing-subscriber` | 0.1.44 / 0.3.23 | rust-cli; 2025-12-18 / 2026-03-13 |
-| dev crates `assert_cmd` / `predicates` / `insta` / `tempfile` | 2.2.2 / 3.1.4 / 1.49.0 / 3.27.0 | rust-cli; `insta` with `json` only; 2026-05-11 / 2026-02-11 / 2026-10-03 / 2026-03-11 |
-| Rust toolchain | 1.99.1 | rust-cli `rust-toolchain.toml` and `rust-version`; stable manifest dated 2026-10-15 |
-| `cargo-deny` | 0.20.2 | `taiki-e/install-action` in `ci.yml` and `release.yml` (§8.7); Renovate tracks it with a regex manager; 2026-07-09 |
-| npm CLI (release) | Node 24's bundled npm | `release.yml` `setup-node` `node-version: 24` (Node 24.22.0 ships npm 11.19.1); trusted publishing needs npm ≥ 11.5.1, Node ≥ 22.14.0 (docs.npmjs.com/trusted-publishers, 2026-10-17); no separate pin |
-| Actions (release) | `actions/attest-build-provenance@v4`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `taiki-e/install-action@v2` | major tags (latest v4.2.2, v7.0.2, v8.0.2, v2.87.29 on 2026-10-17); Renovate pins digests; checkout/pnpm/setup-node as in `ci.yml` |
+| Package                                                        | Pin                                                                                                                             | Note                                                                                                                                                                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `vite-plus`                                                    | 1.5.1                                                                                                                           | security release, published 2026-11-09 (checked 2026-11-12); 1.6.0 (2026-11-11) waits for `minimumReleaseAge`                                                                                          |
+| `@voidzero-dev/vite-plus-core`                                 | 1.5.1                                                                                                                           | via the `vite` override; always the same version as vite-plus                                                                                                                                          |
+| `turbo`                                                        | 2.11.10                                                                                                                         |                                                                                                                                                                                                        |
+| `typescript`                                                   | 7.0.2                                                                                                                           | native compiler, binary `tsc`                                                                                                                                                                          |
+| `@types/node`                                                  | 24.19.2                                                                                                                         | published 2026-10-09 (checked 2026-10-22); npm-cli `typecheck` (§6.11); Node 24 line                                                                                                                   |
+| `preact`                                                       | 11.2.0                                                                                                                          | 11.2.0 published 2026-11-06; `@astrojs/preact` 6.1.2 peers `^10.6.5                                                                                                                                    |     | ^11.0.0` |
+| `@preact/preset-vite`                                          | 2.10.6                                                                                                                          |                                                                                                                                                                                                        |
+| `astro`                                                        | 7.4.7                                                                                                                           | depends on `vite ^8.3.1`                                                                                                                                                                               |
+| `@astrojs/preact`                                              | 6.1.2                                                                                                                           |                                                                                                                                                                                                        |
+| `storybook`, `@storybook/preact-vite`, `@storybook/addon-docs` | 10.6.6                                                                                                                          |                                                                                                                                                                                                        |
+| `hono`                                                         | 4.13.16                                                                                                                         |                                                                                                                                                                                                        |
+| `wrangler`                                                     | 4.158.0                                                                                                                         |                                                                                                                                                                                                        |
+| `@cloudflare/workers-types`                                    | 5.20261106.1                                                                                                                    |                                                                                                                                                                                                        |
+| `@sentry/cloudflare`                                           | 11.11.0                                                                                                                         |                                                                                                                                                                                                        |
+| `@tauri-apps/cli`                                              | 2.12.4                                                                                                                          | `@tauri-apps/api` 2.12.4; crates `tauri` 2.12.4, `tauri-build` 2.7.3 (§6.7)                                                                                                                            |
+| `@cascivo/react` / `@cascivo/themes`                           | 1.9.0 / 1.0.3                                                                                                                   | published 2026-10-09; Preact path via `preact/compat` (§6.2)                                                                                                                                           |
+| `@preact/signals-react`                                        | 3.12.0                                                                                                                          | cascivo peer                                                                                                                                                                                           |
+| `react`, `react-dom`                                           | 19.3.1                                                                                                                          | dev-only cascivo peers, aliased to `preact/compat`; 19.3.1 published 2026-10-14                                                                                                                        |
+| `happy-dom`                                                    | 21.0.4                                                                                                                          | DOM environment for component tests; published 2026-10-20                                                                                                                                              |
+| `docspack`                                                     | 1.5.0                                                                                                                           |                                                                                                                                                                                                        |
+| `publint`                                                      | 0.3.25                                                                                                                          | ts-lib `build`; checked with `npm view` 2026-10-17                                                                                                                                                     |
+| `@arethetypeswrong/cli`                                        | 0.18.5                                                                                                                          | ts-lib `build`; bundles TypeScript 5.6.1-rc; checked with `npm view` 2026-10-17                                                                                                                        |
+| pnpm / Node                                                    | 12.11.2 / 24                                                                                                                    | Node 24 is the active LTS                                                                                                                                                                              |
+| crates `clap` / `clap_complete` / `clap_mangen`                | 4.6.7 / 4.6.11 / 0.3.3                                                                                                          | rust-cli `Cargo.toml` (not in the pnpm catalog); crates.io publish dates 2026-09-14 / 2026-09-15 / 2026-08-12                                                                                          |
+| crates `thiserror` / `serde` / `serde_json`                    | 2.0.21 / 1.0.229 / 1.0.154                                                                                                      | rust-cli; 2026-09-23 / 2026-07-18 / 2026-10-11                                                                                                                                                         |
+| crates `tracing` / `tracing-subscriber`                        | 0.1.44 / 0.3.23                                                                                                                 | rust-cli; 2025-12-18 / 2026-03-13                                                                                                                                                                      |
+| dev crates `assert_cmd` / `predicates` / `insta` / `tempfile`  | 2.2.2 / 3.1.4 / 1.49.0 / 3.27.0                                                                                                 | rust-cli; `insta` with `json` only; 2026-05-11 / 2026-02-11 / 2026-10-03 / 2026-03-11                                                                                                                  |
+| Rust toolchain                                                 | 1.99.1                                                                                                                          | rust-cli `rust-toolchain.toml` and `rust-version`; stable manifest dated 2026-10-15                                                                                                                    |
+| `cargo-deny`                                                   | 0.20.2                                                                                                                          | `taiki-e/install-action` in `ci.yml` and `release.yml` (§8.7); Renovate tracks it with a regex manager; 2026-07-09                                                                                     |
+| npm CLI (release)                                              | Node 24's bundled npm                                                                                                           | `release.yml` `setup-node` `node-version: 24` (Node 24.22.0 ships npm 11.19.1); trusted publishing needs npm ≥ 11.5.1, Node ≥ 22.14.0 (docs.npmjs.com/trusted-publishers, 2026-10-17); no separate pin |
+| Actions (release)                                              | `actions/attest-build-provenance@v4`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `taiki-e/install-action@v2` | major tags (latest v4.2.2, v7.0.2, v8.0.2, v2.87.29 on 2026-10-17); Renovate pins digests; checkout/pnpm/setup-node as in `ci.yml`                                                                     |
 
 ### 7.1 Turbo and Vite+
 
@@ -692,14 +703,14 @@ upstream.
   6. Turbo cache: `uses: keelstackhq/hoard` (v0.6.1, SHA-pinned; since 2026-10-22, hoard 0.1.0): a Turborepo
      remote cache in the GitHub Actions cache; it exports `TURBO_API`/`TURBO_TOKEN`/`TURBO_TEAM`
      for the `turbo run` step. No `actions/cache` step.
-  6. Rust (present in the plain `ci.yml`, guarded at runtime by
+  7. Rust (present in the plain `ci.yml`, guarded at runtime by
      `hashFiles('.github/scripts/rust-affected.mjs') != ''` (that script renders only with rust-tool),
      because a `.jinja` workflow cannot hold `${{` — §4.3 item 8): `.github/scripts/rust-affected.mjs` [owned] reads
      `turbo query affected --packages` JSON and sets `rust=true` when an affected package has a
      `Cargo.toml`; then a `rustup toolchain install` step (installs the channel and components pinned in `rust-toolchain.toml`; `dtolnay/rust-toolchain@stable` would download a second toolchain once stable moves past the pin),
      `Swatinem/rust-cache` (extra `key` = `hashFiles('rust-toolchain.toml')`), `taiki-e/install-action` (`tool: cargo-nextest@0.9.148,cargo-deny@0.20.2`, both tracked by Renovate regex managers; cargo-deny is installed for every Rust repo, a small cost), all `if: rust == 'true'`.
-  7. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
-  8. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
+  8. `pnpm turbo run lint format:check typecheck test build --affected --output-logs=errors-only`.
+  9. `Job duration` (`if: always()`, `continue-on-error`): writes the job time and the budget to the
      step summary, timed from a first `Start timer` step.
 - Drafts: every job except `ci-ok` (`ci`, `preview`; also `template-rust` and hull's own `ci.yml`) has `if: github.event.pull_request.draft != true`, so a draft PR runs no real CI and the run starts on `ready_for_review`. `ci-ok` still runs on a draft (seconds) and FAILS with "draft: CI not run, mark ready for review": a skipped required check counts as green, which would let a draft push merge untested once marked ready. Every PR workflow cancels superseded runs (`tests/draft-skip.test.mjs`). Known limits: `converted_to_draft` is not a trigger, so a run in progress finishes; a skipped `preview` still fires `preview-deploy` (conclusion `skipped`, no deploy) and may cancel an in-flight deploy of the same branch.
 - Job `ci-ok`: `needs: [ci]`, `if: always()`, fails on a draft and unless `needs.ci.result == 'success'`. It is
@@ -868,14 +879,14 @@ node scripts/render.mjs new --template <dir> --out <dir> --piece <id>[:<name>]..
 
 ### 10.1 Combos (`scripts/combos.json`)
 
-| name | pieces |
-|---|---|
-| `base` | base |
-| `web` | base, preact-app:web, ui-storybook, hono-worker:api |
-| `site` | base, astro-site:site, rust-tool:tool (rust-tool from plan 03) |
-| `docs` | base, docs (from plan 03) |
-| `cli` | base, rust-cli:cli, npm-cli:cli |
-| `lib` | base, ts-lib:lib |
+| name      | pieces                                                          |
+| --------- | --------------------------------------------------------------- |
+| `base`    | base                                                            |
+| `web`     | base, preact-app:web, ui-storybook, hono-worker:api             |
+| `site`    | base, astro-site:site, rust-tool:tool (rust-tool from plan 03)  |
+| `docs`    | base, docs (from plan 03)                                       |
+| `cli`     | base, rust-cli:cli, npm-cli:cli                                 |
+| `lib`     | base, ts-lib:lib                                                |
 | `desktop` | base, preact-app:web, tauri-app:desktop — scheduled/manual only |
 
 Template var `scope = "hullci"` for all.
@@ -883,6 +894,7 @@ Template var `scope = "hullci"` for all.
 ### 10.2 `ci.yml` (hull)
 
 One job + `ci-ok`, same triggers/concurrency/checkout rules as §8.1:
+
 1. `pnpm install --frozen-lockfile --prefer-offline`; `vp lint`, `vp fmt --check`, `pnpm test`
    (`node --test "tests/**/*.test.mjs"`: renderer unit tests + template invariants). Always runs (seconds).
 2. `node scripts/affected-combos.mjs --base $BASE` → list. Changes under
@@ -929,9 +941,10 @@ Modelled on splice's `release.yml`. Source of truth: the first `## v<X.Y.Z> — 
 `CHANGELOG.md`; `<rest>` is `YYYY-MM-DD` (release it) or `unreleased` (release nothing); any other
 heading fails the run. `scripts/release-tag.mjs` decides (`changelogRelease`, `releaseTag`,
 `previousTag`; tests in `tests/release-tag.test.mjs`).
+
 - Triggers `push` to `main` + `workflow_dispatch`; `permissions: {}`; run-level concurrency
   `release-run-<run_id>`, no cancel, so pushes never cancel each other's runs (the job-level group
-  below still lets GitHub drop an older *pending* release job of the same tag for a newer one).
+  below still lets GitHub drop an older _pending_ release job of the same tag for a newer one).
 - `plan` (`github.repository == 'keelstackhq/hull'` and ref `main`, `contents: read`): `git
   ls-remote --tags`; releases when `v<version>` is missing, or (a re-run, attempt > 1) already tags
   this commit. On a first attempt an existing tag (e.g. one pushed by hand) releases nothing.
@@ -1012,11 +1025,11 @@ inside contract format 1; `docs/template-format.md` is unchanged (D-003).
 base is `meta`, an empty piece (only `id`, `description`, `multiple`; no files, sections, vars or
 post) and every real piece below is optional; `claude` and `skills` require `meta`, not `core`.
 
-| Piece | Content | Class |
-|---|---|---|
-| `core` | `[sections] "AGENTS.md" = "sections/rules.md.jinja"`: harness-neutral working rules (test first, verify with real output, one task per change, no secrets or `.env*` reads, releases by a human, ≤ 2-3 parallel agents); one bullet naming the subagents only with `"claude" in pieces`; ≤ 12 lines, no `@` imports, no files of its own | section |
-| `claude` | `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`, the §6.9 agents with the same names, models and tools, made stack-neutral ("the fast checks `AGENTS.md` or `CLAUDE.md` lists" instead of `pnpm turbo`); **no** `CLAUDE.md` section: hull owns `CLAUDE.md`, which imports `@AGENTS.md` | owned |
-| `skills` | `multiple = true`, `target = ".{{ dir }}/skills"`, var `dir` pattern `^(claude\|agents)$` (no default); `files/<skill>/SKILL.md` with `name` + `description` frontmatter; first skill `handoff` (write next steps and blockers to the progress notes, start fresh rather than compact) | owned |
+| Piece    | Content                                                                                                                                                                                                                                                                                                                                  | Class   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `core`   | `[sections] "AGENTS.md" = "sections/rules.md.jinja"`: harness-neutral working rules (test first, verify with real output, one task per change, no secrets or `.env*` reads, releases by a human, ≤ 2-3 parallel agents); one bullet naming the subagents only with `"claude" in pieces`; ≤ 12 lines, no `@` imports, no files of its own | section |
+| `claude` | `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md`, the §6.9 agents with the same names, models and tools, made stack-neutral ("the fast checks `AGENTS.md` or `CLAUDE.md` lists" instead of `pnpm turbo`); **no** `CLAUDE.md` section: hull owns `CLAUDE.md`, which imports `@AGENTS.md`                                       | owned   |
+| `skills` | `multiple = true`, `target = ".{{ dir }}/skills"`, var `dir` pattern `^(claude\|agents)$` (no default); `files/<skill>/SKILL.md` with `name` + `description` frontmatter; first skill `handoff` (write next steps and blockers to the progress notes, start fresh rather than compact)                                                   | owned   |
 
 **Who adds which piece.** `core` is for repos not rendered from hull (splice, hoard, hoist,
 berth, …). A hull repo already carries these rules in its own `AGENTS.md` (§6.9), so it adds only
@@ -1086,12 +1099,12 @@ Contract format 1 stays as it is (D-003, D-005).
 
 **Turborepo: no.** Evidence from 2026-10-23:
 
-| Measurement | Turborepo (`cli` combo: base + rust-cli) | Plain cargo, same crate |
-|---|---|---|
-| Cold, no `target/`, all CI tasks (local) | 25.8 s | 26.0 s |
-| Crate source changed, warm `target/` (local) | 1.35 s (cache miss) | 2.2 s |
-| Nothing changed (local) | 0.24 s (full hit) | 1.35 s (cargo no-op) |
-| Node setup on a GitHub runner (hull run 39808906539) | pnpm/action-setup 5 s + setup-node 4 s + install 1 s | 0 s |
+| Measurement                                          | Turborepo (`cli` combo: base + rust-cli)             | Plain cargo, same crate |
+| ---------------------------------------------------- | ---------------------------------------------------- | ----------------------- |
+| Cold, no `target/`, all CI tasks (local)             | 25.8 s                                               | 26.0 s                  |
+| Crate source changed, warm `target/` (local)         | 1.35 s (cache miss)                                  | 2.2 s                   |
+| Nothing changed (local)                              | 0.24 s (full hit)                                    | 1.35 s (cargo no-op)    |
+| Node setup on a GitHub runner (hull run 39808906539) | pnpm/action-setup 5 s + setup-node 4 s + install 1 s | 0 s                     |
 
 - A turbo hit saves about 1 s over a warm cargo no-op. A PR that changes a crate changes that
   crate's inputs, so it always misses the cache. Hits help only re-runs of the same tree
@@ -1185,7 +1198,7 @@ README gives. Token order for the bot and for `prepare`: a GitHub App token
 `vars.HOIST_RELEASE_APP_CLIENT_ID` hold the App's Client ID, a repository variable read by both `prepare` and `publish`; the key is
 a secret of each environment that uses it: `release-pr`, `release`), else
 the PAT secret, else `github.token`, whose PRs get no CI. `vars.SPLICE_BOT == 'off'` skips the bot
-job (session mode: an agent session runs `splice update --all` and opens the PR). 
+job (session mode: an agent session runs `splice update --all` and opens the PR).
 `publish` takes the same optional App (Contents write only) for `GH_TOKEN`, else `github.token`,
 because hoist pushes the release tags and a `*-v*` tag ruleset rejects `github.token`. The token
 exists in a step where `cargo publish` runs crates' build scripts, hence contents-only, and the App
