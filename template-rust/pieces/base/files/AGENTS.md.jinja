@@ -16,7 +16,8 @@ cargo test --workspace --doc --locked
 ```
 
 Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
-`node scripts/agents-index.mjs` (regenerate `docs/agents/index.md`; CI checks it).
+`node scripts/agents-index.mjs` (regenerate `docs/agents/index.md`; CI checks it),
+`node scripts/licenses.mjs` (regenerate `THIRD_PARTY_LICENSES.md` after dependency changes; CI checks it).
 `scripts/ci-extra.sh` (seed): repo checks, run last by CI; keep it fast.
 
 ## Rules

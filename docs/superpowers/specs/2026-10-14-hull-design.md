@@ -673,7 +673,8 @@ upstream.
   1. `actions/checkout` with `fetch-depth: 0`, `filter: blob:none`.
   2. Index check: a separate step with no `if`, using the runner's `node`:
      `node scripts/agents-index.mjs --check` fails when `docs/agents/index.md` is stale (docs-only
-     cost < 1 s).
+     cost < 1 s). Then `node scripts/licenses.mjs --check` (lockfile hash gate, no install; see
+     `2026-11-17-third-party-licenses-design.md`).
   3. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
      `TURBO_VERSION` (= the catalog pin; the Renovate preset does not bump it alone, since the pinned `TURBO_SHA256` must move with it: `splice update` carries version and sha together) from the npm registry with
      `curl` (~1 s; `npx` took ~5-7 s) into `$RUNNER_TEMP` and verifies it against the pinned

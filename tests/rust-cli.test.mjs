@@ -54,8 +54,8 @@ test("piece manifest", async () => {
   assert.deepEqual(
     p.post.map((x) => [x.run, x.when]),
     [
-      ["cargo generate-lockfile", ["new"]],
-      ["cargo update --workspace", ["add"]],
+      ["cargo generate-lockfile && { node scripts/licenses.mjs || true; }", ["new"]],
+      ["cargo update --workspace && { node scripts/licenses.mjs || true; }", ["add"]],
     ],
   );
 });

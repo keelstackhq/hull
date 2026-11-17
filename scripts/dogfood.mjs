@@ -27,6 +27,13 @@ const CI_EXTRA = [
   ["-c", "if [ -f scripts/ci-extra.sh ]; then bash scripts/ci-extra.sh; fi"],
 ];
 
+// the licenses [[post]] hook (dev renderer); the checks both CI plans run before `affected`
+const LICENSES = ["node", ["scripts/licenses.mjs"]];
+const CHECKS = [
+  ["node", ["scripts/agents-index.mjs", "--check"]],
+  ["node", ["scripts/licenses.mjs", "--check"]],
+];
+
 /** Steps run in a rendered template-rust combo (spec §15): no pnpm, no turbo. */
 export function rustComboSteps(renderer = "dev", pieces = [], dir = ".") {
   const ci = RUST_CI_STEPS.map((s) => {
@@ -41,8 +48,9 @@ export function rustComboSteps(renderer = "dev", pieces = [], dir = ".") {
           ["git", ["init", "-q"]],
           ["cargo", ["generate-lockfile"]],
           ["node", ["scripts/agents-index.mjs"]],
+          LICENSES,
         ];
-  const steps = [...setup, ...ci, CI_EXTRA, ["node", ["scripts/agents-index.mjs", "--check"]]];
+  const steps = [...setup, ...ci, CI_EXTRA, ...CHECKS];
   // pack .circleci/src with the pinned CLI and check it (S§12 item 3)
   if (pieces.some((p) => p.split(":")[0] === "circleci"))
     steps.push(["node", [CHECK_CIRCLECI, dir]]);
@@ -66,9 +74,10 @@ export function comboSteps(cacheDir, pieces = [], dir = ".", renderer = "dev") {
             : []),
           // the base [[post]] hook, which the dev renderer does not run
           ["node", ["scripts/agents-index.mjs"]],
+          LICENSES,
           turbo(cmd, args, cacheDir),
           CI_EXTRA,
-          ["node", ["scripts/agents-index.mjs", "--check"]],
+          ...CHECKS,
         ];
   if (pieces.some((p) => VITE_PIECES.has(p.split(":")[0]))) {
     steps.push(["node", [CHECK_SINGLE_VITE, dir]]);
@@ -88,7 +97,7 @@ const turbo = (cmd, args, cacheDir) => [
 ];
 
 function spliceSteps(cmd, args, cacheDir) {
-  return [turbo(cmd, args, cacheDir), CI_EXTRA, ["node", ["scripts/agents-index.mjs", "--check"]]];
+  return [turbo(cmd, args, cacheDir), CI_EXTRA, ...CHECKS];
 }
 
 const RENDERERS = new Set(["splice", "dev"]);

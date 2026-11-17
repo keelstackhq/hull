@@ -45,6 +45,7 @@ test("step ids in ci.yml equal CI_PLAN ids in order", async () => {
     "timer",
     "checkout",
     "agents-index",
+    "licenses",
     "affected",
     "ci-pre",
     "setup-pnpm-node",

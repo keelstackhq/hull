@@ -26,8 +26,8 @@ const varsFor = (pieces) => ({
   ...comboVars,
   ...(pieces.includes("secrets") ? { context_prefix: "hullci" } : {}),
 });
-/** Always-loaded bytes ceiling (max measured 4,204: base + rust-cli + npm-cli, 2026-11-04). */
-const CEILING = 4216;
+/** Always-loaded bytes ceiling (max measured 4,278: base + rust-cli + npm-cli, with the licenses line, 2026-11-17). */
+const CEILING = 4290;
 
 /** Parse flat `key: value` frontmatter. */
 function frontmatter(text) {
@@ -102,6 +102,7 @@ test("AGENTS.md commands block lists install, check, run ci, format and agents:i
     "pnpm run ci",
     "pnpm format",
     "pnpm agents:index",
+    "node scripts/licenses.mjs",
   ]);
 });
 
@@ -502,7 +503,10 @@ test("verify skill runs the index check first and says pnpm run ci does not", as
   const { dir } = await renderCombo(["base"]);
   const text = await read(dir, ".claude/skills/verify/SKILL.md");
   assert.match(text, /node scripts\/agents-index\.mjs --check/);
-  assert.match(text, /`pnpm run ci` does not run this check \(it is not a turbo task\); CI does/);
+  assert.match(
+    text,
+    /`pnpm run ci` does not run the two checks \(they are not turbo tasks\); CI does/,
+  );
   assert.ok(text.indexOf("agents-index.mjs --check") < text.indexOf("pnpm turbo run"));
 });
 

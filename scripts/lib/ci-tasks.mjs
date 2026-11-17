@@ -40,6 +40,13 @@ const GITHUB_STEPS = [
     ),
   },
   {
+    id: "licenses",
+    github: yml(
+      "      - name: Licenses list current?",
+      "        run: node scripts/licenses.mjs --check",
+    ),
+  },
+  {
     id: "affected",
     github: yml(
       "      - name: Anything affected?",
@@ -225,6 +232,11 @@ const CIRCLECI = {
     "  - run:",
     "      name: Agents index current?",
     "      command: node scripts/agents-index.mjs --check",
+  ),
+  licenses: yml(
+    "  - run:",
+    "      name: Licenses list current?",
+    "      command: node scripts/licenses.mjs --check",
   ),
   affected: yml(
     "  - run:",
@@ -456,6 +468,7 @@ export const RUST_CI_PLAN = Object.freeze(
       ),
       circleci: CIRCLECI["agents-index"],
     },
+    { id: "licenses", github: GITHUB_STEPS[3].github, circleci: CIRCLECI.licenses },
     {
       id: "docs-only",
       github: yml(

@@ -120,6 +120,11 @@ test("base post: install on new, lockfile-only refresh on update, then agents-in
     // a catalog bump arrives via the pnpm-workspace.yaml merge; the bot's PR needs a matching lockfile
     { run: "pnpm install --lockfile-only --ignore-scripts", when: ["update"] },
     { run: "node scripts/agents-index.mjs", when: ["new", "add", "update"] },
+    { run: "node scripts/licenses.mjs", when: ["new"] },
+    {
+      run: "pnpm install --frozen-lockfile --ignore-scripts --prefer-offline && node scripts/licenses.mjs || true",
+      when: ["update"],
+    },
   ]);
 });
 

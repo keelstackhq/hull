@@ -17,9 +17,12 @@ seed = ["src/main.rs", "CLAUDE.md"]
 "package.json" = "json"
 
 [[post]]
-run = "cargo generate-lockfile"
+# Chained, not a separate post: splice ran an identical command (base's) only once. `|| true`:
+# run before base's pnpm install it fails, writing nothing, and base's own post writes the list.
+run = "cargo generate-lockfile && { node scripts/licenses.mjs || true; }"
 when = ["new"]
 
 [[post]]
-run = "cargo update --workspace"
+# `|| true`: without node_modules the script says what to run; CI's check catches it.
+run = "cargo update --workspace && { node scripts/licenses.mjs || true; }"
 when = ["add"]
