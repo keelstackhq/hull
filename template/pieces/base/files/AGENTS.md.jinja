@@ -21,7 +21,7 @@ Packages call `vp build/test/lint/fmt/pack` directly (Turbo caches); never `vp r
 
 - Test first, then implement; verify with real output before saying done. Tests: `*.test.ts` beside
   source, from `vite-plus/test`; one package: `pnpm --filter <name> test`.
-- One task per change; no drive-by refactors.
+- One task per change; no drive-by refactors; docs-only PRs need no changelog/progress fragment.
 - Versions: exact pins in the `pnpm-workspace.yaml` catalog; `catalog:` in packages.
 - Template-owned files (configs, workflows, `.claude/`) change via `splice update --all`; local changes go
   in seed files, `docs/agents/project.md` or a package's `AGENTS.md`.

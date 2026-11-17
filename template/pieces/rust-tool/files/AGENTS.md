@@ -8,3 +8,4 @@ A crate in the root Cargo workspace (`Cargo.toml`, `crates/*`), run by Turborepo
 - `typecheck` is `cargo check -p <crate> --all-targets`.
 - `Cargo.lock` lives at the repo root and is committed; edit dependencies with `cargo add -p <crate>`.
 - This is for in-repo tools. For a distributed CLI (npm, GitHub release) use `rust-cli`.
+- One integration-test binary per crate: `tests/it/main.rs` with `mod` per topic, not one file per test (each top-level file in `tests/` links its own binary and slows CI).

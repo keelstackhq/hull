@@ -89,8 +89,8 @@ on any breaking change (a removed, renamed or retyped field); otherwise fields a
   - `template/`: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `packages/shared/package.json`
   - `template-rust/`: `Cargo.toml`, `crates/common/Cargo.toml`
 - **seed**: kept as they are (dry-run action `skip`).
-  - `template/`: `AGENTS.md`, `README.md`, `docs/agents/index.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `packages/shared/src/**`
-  - `template-rust/`: `AGENTS.md`, `README.md`, `deny.local.toml`, `docs/agents/index.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `hoist.toml`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `crates/common/src/**`
+  - `template/`: `AGENTS.md`, `CHANGELOG.md`, `README.md`, `docs/agents/index.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `packages/shared/src/**`
+  - `template-rust/`: `AGENTS.md`, `CHANGELOG.md`, `README.md`, `deny.local.toml`, `docs/agents/index.md`, `docs/agents/onboarding.toml`, `docs/agents/project.md`, `hoist.toml`, `scripts/ci-pre.sh`, `scripts/ci-extra.sh`, `crates/common/src/**`
 - **targets**: a piece's target directory that already exists and is not the piece's source.
 
 Every other file the template writes is new (`create`). Pieces add more files under their target.
