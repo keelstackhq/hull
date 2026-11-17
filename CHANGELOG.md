@@ -7,7 +7,7 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
-## v0.13.0 — unreleased
+## v0.13.0 — 2026-11-17
 
 - Base (both templates): `scripts/licenses.mjs` writes `THIRD_PARTY_LICENSES.md` and
   `third-party-licenses.json` (license of every npm and cargo dependency, direct/dev flagged,
