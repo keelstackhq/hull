@@ -7,6 +7,13 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.13.0 — unreleased
+
+- Base (both templates): `scripts/licenses.mjs` writes `THIRD_PARTY_LICENSES.md` and
+  `third-party-licenses.json` (license of every npm and cargo dependency, direct/dev flagged,
+  `UNKNOWN` reported) on `new`; CI step `licenses` fails when a lockfile changed since
+  (`node scripts/licenses.mjs` fixes it). Spec `2026-11-17-third-party-licenses-design.md`.
+
 ## v0.12.1 — 2026-11-16
 
 - Contract: `docs/template-format.md` gains rule 29 "Kept keys" (the lock records the dotted key

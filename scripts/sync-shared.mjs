@@ -11,6 +11,7 @@ const TO = join(ROOT, "template-rust/pieces/base/files");
 export const SHARED = [
   "scripts/ready.mjs",
   "scripts/deny.mjs",
+  "scripts/licenses.mjs",
   ".claude/hooks/guard.mjs",
   ".claude/skills/ready/SKILL.md",
   ".claude/agents/explore.md",

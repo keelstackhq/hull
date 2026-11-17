@@ -537,7 +537,7 @@ export const CLASH = {
       ".github/workflows/ci.yml .github/workflows/desktop.yml .github/workflows/preview-deploy.yml " +
       ".github/workflows/preview.yml .github/workflows/release.yml .github/workflows/splice.yml " +
       ".gitattributes .gitignore .node-version CLAUDE.md Cargo.toml renovate.json rust-toolchain.toml " +
-      "scripts/agents-index.mjs scripts/deny.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
+      "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
       "packages/shared/tsconfig.json packages/shared/vite.config.ts",
     shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
     seed:
@@ -553,7 +553,7 @@ export const CLASH = {
       ".config/nextest.toml .github/scripts/docs-only.mjs .github/scripts/release-pending.mjs " +
       ".github/workflows/ci.yml .github/workflows/release.yml .github/workflows/splice.yml " +
       ".gitattributes .gitignore CLAUDE.md deny.toml renovate.json rust-toolchain.toml rustfmt.toml " +
-      "scripts/agents-index.mjs scripts/deny.mjs scripts/ready.mjs",
+      "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/ready.mjs",
     shared: "Cargo.toml crates/common/Cargo.toml",
     seed:
       "AGENTS.md README.md deny.local.toml docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +

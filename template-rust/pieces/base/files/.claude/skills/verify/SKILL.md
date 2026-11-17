@@ -7,6 +7,7 @@ Run, in order, and keep going after a failure so every step reports:
 
 ```bash
 node scripts/agents-index.mjs --check
+node scripts/licenses.mjs --check
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 node scripts/deny.mjs --locked check bans licenses sources
@@ -14,8 +15,8 @@ cargo nextest run --workspace --locked --profile ci
 cargo test --workspace --doc --locked
 ```
 
-If the index check fails, run `node scripts/agents-index.mjs` and include the regenerated
-`docs/agents/index.md` in the change.
+If a check fails, run `node scripts/agents-index.mjs` or `node scripts/licenses.mjs` and include
+the regenerated files in the change.
 
 Report at most 10 lines: pass or fail per step, and for each failure the first error only (file,
 line, message). If everything passed, say so in one line. Never report a pass you did not see in

@@ -11,6 +11,7 @@ pnpm check          # lint, format:check, typecheck, test (all packages)
 pnpm run ci         # the CI task list on changed packages (--affected)
 pnpm format         # vp fmt
 pnpm agents:index   # regenerate docs/agents/index.md
+node scripts/licenses.mjs # regenerate THIRD_PARTY_LICENSES.md
 ```
 
 Packages call `vp build/test/lint/fmt/pack` directly (Turbo caches); never `vp run`.

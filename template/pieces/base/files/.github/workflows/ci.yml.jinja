@@ -34,6 +34,9 @@ jobs:
       # step: agents-index
       - name: Agents index current?
         run: node scripts/agents-index.mjs --check
+      # step: licenses
+      - name: Licenses list current?
+        run: node scripts/licenses.mjs --check
       # step: affected
       - name: Anything affected?
         id: affected

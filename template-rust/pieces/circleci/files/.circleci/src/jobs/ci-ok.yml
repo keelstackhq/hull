@@ -15,6 +15,10 @@ steps:
   - run:
       name: Agents index current?
       command: node scripts/agents-index.mjs --check
+  # step: licenses
+  - run:
+      name: Licenses list current?
+      command: node scripts/licenses.mjs --check
   # step: docs-only
   - run:
       name: Docs only?

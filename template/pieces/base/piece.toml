@@ -3,7 +3,7 @@ description = "Workspace root: pnpm, Turborepo, TypeScript, Vite+, CI and AI lay
 
 [files]
 shared = ["package.json", "pnpm-workspace.yaml", "turbo.json", "packages/shared/package.json"]
-owned = [".claude/agents/*.md", ".github/workflows/ci.yml", ".github/workflows/preview.yml", ".github/workflows/preview-deploy.yml", ".github/scripts/preview.mjs", ".github/workflows/desktop.yml", ".github/scripts/affected.mjs", ".github/scripts/rust-affected.mjs", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/release-plan.mjs", "scripts/agents-index.mjs", "scripts/ready.mjs", "scripts/deny.mjs", "Cargo.toml", "rust-toolchain.toml", "renovate.json"]
+owned = [".claude/agents/*.md", ".github/workflows/ci.yml", ".github/workflows/preview.yml", ".github/workflows/preview-deploy.yml", ".github/scripts/preview.mjs", ".github/workflows/desktop.yml", ".github/scripts/affected.mjs", ".github/scripts/rust-affected.mjs", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/release-plan.mjs", "scripts/agents-index.mjs", "scripts/ready.mjs", "scripts/deny.mjs", "scripts/licenses.mjs", "Cargo.toml", "rust-toolchain.toml", "renovate.json"]
 seed = ["docs/agents/index.md", "AGENTS.md", "docs/agents/onboarding.toml", "scripts/ci-pre.sh", "scripts/ci-extra.sh", "README.md", "docs/agents/project.md", "packages/shared/src/**"]
 
 [merge]
@@ -25,3 +25,9 @@ when = ["update"]
 [[post]]
 run = "node scripts/agents-index.mjs"
 when = ["new", "add", "update"]
+
+# THIRD_PARTY_LICENSES.md + third-party-licenses.json; needs node_modules, so not on update (CI's
+# check names the command).
+[[post]]
+run = "node scripts/licenses.mjs"
+when = ["new"]

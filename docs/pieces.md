@@ -67,6 +67,7 @@ Files (owned):
 - `scripts/agents-index.mjs`
 - `scripts/ready.mjs`
 - `scripts/deny.mjs`
+- `scripts/licenses.mjs`
 - `Cargo.toml`
 - `rust-toolchain.toml`
 - `renovate.json`

@@ -3,7 +3,7 @@ description = "Pure Rust workspace root: cargo, rustup pin, cargo-deny, nextest,
 
 [files]
 shared = ["Cargo.toml", "crates/common/Cargo.toml"]
-owned = [".claude/agents/*.md", ".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/docs-only.mjs", ".github/scripts/release-pending.mjs", "scripts/agents-index.mjs", "scripts/ready.mjs", "scripts/deny.mjs", "rust-toolchain.toml", "rustfmt.toml", "deny.toml", ".config/nextest.toml", "renovate.json"]
+owned = [".claude/agents/*.md", ".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/splice.yml", ".github/scripts/docs-only.mjs", ".github/scripts/release-pending.mjs", "scripts/agents-index.mjs", "scripts/ready.mjs", "scripts/deny.mjs", "scripts/licenses.mjs", "rust-toolchain.toml", "rustfmt.toml", "deny.toml", ".config/nextest.toml", "renovate.json"]
 seed = ["docs/agents/index.md", "AGENTS.md", "deny.local.toml", "docs/agents/onboarding.toml", "scripts/ci-pre.sh", "scripts/ci-extra.sh", "README.md", "docs/agents/project.md", "hoist.toml", "crates/common/src/**"]
 
 [merge]
@@ -21,3 +21,9 @@ when = ["update"]
 [[post]]
 run = "node scripts/agents-index.mjs"
 when = ["new", "add", "update"]
+
+# THIRD_PARTY_LICENSES.md + third-party-licenses.json (cargo metadata; no install step needed).
+# Not on add: a new crate is in Cargo.lock only after rust-cli's chained post (order is not fixed).
+[[post]]
+run = "node scripts/licenses.mjs"
+when = ["new", "update"]
