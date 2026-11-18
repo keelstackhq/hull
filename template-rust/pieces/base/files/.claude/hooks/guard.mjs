@@ -3,9 +3,16 @@
 // (.claude/hooks, .claude/settings*.json, release workflows, .splice/lock.toml, .bosun/); asks before
 // editing files the template owns. Every deny names the allowed alternative. A guard rail, not a
 // sandbox: the real fix is a server-side branch ruleset and environment-gated release.
-// Matches the executable and its arguments: heredoc bodies and quoted prose are data (a shell heredoc
-// is still scanned). `eval`, `sh`/interpreter fed from a pipe, `-c`/`-e` bodies, `$VAR` or `$(...)` in
-// command position and git `-c alias.x=` deny when the text mentions push, publish or release.
+// Judges the commands that run: the executable and its arguments, `$(...)`, backticks and `<(...)`
+// outside single quotes (also in heredocs with an unquoted delimiter), and shell heredocs. Quoted
+// heredoc bodies and quoted prose are data. `eval`, `sh`/interpreter fed from a pipe, `$VAR` or
+// `$(...)` in command position and git `-c alias.x=` deny when the text mentions push, publish or
+// release; interpreter code (`-c`/`-e`, heredoc) is data only when every statement is inert
+// (`inert()`: print/echo of literals or names; Python: read or json/yaml-safe-load a literal path);
+// any other code is scanned (fail closed). Code from stdin (`source /dev/stdin`, `bash <(...)`, `xargs`) is scanned
+// as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and `$'...'` escapes are read
+// like the shell; joined string literals are checked for secret file names.
+// `gh api` with an explicit GET and graphql queries are reads. A deny names its rule and the match.
 // Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
 // a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
 // piped in (refused) or made by a producer other than `git diff|show|format-patch -- <paths>`
@@ -30,6 +37,102 @@ const RISKY_RE = /\b(push|publish|unpublish|release|dist-tag|gh|secrets?|sops)\b
 const EXEC_RE =
   /\b(git|gh|npm|pnpm|yarn|bun|cargo|make|hoist|sops)\b[^\n]*\b(push|publish|unpublish|release|dist-tag|secrets?|merge|decrypt)\b/i;
 const INLINE_RE = /^-[a-zA-Z]*[ceEp]$|^--eval$/;
+// The only inert statements (on code whose strings are replaced by S): print/echo string literals
+// or plain names, and (Python) read or json/yaml-safe-load a literal path with open()'s default
+// read mode. Everything else is code and gets the full scan.
+const ARG = String.raw`(?:S|[A-Za-z_]\w*|S\s+in\s+[A-Za-z_]\w*)`;
+const PRINT_RE = new RegExp(
+  String.raw`^(?:print|console\.log|puts|echo|say)\s*(?:\(\s*(?:${ARG}(?:\s*,\s*${ARG})*)?\s*\)|${ARG}(?:\s*,\s*${ARG})*)?$`,
+);
+const PY_INERT_RES = [
+  /^[A-Za-z_]\w*\s*=\s*open\s*\(\s*S\s*\)\s*\.\s*read\s*\(\s*\)(?:\s*\.\s*(?:strip|splitlines)\s*\(\s*\)|\s*\.\s*split\s*\(\s*S?\s*\))?$/,
+  /^[A-Za-z_]\w*\s*=\s*(?:json\s*\.\s*load|yaml\s*\.\s*safe_load)\s*\(\s*open\s*\(\s*S\s*\)\s*\)$/,
+  /^import\s+(?:json|yaml)(?:\s*,\s*(?:json|yaml))?$/,
+];
+
+/** True when interpreter code is only inert statements (PRINT_RE, PY_INERT_RES): literals printed,
+ * a literal path read or safe-loaded. Anything else is code and is scanned (fail closed). */
+export function inert(body, prog) {
+  const lang = /^(ruby|perl|php)/.test(prog) ? "rpp" : /^python/.test(prog) ? "py" : "js";
+  let code = "";
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    // A comment ends at the newline, whatever quotes it holds.
+    // Perl/Ruby/PHP: `#` can delimit a quote (`q#..#`, `%q#..#`), so it is code, never a comment.
+    if (lang === "rpp" && c === "#") return false;
+    if ((lang === "py" && c === "#") || (lang === "js" && c === "/" && body[i + 1] === "/")) {
+      const nl = body.indexOf("\n", i);
+      if (nl < 0) break;
+      i = nl - 1;
+      continue;
+    }
+    if (c === "`" && lang === "rpp") return false; // backticks run a program
+    if (c !== "'" && c !== '"' && c !== "`") {
+      code += c;
+      continue;
+    }
+    let j = i + 1;
+    while (j < body.length && body[j] !== c) j += body[j] === "\\" ? 2 : 1;
+    if (j >= body.length) return false; // unterminated
+    if (/[$#@]\{|\{\$/.test(body.slice(i + 1, j))) return false; // interpolation
+    code += " S ";
+    i = j;
+  }
+  if (/[^\x20-\x7e\t\n\r]/.test(code)) return false; // full-width names are names (NFKC)
+  const stmts = code
+    .split(/[;\n]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  // A printed name must be assigned earlier by an inert statement (`process`, `ENV`, `$_` are not).
+  const assigned = new Set();
+  for (const x of stmts) {
+    if (lang === "py" && PY_INERT_RES.some((re) => re.test(x))) {
+      const name = /^([A-Za-z_]\w*)\s*=/.exec(x)?.[1];
+      if (name) assigned.add(name);
+    } else if (PRINT_RE.test(x)) {
+      const names = x.replace(/^\w+(\.\w+)?/, "").match(/[A-Za-z_]\w*/g) ?? [];
+      if (names.some((n) => n !== "S" && n !== "in" && !assigned.has(n))) return false;
+    } else return false;
+  }
+  return true;
+}
+
+const UNICODE_NAMES = { "FULL STOP": ".", SOLIDUS: "/", "HYPHEN-MINUS": "-", "LOW LINE": "_" };
+
+/** Escapes in string text decoded (`".\x65nv"` is `.env`), for secret scans. */
+function unescape(body) {
+  return body
+    .replace(/\\\n/g, "")
+    .replace(/\\N\{([A-Z -]+)\}/g, (m, n) => {
+      const letter = /^LATIN (SMALL|CAPITAL) LETTER ([A-Z])$/.exec(n);
+      if (letter) return letter[1] === "SMALL" ? letter[2].toLowerCase() : letter[2];
+      return UNICODE_NAMES[n] ?? m;
+    })
+    .replace(
+      /\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})|\\([0-7]{1,3})/g,
+      (_, x, u, U, o) => {
+        const cp = Number.parseInt(x ?? u ?? U ?? o, o ? 8 : 16);
+        return cp <= 0x10ffff ? String.fromCodePoint(cp) : "";
+      },
+    );
+}
+
+/** Adjacent or joined string literals merged (`".en" "v"`, `".en" + "v"`) for secret scans. */
+function joinStrings(body) {
+  let prev;
+  let out = body;
+  for (let n = 0; n < 20 && out !== prev; n++) {
+    prev = out;
+    out = out.replace(
+      /(['"])([^'"\n]*)\1\s*[+.]?\s*(['"])([^'"\n]*)\3/g,
+      (_, q, a, _q, b) => q + a + b + q,
+    );
+  }
+  return out;
+}
+
+/** The whole environment passed as a value: `console.log(process)`, `puts ENV`, `p ENV.to_h`. */
+const WHOLE_ENV_RE = /\bprocess\s*[,)\]}]|\bprocess\s*$|\bENV\b(?!\s*\[|\s*\.\s*fetch)|%ENV\b/m;
 const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i;
 const SECRET_DIR_RE =
   /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/[^/]+\/environ$/;
@@ -107,9 +210,90 @@ export function ownedPaths(lockText) {
   return owned;
 }
 
-/** Split a command line into simple commands (token lists), ignoring quotes' content for splitting. */
+const ANSI = {
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  a: "\x07",
+  b: "\b",
+  e: "\x1b",
+  E: "\x1b",
+  f: "\f",
+  v: "\v",
+};
+
+/** One ANSI-C escape (the text after the backslash): [decoded text, characters used]. */
+function ansiC(s) {
+  let m = /^x([0-9a-fA-F]{1,2})/.exec(s);
+  if (m) return [String.fromCharCode(Number.parseInt(m[1], 16)), m[0].length];
+  m = /^u([0-9a-fA-F]{1,4})|^U([0-9a-fA-F]{1,8})/.exec(s);
+  if (m) {
+    const cp = Number.parseInt(m[1] ?? m[2], 16);
+    return [cp <= 0x10ffff ? String.fromCodePoint(cp) : "", m[0].length];
+  }
+  m = /^[0-7]{1,3}/.exec(s);
+  if (m) return [String.fromCharCode(Number.parseInt(m[0], 8) & 255), m[0].length];
+  // `\c'` leaves the quote's end alone: bash keeps `\c` and closes the quote
+  if (s[0] === "c" && s[1] === "\\" && s.length > 2) return [String.fromCharCode(0x1c), 3]; // `\c\\`
+  if (s[0] === "c" && s.length > 1 && s[1] !== "'")
+    return [String.fromCharCode(s.charCodeAt(1) & 31), 2];
+  if (s[0] === "c") return ["\\c", 1];
+  return [ANSI[s[0]] ?? s[0], 1];
+}
+
+/** End index of the substitution opened at `i` (`$(`, `<(`, `>(` or a backtick), or the text's end. */
+function subEnd(cmd, i) {
+  if (cmd[i] === "`") {
+    for (let j = i + 1; j < cmd.length; j++) {
+      if (cmd[j] === "\\") j++;
+      else if (cmd[j] === "`") return j;
+    }
+    return cmd.length;
+  }
+  let depth = 0;
+  let cases = 0; // inside `case ... esac`, a pattern's `)` does not close the substitution
+  let q = "";
+  // A keyword in command position: after `(`, `;`, `&`, `|` or a newline (spaces between).
+  const word = (j, w) =>
+    cmd.startsWith(w, j) &&
+    /[(;&|\n]$/.test(cmd.slice(i, j).replace(/[ \t]+$/, "")) &&
+    /^[\s;&|)]?$/.test(cmd[j + w.length] ?? "");
+  for (let j = i + 1; j < cmd.length; j++) {
+    const c = cmd[j];
+    if (q) {
+      if (c === q) q = "";
+      else if (c === "\\" && q === '"') j++;
+    } else if (c === "'" || c === '"') q = c;
+    else if (c === "\\") j++;
+    else if (word(j, "case")) cases++;
+    else if (word(j, "esac")) cases = Math.max(0, cases - 1);
+    else if (cases && (c === "(" || c === ")")) continue;
+    else if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return j;
+  }
+  return cmd.length;
+}
+
+/** Bodies of `$(...)`, `<(...)`, `>(...)` and backticks in heredoc text (quotes there are literal). */
+function docSubs(body) {
+  const out = [];
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] === "\\") i++;
+    else if (body[i] === "`" || (body[i] === "$" && body[i + 1] === "(")) {
+      const e = subEnd(body, body[i] === "`" ? i : i + 1);
+      out.push(body.slice(i + (body[i] === "`" ? 1 : 2), e));
+      i = e;
+    }
+  }
+  return out;
+}
+
+/** Split a command line into simple commands (token lists), ignoring quotes' content for splitting.
+ * `segments.subs` holds the command substitutions the shell runs: `$(...)`, backticks and `<(...)`
+ * outside single quotes, and those in heredocs whose delimiter is unquoted. */
 function split(cmd) {
   const segments = [];
+  const subs = [];
   let tokens = [];
   let cur = "";
   let has = false;
@@ -132,7 +316,38 @@ function split(cmd) {
   };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
-    if (quote) {
+    const open =
+      quote !== "'" &&
+      quote !== "$'" &&
+      (c === "`" ||
+        (c === "$" && cmd[i + 1] === "(") ||
+        (!quote && /[<>]/.test(c) && cmd[i + 1] === "("));
+    if (quote === "$'") {
+      // ANSI-C quoting: decode escapes the way bash does (`$'\x2df'` is `-f`)
+      if (c === "\\" && i + 1 < cmd.length) {
+        const [ch, len] = ansiC(cmd.slice(i + 1));
+        cur += ch;
+        i += len;
+      } else if (c === "'") quote = "";
+      else cur += c;
+    } else if (!quote && c === "$" && cmd[i + 1] === "'") {
+      quote = "$'";
+      has = true;
+      i++;
+    } else if (!quote && c === "#" && !has) {
+      // A comment runs nothing: skip to the end of the line.
+      const nl = cmd.indexOf("\n", i);
+      if (nl < 0) break;
+      i = nl - 1;
+    } else if (open) {
+      const at = c === "`" ? i : i + 1;
+      const e = subEnd(cmd, at);
+      subs.push(cmd.slice(at + 1, e));
+      if (e >= cmd.length) subs.unclosed = true; // runs to the end: the guard cannot read it
+      cur += cmd.slice(i, e + 1);
+      has = true;
+      i = e;
+    } else if (quote) {
       if (c === quote) quote = "";
       else if (c === "\\" && quote === '"' && i + 1 < cmd.length) cur += cmd[++i];
       else cur += c;
@@ -148,10 +363,13 @@ function split(cmd) {
       has = true;
       i += 2;
     } else if (c === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
-      const m = /^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|([^\s;&|<>()]+))/.exec(cmd.slice(i));
+      const m = /^<<(-?)[ \t]*((?:'[^']*'|"[^"]*"|\\.|[^\s;&|<>()'"\\])+)/.exec(cmd.slice(i));
       if (m) {
         endToken();
-        pending.push({ strip: m[1] === "-", word: m[2] ?? m[3] ?? m[4] });
+        // The delimiter is the whole word minus its quotes (`"E"OF`, `E"OF"`, `\EOF` are EOF);
+        // any quote or backslash in it makes the body data.
+        const word = m[2].replace(/\$?'([^']*)'|\$?"([^"]*)"|\\(.)/g, "$1$2$3"); // `$'EOF'` too
+        pending.push({ strip: m[1] === "-", word, data: /['"\\]/.test(m[2]) });
         i += m[0].length - 1;
       } else {
         cur += c;
@@ -160,7 +378,7 @@ function split(cmd) {
     } else if (c === "\n" && pending.length) {
       // Heredoc bodies are data, not commands; keep them only for a shell that reads them.
       let at = i + 1;
-      for (const { strip, word } of pending) {
+      for (const { strip, word, data } of pending) {
         let body = "";
         while (at < cmd.length) {
           let end = cmd.indexOf("\n", at);
@@ -171,6 +389,7 @@ function split(cmd) {
           body += `${line}\n`;
         }
         docs.push(body);
+        if (!data) subs.push(...docSubs(body)); // an unquoted delimiter runs $(...) and backticks
       }
       pending = [];
       i = at - 1;
@@ -189,10 +408,19 @@ function split(cmd) {
     }
   }
   endSegment();
+  segments.subs = subs;
   return segments;
 }
 
 function stripPrefixes(tokens) {
+  // `case w in pat) cmd` and a later `pat) cmd` branch run `cmd`.
+  const afterPattern = (x) => x.slice(x.indexOf(")") + 1); // `pat)cmd` runs cmd
+  if (base(tokens[0] ?? "") === "case") {
+    const k = tokens.findIndex((x, n) => n > 2 && x.includes(")"));
+    tokens = k > 0 ? [afterPattern(tokens[k]), ...tokens.slice(k + 1)].filter(Boolean) : [];
+  } else if (/^[^()]*\)./.test(tokens[0] ?? ""))
+    tokens = [afterPattern(tokens[0]), ...tokens.slice(1)];
+  else if (tokens.length > 1 && /^[^()]*\)$/.test(tokens[0])) tokens = tokens.slice(1);
   let t = tokens
     .map((x, i) => (i === 0 ? x.replace(/^[({]+/, "") : x).replace(/[)}]+$/, ""))
     .filter((x) => x !== "");
@@ -287,11 +515,21 @@ export function commands(cmd) {
   const DUMP_RE = /process\.env(?![.[\w])|os\.environ(?![.[\w])|\bENVIRON\b/;
   const secretTokens = (body) => {
     if (DUMP_RE.test(body)) out.push(["printenv"]);
-    for (const m of body.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
-      if (secretLike(m[0])) out.push(["cat", m[0]]);
-    }
+    // String pieces in order, joined two and three at a time: a path built from parts.
+    const parts = [...body.matchAll(/(['"`])([^'"`\n]*)\1/g)].map((m) => m[2]);
+    const built = parts.flatMap((p, i) => [
+      p + (parts[i + 1] ?? ""),
+      p + (parts[i + 1] ?? "") + (parts[i + 2] ?? ""),
+    ]);
+    for (const text of [body, joinStrings(body), built.join(" "), unescape(joinStrings(body))])
+      for (const m of text.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
+        if (secretLike(m[0])) out.push(["cat", m[0]]);
+      }
   };
-  for (const seg of split(text)) {
+  const segs = split(text);
+  if (segs.subs.unclosed) out.push(["@evade", text]);
+  for (const sub of segs.subs) for (const inner of commands(sub)) out.push(inner);
+  for (const seg of segs) {
     const t = stripPrefixes(seg);
     if (!t.length) {
       // A bare `env` (options and assignments only) prints the environment.
@@ -304,7 +542,18 @@ export function commands(cmd) {
     const prog = base(t[0]);
     const segText = seg.join(" ");
     // `xargs git ...` takes its last arguments from stdin; `find -exec cmd ... ;` runs cmd.
-    if (base(seg[0].replace(/^[({]+/, "")) === "xargs") out.push(["@evade", segText]);
+    if (base(seg[0].replace(/^[({]+/, "")) === "xargs") out.push(["@evade", text]); // args come from the pipe
+    // `source /dev/stdin`, `bash <(...)`, `xargs sh -c`: the code comes from elsewhere.
+    const fed = (x) => /^(\/dev\/(stdin|fd\/0)|\/proc\/self\/fd\/0|-|<\(.*)$/.test(x);
+    if (
+      ((prog === "source" || prog === ".") && (t.length === 1 || fed(t[1]))) ||
+      ((SHELLS.has(prog) || INTERPRETERS.test(prog)) &&
+        t.slice(1).some(fed) &&
+        !seg.docs?.length) ||
+      (base(seg[0].replace(/^[({]+/, "")) === "xargs" &&
+        (SHELLS.has(prog) || INTERPRETERS.test(prog)))
+    )
+      out.push(["@evade", text]);
     if (prog === "find") {
       const e = t.findIndex((x) => x === "-exec" || x === "-execdir" || x === "-ok");
       if (e >= 0) {
@@ -326,22 +575,31 @@ export function commands(cmd) {
       for (const inner of commands(body)) out.push(inner);
     }
     const noArgs = t.slice(1).every((x) => x === "-" || x === "-s") && !seg.docs?.length;
+    // stripPrefixes drops a token's trailing `)`: give it back before the inert test.
+    // perl/ruby -n/-p loop over stdin with implicit variables: never inert.
+    const loops = /^(perl|ruby)/.test(prog) && t.some((x) => /^-[a-zA-Z]*[np][a-zA-Z]*$/.test(x));
+    const runs = (body) => loops || ![body, `${body})`, `${body}))`].some((b) => inert(b, prog));
     // `bash <<< 'cmd'`: the here-string is evaluated.
     const hs = t.findIndex((x) => x.startsWith("<<<"));
     if (hs >= 0 && (SHELLS.has(prog) || INTERPRETERS.test(prog))) {
       const body = t[hs].length > 3 ? t[hs].slice(3) : (t[hs + 1] ?? "");
       if (SHELLS.has(prog)) for (const inner of commands(body)) out.push(inner);
-      out.push(["@evade", body], ["@evade-exec", body]);
+      if (SHELLS.has(prog) || runs(body)) out.push(["@evade", body], ["@evade-exec", body]);
     }
     if (INTERPRETERS.test(prog)) {
-      const i = t.findIndex((x, n) => n > 0 && INLINE_RE.test(x));
+      const i =
+        prog === "deno" && t[1] === "eval"
+          ? 1
+          : t.findIndex((x, n) => n > 0 && (INLINE_RE.test(x) || (prog === "php" && x === "-r")));
       if (i > 0 && t[i + 1] !== undefined) {
-        out.push(["@evade", t[i + 1]]);
+        if (runs(t[i + 1])) out.push(["@evade", loops ? text : t[i + 1]]); // -n/-p: stdin is code
+        if (runs(t[i + 1]) && WHOLE_ENV_RE.test(t[i + 1])) out.push(["printenv"]);
         secretTokens(t[i + 1]);
       } else if (noArgs) out.push(["@evade", text]); // code fed on stdin
       // Heredoc code is not scanned like a shell, only for reads of secret files and exec text.
       for (const body of seg.docs ?? []) {
-        out.push(["@evade-exec", body]);
+        if (runs(body)) out.push(["@evade-exec", body]);
+        if (runs(body) && WHOLE_ENV_RE.test(body)) out.push(["printenv"]);
         secretTokens(body);
       }
     }
@@ -381,6 +639,7 @@ function secretLike(value) {
   if (typeof value !== "string" || !value) return false;
   const clean = value.replace(/^[<>]+/, "");
   const variants = [clean, clean.slice(clean.lastIndexOf("=") + 1), clean.split(/[<>]/).pop()];
+  variants.push(...variants.map((v) => posix.normalize(v))); // `/proc/self/./environ`
   for (const v of new Set(variants)) {
     if (isSecretName(v.slice(v.lastIndexOf("/") + 1)) || SECRET_DIR_RE.test(v.replace(/\/+$/, "")))
       return true;
@@ -533,18 +792,24 @@ function writesTarget(t, i) {
   );
 }
 
-/** `gh api` that writes: a non-GET method, a body/field flag (these imply POST) or a mutation. */
+/** `gh api` that writes: a non-GET method, or with no method a body/field flag (these imply POST);
+ * graphql writes on a mutation or a query the guard cannot read (a file, stdin or a variable). */
 function ghApiWrites(args) {
+  let method;
+  let body = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    let method;
     if (a === "-X" || a === "--method") method = args[i + 1];
     else if (a.startsWith("--method=")) method = a.slice(9);
     else if (/^-X./.test(a)) method = a.slice(2);
-    if (method !== undefined && method.toUpperCase() !== "GET") return true;
-    if (/^(-[fF]|--field|--raw-field|--input)(=|$)/.test(a) || /^-[fF][^-]/.test(a)) return true;
+    if (/^(-[fF]|--field|--raw-field|--input)(=|$)/.test(a) || /^-[fF][^-]/.test(a)) body = true;
   }
-  return args.includes("graphql") && args.some((a) => /\bmutation\b/i.test(a));
+  if (args.includes("graphql"))
+    return args.some(
+      (a) => /\bmutation\b/i.test(a) || /^--input(=|$)/.test(a) || /query=[@$]/.test(a),
+    );
+  if (method !== undefined) return String(method).toUpperCase() !== "GET";
+  return body;
 }
 
 const ADMIN_API_RE =
@@ -841,6 +1106,14 @@ function relPath(p, projectDir, cwd = projectDir) {
   return rel;
 }
 
+/** The text a deny names: the risky word of an unreadable body, else the simple command. */
+function matched(t) {
+  if (t[0] === "@evade") return RISKY_RE.exec(t[1])?.[0] ?? t[1];
+  if (t[0] === "@evade-exec") return EXEC_RE.exec(t[1])?.[0] ?? t[1];
+  if (t[0] === "@chdir") return t[1];
+  return t.join(" ");
+}
+
 /**
  * @param {{ tool_name: string, tool_input: Record<string, unknown> }} input
  * @param {{ lockText?: string, projectDir: string }} ctx
@@ -849,13 +1122,19 @@ function relPath(p, projectDir, cwd = projectDir) {
 export function decide(input, ctx) {
   const name = input?.tool_name;
   const ti = input?.tool_input ?? {};
-  const deny = (key) => ({ decision: "deny", reason: REASON[key] });
+  const deny = (key, hit) => {
+    const shown = String(hit ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+    return { decision: "deny", reason: `${REASON[key]} (rule ${key}, matched \`${shown}\`)` };
+  };
   const cwd = [ctx.cwd, input?.cwd].find((x) => typeof x === "string" && x) ?? ctx.projectDir;
   if (name === "Bash") {
     const chain = { made: new Set(), tainted: new Set() };
     for (const t of commands(ti.command)) {
       const rule = bashRule(t, ctx.projectDir, cwd, chain);
-      if (rule) return deny(rule);
+      if (rule) return deny(rule, matched(t));
       noteWrites(t, cwd, chain);
     }
     return null;
@@ -863,16 +1142,17 @@ export function decide(input, ctx) {
   if (!FILE_TOOLS.has(name)) return null;
   const candidates = [targetPath(ti), ti.glob];
   if (name === "Glob") candidates.push(ti.pattern);
-  if (candidates.some(secretLike)) return deny("secret");
+  const secretHit = candidates.find(secretLike);
+  if (secretHit) return deny("secret", secretHit);
   if (!EDIT_TOOLS.has(name)) return null;
   const target = targetPath(ti);
   if (typeof target !== "string" || !target) return null;
   const rel = relPath(target, ctx.projectDir, cwd);
-  if (LOCK_RE.test(rel)) return deny("lock");
-  if (isProtected(rel)) return deny("protected");
+  if (LOCK_RE.test(rel)) return deny("lock", target);
+  if (isProtected(rel)) return deny("protected", target);
   const real = realRel(target, ctx.projectDir, cwd);
-  if (real && LOCK_RE.test(real)) return deny("lock");
-  if (real && isProtected(real)) return deny("protected");
+  if (real && LOCK_RE.test(real)) return deny("lock", target);
+  if (real && isProtected(real)) return deny("protected", target);
   if (ctx.lockText && ownedPaths(ctx.lockText).has(rel)) {
     return { decision: "ask", reason: ownedReason(rel) };
   }

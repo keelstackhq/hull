@@ -9,6 +9,12 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- guard.mjs (both templates) judges the commands that run, not text: interpreter heredocs and
+  `-c`/`-e` bodies are data only when every statement is inert (print a literal, read a
+  literal path); `gh api` with an explicit GET and
+  graphql queries are reads; `$(...)`, backticks and `<(...)` (also in unquoted heredocs) are now
+  checked as commands (`echo "$(git push -f)"` was allowed). A deny names its rule and the matched
+  command. Fixes false positives reported from a client repo.
 - Generated CI (both templates, GitHub and CircleCI): a `Workflows parse?` step runs
   `node .github/scripts/workflows.mjs` before the affected/docs-only exit and fails on any
   `.github/workflows/*.yml` that does not parse (an unquoted ` : ` once disabled a client repo's
