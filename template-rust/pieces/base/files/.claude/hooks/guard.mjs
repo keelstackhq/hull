@@ -7,9 +7,12 @@
 // outside single quotes (also in heredocs with an unquoted delimiter), and shell heredocs. Quoted
 // heredoc bodies and quoted prose are data. `eval`, `sh`/interpreter fed from a pipe, `$VAR` or
 // `$(...)` in command position and git `-c alias.x=` deny when the text mentions push, publish or
-// release; interpreter code (`-c`/`-e`, heredoc) is scanned so only when it can start a program
-// (exec, spawn, system, subprocess, eval, dynamic import, names built from strings; Ruby/Perl/PHP
-// backticks and pipe opens; names built by other means are a known gap). Comments, `case` patterns and `$'...'` quoting are parsed like the shell.
+// release; interpreter code (`-c`/`-e`, heredoc) is data only when inert: no exec, spawn, system,
+// eval, import/require, `${}`, join, string-built names or subscripts (Ruby/Perl/PHP: no backticks
+// or pipe opens); any other code is scanned. Code from stdin (`source /dev/stdin`, `bash <(...)`,
+// `xargs sh -c`) is scanned as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and
+// `$'...'` escapes are read like the shell. The inert test is broad on purpose (fail closed): most
+// real code (an import, a subscript) is scanned, only prose-like snippets are data.
 // `gh api` with an explicit GET and graphql queries are reads. A deny names its rule and the match.
 // Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
 // a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
@@ -35,9 +38,10 @@ const RISKY_RE = /\b(push|publish|unpublish|release|dist-tag|gh|secrets?|sops)\b
 const EXEC_RE =
   /\b(git|gh|npm|pnpm|yarn|bun|cargo|make|hoist|sops)\b[^\n]*\b(push|publish|unpublish|release|dist-tag|secrets?|merge|decrypt)\b/i;
 const INLINE_RE = /^-[a-zA-Z]*[ceEp]$|^--eval$/;
-/** Code that can start a program or hide what it calls; interpreter text without it is data. */
+/** Code that can start a program, load a module or build a name; interpreter code without any of
+ * it is inert text (data), all other code is scanned. */
 const RUNS_RE =
-  /exec|spawn|system|popen|subprocess|child_process|fork|shell|pty|ctypes|ffi|dlopen|command|eval|getattr|globals|__import__|importlib|import\s*\(|require\s*\(\s*[^\s'"`]|\$`|open3|passthru|proc_open|pcntl|%x|\bqx\b|__dict__|__builtins__|__getattribute__|\.concat\s*\(|\bvars\s*\(|['"`]\s*\+\s*['"`]/i;
+  /exec|spawn|system|popen|subprocess|child_process|fork|shell|pty|ctypes|ffi|dlopen|command|eval|getattr|globals|__import__|importlib|import\s*\(|require\s*\(\s*[^\s'"`]|\$`|open3|passthru|proc_open|pcntl|%x|\bqx\b|__dict__|__builtins__|__getattribute__|\.concat\s*\(|\bvars\s*\(|\bimport\b|\brequire\b|\$\{|\bjoin\b|attrgetter|methodcaller|\bsend\b|binding|\[\s*['"`]|['"`]\s*\+\s*['"`]/i;
 const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i;
 const SECRET_DIR_RE =
   /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/[^/]+\/environ$/;
@@ -113,6 +117,37 @@ export function ownedPaths(lockText) {
     if (m) owned.add(m[1]);
   }
   return owned;
+}
+
+const ANSI = {
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  a: "\x07",
+  b: "\b",
+  e: "\x1b",
+  E: "\x1b",
+  f: "\f",
+  v: "\v",
+};
+
+/** One ANSI-C escape (the text after the backslash): [decoded text, characters used]. */
+function ansiC(s) {
+  let m = /^x([0-9a-fA-F]{1,2})/.exec(s);
+  if (m) return [String.fromCharCode(Number.parseInt(m[1], 16)), m[0].length];
+  m = /^u([0-9a-fA-F]{1,4})|^U([0-9a-fA-F]{1,8})/.exec(s);
+  if (m) {
+    const cp = Number.parseInt(m[1] ?? m[2], 16);
+    return [cp <= 0x10ffff ? String.fromCodePoint(cp) : "", m[0].length];
+  }
+  m = /^[0-7]{1,3}/.exec(s);
+  if (m) return [String.fromCharCode(Number.parseInt(m[0], 8) & 255), m[0].length];
+  // `\c'` leaves the quote's end alone: bash keeps `\c` and closes the quote
+  if (s[0] === "c" && s[1] === "\\" && s.length > 2) return [String.fromCharCode(0x1c), 3]; // `\c\\`
+  if (s[0] === "c" && s.length > 1 && s[1] !== "'")
+    return [String.fromCharCode(s.charCodeAt(1) & 31), 2];
+  if (s[0] === "c") return ["\\c", 1];
+  return [ANSI[s[0]] ?? s[0], 1];
 }
 
 /** End index of the substitution opened at `i` (`$(`, `<(`, `>(` or a backtick), or the text's end. */
@@ -197,9 +232,12 @@ function split(cmd) {
         (c === "$" && cmd[i + 1] === "(") ||
         (!quote && /[<>]/.test(c) && cmd[i + 1] === "("));
     if (quote === "$'") {
-      // ANSI-C quoting: `\'` does not end it
-      if (c === "\\" && i + 1 < cmd.length) cur += cmd[++i];
-      else if (c === "'") quote = "";
+      // ANSI-C quoting: decode escapes the way bash does (`$'\x2df'` is `-f`)
+      if (c === "\\" && i + 1 < cmd.length) {
+        const [ch, len] = ansiC(cmd.slice(i + 1));
+        cur += ch;
+        i += len;
+      } else if (c === "'") quote = "";
       else cur += c;
     } else if (!quote && c === "$" && cmd[i + 1] === "'") {
       quote = "$'";
@@ -234,10 +272,13 @@ function split(cmd) {
       has = true;
       i += 2;
     } else if (c === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
-      const m = /^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|([^\s;&|<>()]+))/.exec(cmd.slice(i));
+      const m = /^<<(-?)[ \t]*((?:'[^']*'|"[^"]*"|\\.|[^\s;&|<>()'"\\])+)/.exec(cmd.slice(i));
       if (m) {
         endToken();
-        pending.push({ strip: m[1] === "-", word: m[2] ?? m[3] ?? m[4], data: !m[4] });
+        // The delimiter is the whole word minus its quotes (`"E"OF`, `E"OF"`, `\EOF` are EOF);
+        // any quote or backslash in it makes the body data.
+        const word = m[2].replace(/\$?'([^']*)'|\$?"([^"]*)"|\\(.)/g, "$1$2$3"); // `$'EOF'` too
+        pending.push({ strip: m[1] === "-", word, data: /['"\\]/.test(m[2]) });
         i += m[0].length - 1;
       } else {
         cur += c;
@@ -404,6 +445,17 @@ export function commands(cmd) {
     const segText = seg.join(" ");
     // `xargs git ...` takes its last arguments from stdin; `find -exec cmd ... ;` runs cmd.
     if (base(seg[0].replace(/^[({]+/, "")) === "xargs") out.push(["@evade", segText]);
+    // `source /dev/stdin`, `bash <(...)`, `xargs sh -c`: the code comes from elsewhere.
+    const fed = (x) => /^(\/dev\/(stdin|fd\/0)|\/proc\/self\/fd\/0|-|<\(.*)$/.test(x);
+    if (
+      ((prog === "source" || prog === ".") && (t.length === 1 || fed(t[1]))) ||
+      ((SHELLS.has(prog) || INTERPRETERS.test(prog)) &&
+        t.slice(1).some(fed) &&
+        !seg.docs?.length) ||
+      (base(seg[0].replace(/^[({]+/, "")) === "xargs" &&
+        (SHELLS.has(prog) || INTERPRETERS.test(prog)))
+    )
+      out.push(["@evade", text]);
     if (prog === "find") {
       const e = t.findIndex((x) => x === "-exec" || x === "-execdir" || x === "-ok");
       if (e >= 0) {

@@ -491,9 +491,10 @@ settings pin no main-session model (the session's own choice stands).
   backticks, `<(...)`; not in single quotes or quoted-delimiter heredocs) are checked as commands;
   `gh api` with an explicit GET or a graphql query (not a mutation) is a read. Indirection (`eval`,
   `sh` or an interpreter fed from a pipe, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies
-  when the text mentions push, publish or release; interpreter code (`-c`/`-e`, heredoc) is scanned
-  only when it can start a program (exec/spawn/system/subprocess/eval/dynamic import, Ruby/Perl/PHP
-  backticks). A deny reason ends with `(rule <key>, matched `<command or token>`)`; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
+  when the text mentions push, publish or release; interpreter code (`-c`/`-e`, heredoc) is data
+  only when inert (no exec/spawn/system/eval, import/require, `${}`, join, string-built names;
+  Ruby/Perl/PHP: no backticks or pipe opens), else scanned; code read from stdin (`source
+  /dev/stdin`, `bash <(...)`, `xargs sh -c`) is scanned as text; `$'...'` escapes are decoded. A deny reason ends with `(rule <key>, matched `<command or token>`)`; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
   `cd`/`pushd` and any `-C`/`--chdir`/`--directory`/`--work-tree`/`--prefix` flag (`env`, `tar`,
   `make`, `git`) into `.claude`, `.claude/hooks`, `.bosun` or `.github/workflows` deny, also through a
   glob (`cd .cla*`); relative paths resolve against the hook's `cwd`; `patch` and `git apply` are read
