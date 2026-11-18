@@ -58,7 +58,9 @@ export function inert(body, prog) {
   for (let i = 0; i < body.length; i++) {
     const c = body[i];
     // A comment ends at the newline, whatever quotes it holds.
-    if ((lang !== "js" && c === "#") || (lang === "js" && c === "/" && body[i + 1] === "/")) {
+    // Perl/Ruby/PHP: `#` can delimit a quote (`q#..#`, `%q#..#`), so it is code, never a comment.
+    if (lang === "rpp" && c === "#") return false;
+    if ((lang === "py" && c === "#") || (lang === "js" && c === "/" && body[i + 1] === "/")) {
       const nl = body.indexOf("\n", i);
       if (nl < 0) break;
       i = nl - 1;
@@ -81,16 +83,38 @@ export function inert(body, prog) {
     .split(/[;\n]/)
     .map((x) => x.trim())
     .filter(Boolean);
-  return stmts.every(
-    (x) => PRINT_RE.test(x) || (lang === "py" && PY_INERT_RES.some((re) => re.test(x))),
-  );
+  // A printed name must be assigned earlier by an inert statement (`process`, `ENV`, `$_` are not).
+  const assigned = new Set();
+  for (const x of stmts) {
+    if (lang === "py" && PY_INERT_RES.some((re) => re.test(x))) {
+      const name = /^([A-Za-z_]\w*)\s*=/.exec(x)?.[1];
+      if (name) assigned.add(name);
+    } else if (PRINT_RE.test(x)) {
+      const names = x.replace(/^\w+(\.\w+)?/, "").match(/[A-Za-z_]\w*/g) ?? [];
+      if (names.some((n) => n !== "S" && n !== "in" && !assigned.has(n))) return false;
+    } else return false;
+  }
+  return true;
 }
+
+const UNICODE_NAMES = { "FULL STOP": ".", SOLIDUS: "/", "HYPHEN-MINUS": "-", "LOW LINE": "_" };
 
 /** Escapes in string text decoded (`".\x65nv"` is `.env`), for secret scans. */
 function unescape(body) {
-  return body.replace(/\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\([0-7]{1,3})/g, (_, x, u, o) =>
-    String.fromCharCode(Number.parseInt(x ?? u ?? o, x || u ? 16 : 8)),
-  );
+  return body
+    .replace(/\\\n/g, "")
+    .replace(/\\N\{([A-Z -]+)\}/g, (m, n) => {
+      const letter = /^LATIN (SMALL|CAPITAL) LETTER ([A-Z])$/.exec(n);
+      if (letter) return letter[1] === "SMALL" ? letter[2].toLowerCase() : letter[2];
+      return UNICODE_NAMES[n] ?? m;
+    })
+    .replace(
+      /\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})|\\([0-7]{1,3})/g,
+      (_, x, u, U, o) => {
+        const cp = Number.parseInt(x ?? u ?? U ?? o, o ? 8 : 16);
+        return cp <= 0x10ffff ? String.fromCodePoint(cp) : "";
+      },
+    );
 }
 
 /** Adjacent or joined string literals merged (`".en" "v"`, `".en" + "v"`) for secret scans. */
@@ -107,6 +131,8 @@ function joinStrings(body) {
   return out;
 }
 
+/** The whole environment passed as a value: `console.log(process)`, `puts ENV`, `p ENV.to_h`. */
+const WHOLE_ENV_RE = /\bprocess\s*[,)\]}]|\bprocess\s*$|\bENV\b(?!\s*\[|\s*\.\s*fetch)|%ENV\b/m;
 const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i;
 const SECRET_DIR_RE =
   /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/[^/]+\/environ$/;
@@ -550,7 +576,9 @@ export function commands(cmd) {
     }
     const noArgs = t.slice(1).every((x) => x === "-" || x === "-s") && !seg.docs?.length;
     // stripPrefixes drops a token's trailing `)`: give it back before the inert test.
-    const runs = (body) => ![body, `${body})`, `${body}))`].some((b) => inert(b, prog));
+    // perl/ruby -n/-p loop over stdin with implicit variables: never inert.
+    const loops = /^(perl|ruby)/.test(prog) && t.some((x) => /^-[a-zA-Z]*[np][a-zA-Z]*$/.test(x));
+    const runs = (body) => loops || ![body, `${body})`, `${body}))`].some((b) => inert(b, prog));
     // `bash <<< 'cmd'`: the here-string is evaluated.
     const hs = t.findIndex((x) => x.startsWith("<<<"));
     if (hs >= 0 && (SHELLS.has(prog) || INTERPRETERS.test(prog))) {
@@ -564,12 +592,14 @@ export function commands(cmd) {
           ? 1
           : t.findIndex((x, n) => n > 0 && (INLINE_RE.test(x) || (prog === "php" && x === "-r")));
       if (i > 0 && t[i + 1] !== undefined) {
-        if (runs(t[i + 1])) out.push(["@evade", t[i + 1]]);
+        if (runs(t[i + 1])) out.push(["@evade", loops ? text : t[i + 1]]); // -n/-p: stdin is code
+        if (runs(t[i + 1]) && WHOLE_ENV_RE.test(t[i + 1])) out.push(["printenv"]);
         secretTokens(t[i + 1]);
       } else if (noArgs) out.push(["@evade", text]); // code fed on stdin
       // Heredoc code is not scanned like a shell, only for reads of secret files and exec text.
       for (const body of seg.docs ?? []) {
         if (runs(body)) out.push(["@evade-exec", body]);
+        if (runs(body) && WHOLE_ENV_RE.test(body)) out.push(["printenv"]);
         secretTokens(body);
       }
     }
@@ -609,6 +639,7 @@ function secretLike(value) {
   if (typeof value !== "string" || !value) return false;
   const clean = value.replace(/^[<>]+/, "");
   const variants = [clean, clean.slice(clean.lastIndexOf("=") + 1), clean.split(/[<>]/).pop()];
+  variants.push(...variants.map((v) => posix.normalize(v))); // `/proc/self/./environ`
   for (const v of new Set(variants)) {
     if (isSecretName(v.slice(v.lastIndexOf("/") + 1)) || SECRET_DIR_RE.test(v.replace(/\/+$/, "")))
       return true;
