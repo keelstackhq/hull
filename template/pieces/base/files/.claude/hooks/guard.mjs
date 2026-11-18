@@ -133,7 +133,7 @@ function joinStrings(body) {
 
 /** The whole environment passed as a value: `console.log(process)`, `puts ENV`, `p ENV.to_h`. */
 const WHOLE_ENV_RE =
-  /\bprocess\s*[,)\]}]|\bprocess\s*$|\bENV\b(?!\s*\[|\s*\.\s*fetch)|%ENV\b|\bgetenv\s*\(\s*\)|\$_(SERVER|ENV)\b(?!\s*\[)|\b(Bun|Deno)\.env\b(?!\s*\.\s*(get\b|[A-Za-z_]\w*\b(?!\s*\()))|\bos\.environb\b(?![.[\w])/m;
+  /\bprocess\s*[,)\]}]|\bprocess\s*$|\bENV\b(?!\s*\[|\s*\.\s*fetch)|%ENV\b|\bgetenv\s*\(\s*\)|\$_(SERVER|ENV)\b(?!\s*\[)|\b(Bun|Deno)\s*(?:\.\s*env|\[\s*["']env["']\s*\])(?![\w$])(?!\s*\[|\s*\.\s*(get\b|[A-Za-z_]\w*\b(?!\s*\()))|\bos\.environb\b(?![.[\w])/m;
 const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i;
 const SECRET_DIR_RE = /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/.+\/environ$/;
 const PROTECTED_RES = [

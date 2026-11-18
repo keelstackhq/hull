@@ -1015,6 +1015,8 @@ test("follow-up: every /proc/**/environ path and whole-env reads in more runtime
     "php -r 'var_dump($_SERVER);'",
     "php -r 'print_r($_ENV);'",
     "bun -e 'console.log(Bun.env)'",
+    "bun -e 'console.log(Bun . env)'",
+    "bun -e 'console.log(Bun[\"env\"])'",
     "deno eval 'console.log(Deno.env.toObject())'",
     "python3 -c 'import os; print(os.environb)'",
   ])
@@ -1022,6 +1024,8 @@ test("follow-up: every /proc/**/environ path and whole-env reads in more runtime
   for (const cmd of [
     "php -r 'echo getenv(\"HOME\");'",
     "bun -e 'console.log(Bun.env.HOME)'",
+    "bun -e 'console.log(Bun.env[\"HOME\"])'",
+    "deno eval 'console.log(Deno.env.get(\"HOME\"))'",
     "cat /proc/self/status",
   ])
     assert.equal(decide(bash(cmd), ctx), null, cmd);
