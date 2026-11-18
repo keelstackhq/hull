@@ -14,6 +14,9 @@ Keep `unreleased` while changes accumulate.
   `.github/workflows/*.yml` that does not parse (an unquoted ` : ` once disabled a client repo's
   workflow silently for a day). Uses the pinned, integrity-checked `yaml` 2.9.1 tarball; < 1 s; a
   failed download fails the step.
+- `ready.mjs` (both templates): the stack comes from `.splice/lock.toml`'s source; a package.json
+  with no dependencies (helper scripts only) no longer makes `ready` require pnpm or `--assess`
+  answer `template/`/`ts-pnpm` in a template-rust repo. Reported from a client repo.
 - Rust (both templates): root `Cargo.toml` adds `[profile.dev.package."*"] debug = false`
   (dependencies without debug info: `target/` and the CI cache about 27 % smaller, build time
   unchanged); `template/`'s root also gets `[profile.dev] debug = "line-tables-only"`. Per-crate

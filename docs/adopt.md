@@ -32,8 +32,8 @@ reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 
 | Signal       | Looks for                                           | Gives            |
 | ------------ | --------------------------------------------------- | ---------------- |
-| `pnpm`       | pnpm-workspace.yaml or a package.json               | `template/`      |
-| `cargo-only` | Cargo.toml and no package.json                      | `template-rust/` |
+| `pnpm`       | pnpm-workspace.yaml or a package.json with deps     | `template/`      |
+| `cargo-only` | Cargo.toml and no package.json with deps            | `template-rust/` |
 | `preact`     | a package.json depending on preact                  | `preact-app`     |
 | `astro`      | a package.json depending on astro                   | `astro-site`     |
 | `hono`       | hono dependency next to a wrangler config           | `hono-worker`    |
@@ -42,8 +42,10 @@ reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 | `rust-lib`   | a Cargo crate with src/lib.rs and no binary         | `rust-tool`      |
 | `layout`     | apps/, packages/ and crates/ dirs (where pieces go) | where pieces go  |
 
-A Tauri app replaces its preact hit; a workspace root's package.json is not an app. In
-template-rust, library crates stay with the base (no piece). Each piece has a move: apps, sites,
+A `.splice/lock.toml` source names the template outright; signals then only pick pieces. A
+root package.json with no dependencies (helper scripts only) is no signal. A Tauri app replaces its
+preact hit; a workspace root's package.json is not an app. In template-rust, library crates
+stay with the base (no piece). Each piece has a move: apps, sites,
 workers and Tauri apps go to `apps/<name>`, crates to `crates/<name>`, with the name taken from
 the directory (or package.json / Cargo.toml for the repo root). Code already in place does not
 move; code elsewhere is moved by hand on the branch, before `splice adopt`.
