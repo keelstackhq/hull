@@ -32,6 +32,7 @@ const LICENSES = ["node", ["scripts/licenses.mjs"]];
 const CHECKS = [
   ["node", ["scripts/agents-index.mjs", "--check"]],
   ["node", ["scripts/licenses.mjs", "--check"]],
+  ["node", [".github/scripts/workflows.mjs"]],
 ];
 
 /** Steps run in a rendered template-rust combo (spec §15): no pnpm, no turbo. */

@@ -19,6 +19,10 @@ steps:
   - run:
       name: Licenses list current?
       command: node scripts/licenses.mjs --check
+  # step: workflows
+  - run:
+      name: Workflows parse?
+      command: node .github/scripts/workflows.mjs
   # step: docs-only
   - run:
       name: Docs only?

@@ -9,6 +9,10 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- Generated CI (both templates, GitHub and CircleCI): a `Workflows parse?` step runs
+  `node .github/scripts/workflows.mjs` before the affected/docs-only exit and fails on any
+  `.github/workflows/*.yml` that does not parse (an unquoted ` : ` once disabled a client repo's
+  workflow silently for a day). Uses the pinned, integrity-checked `yaml` 2.9.1 tarball; < 1 s.
 - Rust (both templates): root `Cargo.toml` adds `[profile.dev.package."*"] debug = false`
   (dependencies without debug info: `target/` and the CI cache about 27 % smaller, build time
   unchanged); `template/`'s root also gets `[profile.dev] debug = "line-tables-only"`. Per-crate
