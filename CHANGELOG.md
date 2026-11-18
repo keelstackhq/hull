@@ -9,6 +9,11 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- guard.mjs (both templates) judges the commands that run, not text: interpreter heredocs and
+  `-c`/`-e` bodies are data unless they can start a program; `gh api` with an explicit GET and
+  graphql queries are reads; `$(...)`, backticks and `<(...)` (also in unquoted heredocs) are now
+  checked as commands (`echo "$(git push -f)"` was allowed). A deny names its rule and the matched
+  command. Fixes false positives reported from a client repo.
 - Rust (both templates): root `Cargo.toml` adds `[profile.dev.package."*"] debug = false`
   (dependencies without debug info: `target/` and the CI cache about 27 % smaller, build time
   unchanged); `template/`'s root also gets `[profile.dev] debug = "line-tables-only"`. Per-crate

@@ -487,9 +487,13 @@ settings pin no main-session model (the session's own choice stands).
   `~/.aws|.ssh|.config/gh`, `/proc/*/environ`, bare `env`/`printenv`, `echo $…KEY…`, `sops -d`,
   `age -d`, `hoist secrets exec -- env|sh`; not `.env.example`) and writes to the guard rail itself
   (`.splice/lock.toml`, `.claude/hooks/*`, `.claude/settings*.json`, `release*.yml`, `.bosun/*`,
-  `git config core.hooksPath|alias.*`). Indirection (`eval`, `sh` or an interpreter fed from a pipe,
-  `-c`/`-e` bodies, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies when the text mentions
-  push, publish or release; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
+  `git config core.hooksPath|alias.*`). It judges what runs: command substitutions (`$(...)`,
+  backticks, `<(...)`; not in single quotes or quoted-delimiter heredocs) are checked as commands;
+  `gh api` with an explicit GET or a graphql query (not a mutation) is a read. Indirection (`eval`,
+  `sh` or an interpreter fed from a pipe, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies
+  when the text mentions push, publish or release; interpreter code (`-c`/`-e`, heredoc) is scanned
+  only when it can start a program (exec/spawn/system/subprocess/eval/dynamic import, Ruby/Perl/PHP
+  backticks). A deny reason ends with `(rule <key>, matched `<command or token>`)`; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
   `cd`/`pushd` and any `-C`/`--chdir`/`--directory`/`--work-tree`/`--prefix` flag (`env`, `tar`,
   `make`, `git`) into `.claude`, `.claude/hooks`, `.bosun` or `.github/workflows` deny, also through a
   glob (`cd .cla*`); relative paths resolve against the hook's `cwd`; `patch` and `git apply` are read

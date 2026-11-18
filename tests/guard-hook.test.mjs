@@ -860,3 +860,94 @@ test("chdir flags and globs into a guarded dir are treated like cd", () => {
   ])
     assert.equal(decide(bash(cmd), c), null, cmd);
 });
+
+// Client feedback 2026-11-18: judge the command that runs, not text inside heredocs or strings.
+test("false positives from a client repo: scripts, GET API reads, interpreter text, piped pushes", () => {
+  const c = repoOn("feat/x");
+  for (const cmd of [
+    "bash scripts/tests/dev-slack-test.sh",
+    "bash scripts/tests/dev-slack-test.sh 2>&1 | tail -20",
+    "gh api repos/o/r/pulls/7",
+    "gh api repos/o/r/pulls/7 --jq .auto_merge",
+    "gh api repos/o/r/pulls/7 -q '.auto_merge.enabled_by.login'",
+    "gh api --method GET repos/o/r/pulls -f state=open",
+    "gh api -X GET search/issues -f q='repo:o/r is:pr auto-merge'",
+    'gh api graphql -f query=\'query { repository(owner:"o", name:"r") { pullRequest(number: 7) { autoMergeRequest { enabledAt } } } }\'',
+    "python3 - <<'PY'\nprint('see `scripts/release.sh` before git push')\nPY",
+    "python3 <<'PY'\nt = open('docs/release.md').read()\nprint('npm publish' in t, '`gh pr merge --auto`')\nPY",
+    "node <<'EOF'\nconsole.log(`run git push -u origin <branch>, never npm publish`);\nEOF",
+    "python3 -c \"print('git push and npm publish are in docs/release.md')\"",
+    'python3 -c \'v=open("VERSION").read().split("."); print("release", v)\'',
+    "git push -u origin feat/x 2>&1 | tail -5",
+    "git push 2>&1 | tail",
+    "git push origin HEAD 2>&1 | tee /tmp/push.log | tail -3",
+  ])
+    assert.equal(decide(bash(cmd), c), null, cmd);
+});
+
+test("code that runs still denies: substitutions, unquoted heredocs, interpreters that exec", () => {
+  const c = repoOn("feat/x");
+  for (const cmd of [
+    'echo "$(git push -f)"',
+    "echo $(npm publish)",
+    "echo `git push --tags`",
+    "x=$(cargo publish)",
+    "diff <(git push origin main) /dev/null",
+    "cat <<EOF\n$(git push --force)\nEOF",
+    'python3 <<PY\nprint("`npm publish`")\nPY',
+    "python3 <<'PY'\nimport subprocess\nsubprocess.run(['git', 'push', '--force'])\nPY",
+    "python3 -c \"import os; os.system('g'+'it push -f')\"",
+    "node -e \"require('child_process').execSync('npm publish')\"",
+    "node <<'EOF'\nrequire('node:child_process').execSync('git push origin main');\nEOF",
+    "ruby -e '`git push -f`'",
+    "perl -e 'system(\"npm publish\")'",
+    "gh api -X PUT repos/o/r/pulls/7/merge",
+    "gh api repos/o/r/pulls/7/merge -f merge_method=squash",
+    "gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {}) { clientMutationId } }'",
+    "gh api graphql -F query=@q.graphql",
+    "gh api graphql --input q.json",
+    "gh api graphql -Fquery=@m.graphql",
+    // review round: pipe opens, names built from strings, case in $(...), $'...', other -e forms
+    "perl -e 'open(F, \"|git push -f origin main\")'",
+    'perl -e \'open(my $f, "-|", "git", "push", "-f")\'',
+    "ruby -e 'open(\"|git push -f origin main\")'",
+    "python3 -c \"import os; os.__dict__['sys'+'tem']('git push -f origin main')\"",
+    "node -e \"require('child_'+'process')['ex'+'ecSync']('git push -f origin main')\"",
+    "echo $(case x in x) git push -f origin main;; esac)",
+    "echo $(case x in (x) npm publish;; esac)",
+    "case $x in a) ls ;; b) npm publish ;; esac",
+    "case x in x)git push -f origin main;; esac",
+    'echo "$(echo case)" ; git push -f origin main',
+    "node -r dotenv/config -e \"require('child_process').execSync('git push -f origin main')\"",
+    "ruby -r json -e 'system(\"git push -f origin main\")'",
+    "node -e \"require('child_'.concat('process'))['ex'.concat('ecSync')]('git push -f origin main')\"",
+    'php -r \'$f="sys"."tem"; $f("git push -f origin main");\'',
+    "echo $'\\'' $(git push -f origin main) $'\\''",
+    "php -r 'system(\"npm publish\");'",
+    'deno eval \'new Deno.Command("git", { args: ["push", "-f"] }).outputSync()\'',
+  ])
+    assert.equal(decide(bash(cmd), c)?.decision, "deny", cmd);
+  assert.equal(decide(bash("echo '$(git push -f)'"), c), null, "single quotes are data");
+  assert.equal(
+    decide(bash("echo hi # $(git push -f origin main)"), c),
+    null,
+    "a comment never runs",
+  );
+  assert.equal(decide(bash("echo $# a#b"), c), null);
+  assert.equal(
+    decide(bash("cat <<'EOF'\n$(git push --force)\nEOF"), c),
+    null,
+    "quoted heredoc is data",
+  );
+});
+
+test("deny reason names the matched rule and the exact command", () => {
+  const c = repoOn("feat/x");
+  const r = decide(bash("ls && git push --force origin feat/x | tail"), c).reason;
+  assert.match(r, /rule force/);
+  assert.match(r, /`git push --force origin feat\/x`/);
+  const e = decide(bash("python3 -c \"import os; os.system('g'+'it push -f')\""), c).reason;
+  assert.match(e, /rule evasion/);
+  assert.match(e, /`push`/);
+  assert.match(decide(tool("Read", { file_path: ".env" }), c).reason, /rule secret.*`\.env`/);
+});
