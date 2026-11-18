@@ -47,6 +47,13 @@ const GITHUB_STEPS = [
     ),
   },
   {
+    id: "workflows",
+    github: yml(
+      "      - name: Workflows parse?",
+      "        run: node .github/scripts/workflows.mjs",
+    ),
+  },
+  {
     id: "affected",
     github: yml(
       "      - name: Anything affected?",
@@ -237,6 +244,11 @@ const CIRCLECI = {
     "  - run:",
     "      name: Licenses list current?",
     "      command: node scripts/licenses.mjs --check",
+  ),
+  workflows: yml(
+    "  - run:",
+    "      name: Workflows parse?",
+    "      command: node .github/scripts/workflows.mjs",
   ),
   affected: yml(
     "  - run:",
@@ -469,6 +481,7 @@ export const RUST_CI_PLAN = Object.freeze(
       circleci: CIRCLECI["agents-index"],
     },
     { id: "licenses", github: GITHUB_STEPS[3].github, circleci: CIRCLECI.licenses },
+    { id: "workflows", github: GITHUB_STEPS[4].github, circleci: CIRCLECI.workflows },
     {
       id: "docs-only",
       github: yml(

@@ -82,6 +82,7 @@ test("base combo runs git init, install, index write, turbo, index check in orde
     EXTRA,
     "node scripts/agents-index.mjs --check",
     "node scripts/licenses.mjs --check",
+    "node .github/scripts/workflows.mjs",
   ]);
 });
 
@@ -101,6 +102,7 @@ test("splice renderer (default): splice new (git init + post hooks), then turbo,
     EXTRA,
     "node scripts/agents-index.mjs --check",
     "node scripts/licenses.mjs --check",
+    "node .github/scripts/workflows.mjs",
     `node ${fileURLToPath(new URL("../scripts/check-single-vite.mjs", import.meta.url))} ${join(root, "site")}`,
   ]);
 });
@@ -154,6 +156,7 @@ test("rust combo (template-rust): no pnpm or turbo; cargo steps, index write and
     EXTRA,
     "node scripts/agents-index.mjs --check",
     "node scripts/licenses.mjs --check",
+    "node .github/scripts/workflows.mjs",
   ]);
 });
 
@@ -173,5 +176,6 @@ test("rust combo with splice: renders template-rust without vars, then the cargo
     EXTRA,
     "node scripts/agents-index.mjs --check",
     "node scripts/licenses.mjs --check",
+    "node .github/scripts/workflows.mjs",
   ]);
 });

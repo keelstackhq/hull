@@ -10,10 +10,19 @@ Keep `unreleased` while changes accumulate.
 ## v0.14.0 — unreleased
 
 - guard.mjs (both templates) judges the commands that run, not text: interpreter heredocs and
-  `-c`/`-e` bodies are data unless they can start a program; `gh api` with an explicit GET and
+  `-c`/`-e` bodies are data only when every statement is inert (print a literal, read a
+  literal path); `gh api` with an explicit GET and
   graphql queries are reads; `$(...)`, backticks and `<(...)` (also in unquoted heredocs) are now
   checked as commands (`echo "$(git push -f)"` was allowed). A deny names its rule and the matched
   command. Fixes false positives reported from a client repo.
+- Generated CI (both templates, GitHub and CircleCI): a `Workflows parse?` step runs
+  `node .github/scripts/workflows.mjs` before the affected/docs-only exit and fails on any
+  `.github/workflows/*.yml` that does not parse (an unquoted ` : ` once disabled a client repo's
+  workflow silently for a day). Uses the pinned, integrity-checked `yaml` 2.9.1 tarball; < 1 s; a
+  failed download fails the step.
+- `ready.mjs` (both templates): the stack comes from `.splice/lock.toml`'s source; a package.json
+  with no dependencies (helper scripts only) no longer makes `ready` require pnpm or `--assess`
+  answer `template/`/`ts-pnpm` in a template-rust repo. Reported from a client repo.
 - Rust (both templates): root `Cargo.toml` adds `[profile.dev.package."*"] debug = false`
   (dependencies without debug info: `target/` and the CI cache about 27 % smaller, build time
   unchanged); `template/`'s root also gets `[profile.dev] debug = "line-tables-only"`. Per-crate
