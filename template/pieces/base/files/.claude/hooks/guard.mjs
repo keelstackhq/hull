@@ -7,12 +7,11 @@
 // outside single quotes (also in heredocs with an unquoted delimiter), and shell heredocs. Quoted
 // heredoc bodies and quoted prose are data. `eval`, `sh`/interpreter fed from a pipe, `$VAR` or
 // `$(...)` in command position and git `-c alias.x=` deny when the text mentions push, publish or
-// release; interpreter code (`-c`/`-e`, heredoc) is data only when inert: no exec, spawn, system,
-// eval, import/require, `${}`, join, string-built names or subscripts (Ruby/Perl/PHP: no backticks
-// or pipe opens); any other code is scanned. Code from stdin (`source /dev/stdin`, `bash <(...)`,
-// `xargs sh -c`) is scanned as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and
-// `$'...'` escapes are read like the shell. The inert test is broad on purpose (fail closed): most
-// real code (an import, a subscript) is scanned, only prose-like snippets are data.
+// release; interpreter code (`-c`/`-e`, heredoc) is data only when it is an allowlisted inert form
+// (`inert()`: literals printed, a file read or parsed, json/yaml/re imported); any other code is
+// scanned (fail closed). Code from stdin (`source /dev/stdin`, `bash <(...)`, `xargs`) is scanned
+// as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and `$'...'` escapes are read
+// like the shell; joined string literals are checked for secret file names.
 // `gh api` with an explicit GET and graphql queries are reads. A deny names its rule and the match.
 // Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
 // a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
@@ -38,10 +37,80 @@ const RISKY_RE = /\b(push|publish|unpublish|release|dist-tag|gh|secrets?|sops)\b
 const EXEC_RE =
   /\b(git|gh|npm|pnpm|yarn|bun|cargo|make|hoist|sops)\b[^\n]*\b(push|publish|unpublish|release|dist-tag|secrets?|merge|decrypt)\b/i;
 const INLINE_RE = /^-[a-zA-Z]*[ceEp]$|^--eval$/;
-/** Code that can start a program, load a module or build a name; interpreter code without any of
- * it is inert text (data), all other code is scanned. */
-const RUNS_RE =
-  /exec|spawn|system|popen|subprocess|child_process|fork|shell|pty|ctypes|ffi|dlopen|command|eval|getattr|globals|__import__|importlib|import\s*\(|require\s*\(\s*[^\s'"`]|\$`|open3|passthru|proc_open|pcntl|%x|\bqx\b|__dict__|__builtins__|__getattribute__|\.concat\s*\(|\bvars\s*\(|\bimport\b|\brequire\b|\$\{|\bjoin\b|attrgetter|methodcaller|\bsend\b|binding|\[\s*['"`]|['"`]\s*\+\s*['"`]/i;
+/** Names inert interpreter code may use: printing literals, reading and parsing a file. */
+const INERT_NAMES = new Set(
+  (
+    "print puts printf echo say console log error warn info open read readlines readline with as " +
+    "strip rstrip lstrip split splitlines join replace upper lower startswith endswith format len " +
+    "str int float bool list dict tuple sorted reversed enumerate range min max sum any all keys " +
+    "values items get json loads load dumps dump JSON parse stringify yaml safe_load safe_dump " +
+    "in not and or is if else elif for while True False None true false null undefined nil const " +
+    "let var length trim includes indexOf slice"
+  ).split(" "),
+);
+const INERT_IMPORT_RE =
+  /\b(?:import\s+(?:json|yaml|re)\b(?:\s*,\s*(?:json|yaml|re)\b)*|from\s+(?:json|yaml|re)\s+import\s+[\w ,]+)/g;
+
+/** True when interpreter code is an allowlisted inert form: literals printed, a file read or
+ * parsed, json/yaml/re imported; no other call, attribute, import or interpolation. Anything
+ * else is code and is scanned (fail closed). */
+export function inert(body, prog) {
+  const lang = /^(ruby|perl|php)/.test(prog) ? "rpp" : /^python/.test(prog) ? "py" : "js";
+  let code = "";
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (c === "`" && lang === "rpp") return false; // backticks run a program
+    if (c === "`" && /[\w$)\]]\s*$/.test(code)) return false; // a tagged template is a call
+    if (c !== "'" && c !== '"' && c !== "`") {
+      code += c;
+      continue;
+    }
+    let j = i + 1;
+    while (j < body.length && body[j] !== c) j += body[j] === "\\" ? 2 : 1;
+    const content = body.slice(i + 1, j);
+    if (/[$#@]\{/.test(content) || (/[fF]$/.test(code) && content.includes("{"))) return false;
+    if (lang === "py" && /[fF]$/.test(code)) code = code.slice(0, -1);
+    code += " S ";
+    i = j;
+  }
+  code = code
+    .replace(lang === "js" ? /\/\/.*$/gm : /#.*$/gm, "")
+    .replace(INERT_IMPORT_RE, "")
+    .replace(/\b\d[\w.]*/g, "0");
+  if (/\bS\s*\(/.test(code)) return false; // a string called as a function
+  if (/[\])]\s*\(/.test(code)) return false; // a call on a call or subscript result
+  if (code.includes("__")) return false; // dunder attributes reach builtins and modules
+  if (lang === "js" && code.includes("/")) return false; // a regex literal can hide code
+  if (/\bopen\s*\((?!\s*S\b)/.test(code)) return false; // read only a literal path (secret scan)
+  const declared = new Set();
+  for (const m of code.matchAll(
+    /(?<![.\w$])([A-Za-z_$][\w$]*)\s*=(?![=>~])|\b(?:for|as|const|let|var)\s+([A-Za-z_$][\w$]*)/g,
+  ))
+    declared.add(m[1] ?? m[2]);
+  for (const m of code.matchAll(/[A-Za-z_$][\w$]*/g)) {
+    const name = m[0];
+    if (name === "S") continue;
+    const call = /^\s*\(/.test(code.slice(m.index + name.length));
+    const ok = INERT_NAMES.has(name) && !(lang === "rpp" && name === "open");
+    if (!ok && (call || !declared.has(name))) return false;
+  }
+  return true;
+}
+
+/** Adjacent or joined string literals merged (`".en" "v"`, `".en" + "v"`) for secret scans. */
+function joinStrings(body) {
+  let prev;
+  let out = body;
+  for (let n = 0; n < 20 && out !== prev; n++) {
+    prev = out;
+    out = out.replace(
+      /(['"])([^'"\n]*)\1\s*[+.]?\s*(['"])([^'"\n]*)\3/g,
+      (_, q, a, _q, b) => q + a + b + q,
+    );
+  }
+  return out;
+}
+
 const SECRET_VAR_RE = /\$\{?[A-Za-z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)/i;
 const SECRET_DIR_RE =
   /(^|\/)\.(aws|ssh|age)(\/|$)|(^|\/)\.config\/gh(\/|$)|^\/proc\/[^/]+\/environ$/;
@@ -424,9 +493,16 @@ export function commands(cmd) {
   const DUMP_RE = /process\.env(?![.[\w])|os\.environ(?![.[\w])|\bENVIRON\b/;
   const secretTokens = (body) => {
     if (DUMP_RE.test(body)) out.push(["printenv"]);
-    for (const m of body.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
-      if (secretLike(m[0])) out.push(["cat", m[0]]);
-    }
+    // String pieces in order, joined two and three at a time: a path built from parts.
+    const parts = [...body.matchAll(/(['"`])([^'"`\n]*)\1/g)].map((m) => m[2]);
+    const built = parts.flatMap((p, i) => [
+      p + (parts[i + 1] ?? ""),
+      p + (parts[i + 1] ?? "") + (parts[i + 2] ?? ""),
+    ]);
+    for (const text of [body, joinStrings(body), built.join(" ")])
+      for (const m of text.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
+        if (secretLike(m[0])) out.push(["cat", m[0]]);
+      }
   };
   const segs = split(text);
   if (segs.subs.unclosed) out.push(["@evade", text]);
@@ -444,7 +520,7 @@ export function commands(cmd) {
     const prog = base(t[0]);
     const segText = seg.join(" ");
     // `xargs git ...` takes its last arguments from stdin; `find -exec cmd ... ;` runs cmd.
-    if (base(seg[0].replace(/^[({]+/, "")) === "xargs") out.push(["@evade", segText]);
+    if (base(seg[0].replace(/^[({]+/, "")) === "xargs") out.push(["@evade", text]); // args come from the pipe
     // `source /dev/stdin`, `bash <(...)`, `xargs sh -c`: the code comes from elsewhere.
     const fed = (x) => /^(\/dev\/(stdin|fd\/0)|\/proc\/self\/fd\/0|-|<\(.*)$/.test(x);
     if (
@@ -477,13 +553,7 @@ export function commands(cmd) {
       for (const inner of commands(body)) out.push(inner);
     }
     const noArgs = t.slice(1).every((x) => x === "-" || x === "-s") && !seg.docs?.length;
-    // Ruby, Perl and PHP run backticks and pipe opens (`open("|cmd")`); elsewhere they are text.
-    const runs = (body) =>
-      RUNS_RE.test(body) ||
-      (/^(ruby|perl|php)/.test(prog) &&
-        (body.includes("`") ||
-          (prog === "php" && /['"]\s*\.\s*['"]/.test(body)) ||
-          /\bopen\b[\s\S]*\|/.test(body)));
+    const runs = (body) => !inert(body, prog);
     // `bash <<< 'cmd'`: the here-string is evaluated.
     const hs = t.findIndex((x) => x.startsWith("<<<"));
     if (hs >= 0 && (SHELLS.has(prog) || INTERPRETERS.test(prog))) {
