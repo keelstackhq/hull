@@ -40,7 +40,11 @@ function prWorkflows() {
   return out;
 }
 
-const all = prWorkflows();
+// bosun channel workflows are owned by bosun (its own draft and `edited` handling), not hull.
+const BOSUN = new Set(
+  ["bosun", "risk", "verdict", "main-open", "main-health"].map((n) => `.github/workflows/${n}.yml`),
+);
+const all = prWorkflows().filter((w) => !BOSUN.has(w.rel));
 
 test("PR-triggered workflows are found (hull, template, template-rust)", () => {
   const rels = all.map((w) => w.rel);
@@ -85,4 +89,14 @@ test("every PR workflow cancels superseded PR runs", () => {
     assert.ok(c?.group, `${rel}: concurrency group`);
     assert.match(String(c["cancel-in-progress"]), /^true$|event_name == 'pull_request'/, rel);
   }
+});
+
+// bosun.yml is excluded above (bosun owns it), but it must still gate drafts its own way.
+test("bosun.yml skips drafts: ready_for_review runs it, bosun-trusted skips drafts, bosun-ok fails them", () => {
+  const wf = YAML.parse(readFileSync(join(ROOT, ".github/workflows/bosun.yml"), "utf8"));
+  assert.ok(wf.on.pull_request.types.includes("ready_for_review"));
+  assert.match(wf.jobs["bosun-trusted"].if, /github\.event\.pull_request\.draft == false/);
+  const first = wf.jobs["bosun-ok"].steps[0];
+  assert.match(first.run, /if \[ "\$DRAFT" = true \]; then .*exit 1; fi/);
+  assert.equal(first.env.DRAFT, "${{ github.event.pull_request.draft || false }}");
 });

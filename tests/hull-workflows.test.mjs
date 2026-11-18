@@ -134,6 +134,8 @@ test("hull release.yml plans on main pushes and releases behind the release envi
 
 // setup-node@v5 turns on the package-manager cache by itself when package.json has
 // `packageManager`; without pnpm on PATH it then fails ("Unable to locate executable file: pnpm").
+// setup-node v4 (bosun's workflows pin it) has no automatic cache, so its steps need no opt-out.
+const SETUP_NODE_V4 = "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020";
 test("every setup-node step disables the package-manager cache unless pnpm is set up first under the same condition", async () => {
   const dirs = [
     DIR,
@@ -148,6 +150,7 @@ test("every setup-node step disables the package-manager cache unless pnpm is se
         for (const step of job.steps ?? []) {
           if (String(step.uses).startsWith("pnpm/action-setup")) pnpm.add(step.if ?? "");
           if (!String(step.uses).startsWith("actions/setup-node")) continue;
+          if (step.uses === SETUP_NODE_V4 && !step.with?.cache) continue;
           const covered = pnpm.has("") || pnpm.has(step.if ?? "");
           if (!covered && step.with?.["package-manager-cache"] !== false)
             bad.push(`${dir === DIR ? "hull" : "template"}/${f} ${name}`);
