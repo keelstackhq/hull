@@ -9,6 +9,9 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- hull's dev renderer glob matcher: a `**` that is not a whole path segment (`a**b`, `**b`,
+  `a/b**`) stays within one segment like `*`, as picomatch did; only a whole-segment `**` crosses
+  segments (contract §9.1).
 - hull's dev renderer matches globs (contract §9.1: `*`, `**`, dotfiles) with a built-in matcher
   and no longer depends on `picomatch` (ReDoS advisory GHSA-fc5q-39xc-vjpf, no patched version;
   it turned main red through bosun's deps gate). Same results on every template path.

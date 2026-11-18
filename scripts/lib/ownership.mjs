@@ -1,18 +1,29 @@
 const CLASSES = ["owned", "shared", "seed"];
 
 /** Contract §9.1 glob: `*` stays within one segment, `**` crosses segments; dotfiles match; every
- * other character is literal. */
+ * other character is literal. A `**` that is not a whole segment (`a**b`, `**b`) stays within one
+ * segment like `*` (picomatch's behaviour, which this matcher replaced). */
 function globSource(glob) {
   let out = "";
   for (let i = 0; i < glob.length; i++) {
-    if (glob.startsWith("**/", i)) {
+    const whole =
+      glob.startsWith("**", i) &&
+      (i === 0 || glob[i - 1] === "/") &&
+      (i + 2 === glob.length || glob[i + 2] === "/");
+    if (whole && glob[i + 2] === "/") {
       out += "(?:.*/)?"; // zero or more whole segments
       i += 2;
-    } else if (glob.startsWith("/**", i) && i + 3 === glob.length) {
-      out += "(?:/.*)?";
-      i += 2;
-    } else if (glob.startsWith("**", i)) {
+    } else if (whole && i > 0 && !out.endsWith("/")) {
+      out += ".*"; // `**/**`: the `/` went into the `**/` before it
+      i += 1;
+    } else if (whole && i > 0) {
+      out = `${out.slice(0, -1)}(?:/.*)?`; // `dir/**`: dir itself or anything under it
+      i += 1;
+    } else if (whole) {
       out += ".*";
+      i += 1;
+    } else if (glob.startsWith("**", i)) {
+      out += "[^/]*";
       i += 1;
     } else if (glob[i] === "*") out += "[^/]*";
     else out += glob[i].replace(/[.+?^${}()|[\]\\]/g, "\\$&");
