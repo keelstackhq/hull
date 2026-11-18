@@ -96,6 +96,12 @@ test("hull release.yml plans on main pushes and releases behind the release envi
   assert.deepEqual(wf.permissions, {});
   assert.equal(wf.concurrency.group, "release-run-${{ github.run_id }}");
   assert.equal(wf.concurrency["cancel-in-progress"], false);
+  // bosun's ci-minutes gate wants cancelling concurrency; its documented allow comment keeps a
+  // release from ever being cancelled mid-publish.
+  assert.match(
+    await readFile(DIR + "release.yml", "utf8"),
+    /^ {2}# ci-minutes: allow concurrency \S/m,
+  );
   const { plan, release } = wf.jobs;
   assert.equal(
     plan.if,

@@ -9,6 +9,7 @@ on:
       - main
   workflow_dispatch:
 concurrency:
+  # ci-minutes: allow concurrency a release must never be cancelled mid-publish
   # Pushes never cancel or replace each other; the release job is serialised per tag instead.
   group: release-run-${{ github.run_id }}
   cancel-in-progress: false
