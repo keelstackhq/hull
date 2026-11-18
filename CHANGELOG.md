@@ -9,6 +9,11 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- hull's dev renderer matches globs (contract §9.1: `*`, `**`, dotfiles) with a built-in matcher
+  and no longer depends on `picomatch` (ReDoS advisory GHSA-fc5q-39xc-vjpf, no patched version;
+  it turned main red through bosun's deps gate). Same results on every template path.
+- hull gets a root `pnpm-workspace.yaml` (`packages: []`): bosun 0.20.0's test gate reads it
+  (`pnpm -r --include-workspace-root run test`); the lockfile is unchanged.
 - guard.mjs (both templates) judges the commands that run, not text: interpreter heredocs and
   `-c`/`-e` bodies are data only when every statement is inert (print a literal, read a
   literal path); `gh api` with an explicit GET and

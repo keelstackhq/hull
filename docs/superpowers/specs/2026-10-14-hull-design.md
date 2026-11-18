@@ -63,7 +63,9 @@ CLAUDE.md  .claude/            # for building hull
 
 hull's own toolchain: Node 24, pnpm 12.11.2, `node:test`, `vite-plus` for `vp lint` and `vp fmt`
 on `scripts/` and `tests/`. Runtime deps of the dev renderer: `nunjucks` 3.2.4, `smol-toml` 1.9.1,
-`picomatch` 4.0.7, `yaml` 2.9.1 (tests). Nothing else without asking.
+`yaml` 2.9.1 (tests). Nothing else without asking. Globs (contract §9.1) use a built-in matcher in
+`scripts/lib/ownership.mjs`; `picomatch` was dropped (2026-11-18: ReDoS advisory GHSA-fc5q-39xc-vjpf,
+no patched version).
 
 ## 4. Template contract conformance
 

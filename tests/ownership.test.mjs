@@ -40,3 +40,28 @@ test("mergeStrategy matches globs, defaults to text", () => {
   assert.equal(mergeStrategy("a/b/c.yaml", m), "yaml");
   assert.equal(mergeStrategy("x.txt", m), "text");
 });
+
+test("globMatcher implements contract §9.1 exactly, with dotfiles (no picomatch)", async () => {
+  const { globMatcher } = await import("../scripts/lib/ownership.mjs");
+  const m = (g, p) => globMatcher([g])(p);
+  assert.ok(m("src/**", "src/a/b.ts"));
+  assert.ok(m("src/**", "src/.hidden/x"));
+  assert.ok(m(".claude/agents/*.md", ".claude/agents/x.md"));
+  assert.ok(!m(".claude/agents/*.md", ".claude/agents/sub/x.md"));
+  assert.ok(m("*/SKILL.md", "ready/SKILL.md"));
+  assert.ok(m("**/x.md", "x.md"));
+  assert.ok(m("**/x.md", "a/b/x.md"));
+  assert.ok(m("a/**/b", "a/b"));
+  assert.ok(m("a/**/b", "a/x/y/b"));
+  assert.ok(!m("src/**", "srcx/a"));
+  assert.ok(!m("a.b", "aXb"), "regex metacharacters are literal");
+  assert.ok(m("package.json", "package.json"));
+  assert.ok(globMatcher(["x", "y/*"])("y/z"));
+  assert.ok(!globMatcher([])("x"));
+});
+
+test("hull has no picomatch dependency (its ReDoS advisory has no patched version)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal({ ...pkg.dependencies, ...pkg.devDependencies }.picomatch, undefined);
+});
