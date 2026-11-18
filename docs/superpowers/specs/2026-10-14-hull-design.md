@@ -688,7 +688,12 @@ upstream.
   2. Index check: a separate step with no `if`, using the runner's `node`:
      `node scripts/agents-index.mjs --check` fails when `docs/agents/index.md` is stale (docs-only
      cost < 1 s). Then `node scripts/licenses.mjs --check` (lockfile hash gate, no install; see
-     `2026-11-17-third-party-licenses-design.md`).
+     `2026-11-17-third-party-licenses-design.md`). Then `node .github/scripts/workflows.mjs`
+     [owned, shared with template-rust] parses every `.github/workflows/*.yml|yaml` (GitHub skips a
+     workflow it cannot parse without failing a check): it fetches the zero-dependency `yaml`
+     tarball pinned by version and npm integrity (hull's own devDependency version), < 1 s; a
+     failed download, an integrity mismatch, a parse error or a duplicate key fails (`HULL_YAML_DIR`
+     skips download and integrity: tests and offline only, never CI).
   3. Early exit, before Node/pnpm setup: the step downloads the `@turbo/linux-64` binary at
      `TURBO_VERSION` (= the catalog pin; the Renovate preset does not bump it alone, since the pinned `TURBO_SHA256` must move with it: `splice update` carries version and sha together) from the npm registry with
      `curl` (~1 s; `npx` took ~5-7 s) into `$RUNNER_TEMP` and verifies it against the pinned
@@ -1168,7 +1173,8 @@ circleci-only), no template `[vars]`. hull's `v<semver>` tags version all three 
 `pull_request` + `merge_group` + push to the default branch, no path filters, `fetch-depth: 0`,
 `filter: blob:none`):
 
-1. `node scripts/agents-index.mjs --check` (runner's node).
+1. `node scripts/agents-index.mjs --check` (runner's node), then `licenses.mjs --check` and
+   `node .github/scripts/workflows.mjs` (every workflow parses; as in `template/`).
 2. Docs-only early exit: `node .github/scripts/docs-only.mjs` sets `skip=true` only when the
    `BASE...HEAD` diff is not empty and every path is root `*.md`, `docs/**`, `changelog.d/**`,
    `.claude/**` or `LICENSE*`. On a pull request the checkout is a merge into the current base, so

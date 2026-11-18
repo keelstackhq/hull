@@ -37,6 +37,9 @@ jobs:
       # step: licenses
       - name: Licenses list current?
         run: node scripts/licenses.mjs --check
+      # step: workflows
+      - name: Workflows parse?
+        run: node .github/scripts/workflows.mjs
       # step: affected
       - name: Anything affected?
         id: affected

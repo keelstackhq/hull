@@ -36,6 +36,8 @@ jobs:
         run: node scripts/agents-index.mjs --check
       - name: Licenses list current?
         run: node scripts/licenses.mjs --check
+      - name: Workflows parse?
+        run: node .github/scripts/workflows.mjs
       - name: Docs only?
         id: affected
         run: node .github/scripts/docs-only.mjs >> "$GITHUB_OUTPUT"

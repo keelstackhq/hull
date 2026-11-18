@@ -54,6 +54,7 @@ Variables:
 Files (owned):
 
 - `.claude/agents/*.md`
+- `.github/scripts/workflows.mjs`
 - `.github/workflows/ci.yml`
 - `.github/workflows/preview.yml`
 - `.github/workflows/preview-deploy.yml`
