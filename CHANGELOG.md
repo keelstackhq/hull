@@ -12,6 +12,9 @@ Keep `unreleased` while changes accumulate.
 - hull's dev renderer glob matcher: a `**` that is not a whole path segment (`a**b`, `**b`,
   `a/b**`) stays within one segment like `*`, as picomatch did; only a whole-segment `**` crosses
   segments (contract §9.1).
+- guard.mjs (both templates): any `/proc/**/environ` path is a secret read, and so are
+  whole-environment reads in more runtimes: PHP `getenv()`, `$_SERVER` and `$_ENV`, `Bun.env`,
+  `Deno.env.toObject()`, Python `os.environb`.
 - hull's dev renderer matches globs (contract §9.1: `*`, `**`, dotfiles) with a built-in matcher
   and no longer depends on `picomatch` (ReDoS advisory GHSA-fc5q-39xc-vjpf, no patched version;
   it turned main red through bosun's deps gate). Same results on every template path.
