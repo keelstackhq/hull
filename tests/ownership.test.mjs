@@ -65,3 +65,32 @@ test("hull has no picomatch dependency (its ReDoS advisory has no patched versio
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal({ ...pkg.dependencies, ...pkg.devDependencies }.picomatch, undefined);
 });
+
+test("a ** that is not a whole segment stays in one segment, like * (as picomatch did)", async () => {
+  const { globMatcher } = await import("../scripts/lib/ownership.mjs");
+  const cases = [
+    ["a**b", "aXb", true],
+    ["a**b", "a/x/b", false],
+    ["a/**b", "a/xb", true],
+    ["a/**b", "a/x/yb", false],
+    ["a**/b", "ax/b", true],
+    ["a**/b", "ax/y/b", false],
+    ["**b", "xb", true],
+    ["**b", "x/b", false],
+    ["a/b**", "a/bc", true],
+    ["a/b**", "a/bc/d", false],
+    // whole-segment ** still crosses
+    ["**", "a/b/c", true],
+    ["a/**", "a/b/c", true],
+    ["**/b", "x/y/b", true],
+    ["a/**/b", "a/x/y/b", true],
+  ];
+  for (const [g, p, want] of cases) assert.equal(globMatcher([g])(p), want, `${g} vs ${p}`);
+});
+
+test("**/** and a/**/** match like ** (no regex left half-built)", async () => {
+  const { globMatcher } = await import("../scripts/lib/ownership.mjs");
+  assert.ok(globMatcher(["**/**"])("a/b"));
+  assert.ok(globMatcher(["**/**"])("a"));
+  assert.ok(globMatcher(["a/**/**"])("a/b/c"));
+});

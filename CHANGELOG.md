@@ -9,6 +9,9 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- hull's dev renderer glob matcher: a `**` that is not a whole path segment (`a**b`, `**b`,
+  `a/b**`) stays within one segment like `*`, as picomatch did; only a whole-segment `**` crosses
+  segments (contract §9.1).
 - guard.mjs (both templates): any `/proc/**/environ` path is a secret read, and so are
   whole-environment reads in more runtimes: PHP `getenv()`, `$_SERVER` and `$_ENV`, `Bun.env`,
   `Deno.env.toObject()`, Python `os.environb`.
