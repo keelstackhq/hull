@@ -387,3 +387,22 @@ test("--assess: the lock's source decides the template; a helper-only package.js
   assert.ok(!a.signals.some((s) => s.id === "pnpm"));
   assert.ok(!a.unsure.some((n) => /small JS/.test(n)));
 });
+
+test("--assess: only the root package.json needs dependencies; workspaces, pnpm-workspace.yaml, malformed", async () => {
+  const tauri = await repo({
+    "package.json": pkg({ lodash: "4" }),
+    "pnpm-lock.yaml": "",
+    "desk/package.json": JSON.stringify({ name: "desk" }),
+    "desk/src-tauri/Cargo.toml": '[package]\nname = "desk"\n',
+  });
+  assert.ok(assess(tauri).pieces.some((p) => p.piece === "tauri-app" && p.from === "desk"));
+  const ws = await repo({ "package.json": JSON.stringify({ workspaces: ["apps/*"] }) });
+  assert.equal(assess(ws).template, "template");
+  const pw = await repo({
+    "package.json": JSON.stringify({ scripts: {} }),
+    "pnpm-workspace.yaml": "",
+  });
+  assert.equal(assess(pw).template, "template");
+  const bad = await repo({ "package.json": "{ not json", "Cargo.toml": '[package]\nname = "t"\n' });
+  assert.equal(assess(bad).template, "template-rust");
+});

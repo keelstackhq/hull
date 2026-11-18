@@ -381,7 +381,7 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       const want = /pnpm@(\d+)/.exec(
         file("package.json") ? readFileSync(join(root, "package.json"), "utf8") : "",
       );
-      const pnpm = profile === "template" && run("pnpm", ["--version"]);
+      const pnpm = (profile === "template" || jsStack(root)) && run("pnpm", ["--version"]);
       if (pnpm && (!pnpm.ok || (want && pnpm.out.trim().split(".")[0] !== want[1])))
         missing.push(`pnpm ${want?.[1] ?? ""}`.trim());
       const tools = [
@@ -653,8 +653,8 @@ export function assess(root) {
     }
   };
   const deps = (d) => depNames(json(d));
-  // A package.json with no dependencies (helper scripts only) is not a JS package.
-  const npm = dirs.filter((d) => json(d) && (deps(d).length || json(d).workspaces));
+  // A root package.json with no dependencies (helper scripts only) is not a JS stack.
+  const npm = dirs.filter((d) => json(d) && (d !== "." || deps(d).length || json(d).workspaces));
   const cargo = dirs.filter((d) => read(at(d, "Cargo.toml")) !== null);
   // A workspace root holds the packages; it is not an app itself.
   const workspaceRoot = has("pnpm-workspace.yaml") || Boolean(json(".")?.workspaces);

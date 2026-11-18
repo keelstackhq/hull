@@ -43,7 +43,7 @@ reads files (regular files up to 1 MB, never symlinks) and writes nothing.
 | `layout`     | apps/, packages/ and crates/ dirs (where pieces go) | where pieces go  |
 
 A `.splice/lock.toml` source names the template outright; signals then only pick pieces. A
-package.json with no dependencies (helper scripts only) is no signal. A Tauri app replaces its
+root package.json with no dependencies (helper scripts only) is no signal. A Tauri app replaces its
 preact hit; a workspace root's package.json is not an app. In template-rust, library crates
 stay with the base (no piece). Each piece has a move: apps, sites,
 workers and Tauri apps go to `apps/<name>`, crates to `crates/<name>`, with the name taken from

@@ -827,3 +827,23 @@ test("profileOf without a lock ignores a package.json with no dependencies", asy
   await put(d, "package.json", '{"devDependencies":{"vite":"8.0.0"}}\n');
   assert.equal(profileOf(d), "template");
 });
+
+test("template-rust repo whose root package.json has dependencies still needs pnpm", async () => {
+  const root = await rustRepo();
+  await put(root, "package.json", '{"devDependencies":{"vite":"8.0.0"}}\n');
+  const env = runChecks({ root, run: rustRun(), node: "24.0.0" }).find(
+    (r) => r.id === "environment",
+  );
+  assert.equal(env.status, "fail");
+  assert.match(env.note, /pnpm/);
+});
+
+test("profileOf without a lock: workspaces or pnpm-workspace.yaml are JS; malformed JSON is not", async () => {
+  const d = await mkdtemp(join(tmpdir(), "ready-"));
+  await put(d, "package.json", '{"workspaces":["apps/*"]}\n');
+  assert.equal(profileOf(d), "template");
+  await put(d, "package.json", "{ not json");
+  assert.equal(profileOf(d), "template-rust");
+  await put(d, "pnpm-workspace.yaml", "packages: []\n");
+  assert.equal(profileOf(d), "template");
+});
