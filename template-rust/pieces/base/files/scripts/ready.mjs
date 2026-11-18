@@ -162,11 +162,29 @@ const PIECES = {
   "template-rust": { lib: [], cli: ["rust-cli"] },
 };
 
-/**
- * The hull template this repo was rendered from: the lock's source (written by splice, trusted),
- * else no package.json.
- */
-export function profileOf(root) {
+/** Dependency names of a parsed package.json (all four dependency fields). */
+const depNames = (pkg) =>
+  Object.keys({
+    ...pkg?.dependencies,
+    ...pkg?.devDependencies,
+    ...pkg?.peerDependencies,
+    ...pkg?.optionalDependencies,
+  });
+
+/** A JS stack: a package.json with dependencies or workspaces, or pnpm-workspace.yaml. A
+ * package.json that only holds helper scripts is not one. */
+function jsStack(root) {
+  if (existsSync(join(root, "pnpm-workspace.yaml"))) return true;
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    return depNames(pkg).length > 0 || Boolean(pkg?.workspaces);
+  } catch {
+    return false;
+  }
+}
+
+/** The template named by the lock's source (written by splice, trusted), or undefined. */
+function lockedTemplate(root) {
   let source = "";
   try {
     source =
@@ -174,7 +192,12 @@ export function profileOf(root) {
       "";
   } catch {}
   if (source) return source.endsWith("//template-rust") ? "template-rust" : "template";
-  return existsSync(join(root, "package.json")) ? "template" : "template-rust";
+  return undefined;
+}
+
+/** The hull template this repo was rendered from: the lock's source, else a JS stack. */
+export function profileOf(root) {
+  return lockedTemplate(root) ?? (jsStack(root) ? "template" : "template-rust");
 }
 
 /** The questions and options of one template. */
@@ -358,7 +381,7 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       const want = /pnpm@(\d+)/.exec(
         file("package.json") ? readFileSync(join(root, "package.json"), "utf8") : "",
       );
-      const pnpm = file("package.json") && run("pnpm", ["--version"]);
+      const pnpm = profile === "template" && run("pnpm", ["--version"]);
       if (pnpm && (!pnpm.ok || (want && pnpm.out.trim().split(".")[0] !== want[1])))
         missing.push(`pnpm ${want?.[1] ?? ""}`.trim());
       const tools = [
@@ -571,8 +594,12 @@ export function classOf(template, path) {
 
 /** Signals `--assess` looks for; docs/adopt.md's table is tested against these. */
 export const DETECT = [
-  { id: "pnpm", signal: "pnpm-workspace.yaml or a package.json", template: "template" },
-  { id: "cargo-only", signal: "Cargo.toml and no package.json", template: "template-rust" },
+  { id: "pnpm", signal: "pnpm-workspace.yaml or a package.json with deps", template: "template" },
+  {
+    id: "cargo-only",
+    signal: "Cargo.toml and no package.json with deps",
+    template: "template-rust",
+  },
   { id: "preact", signal: "a package.json depending on preact", piece: "preact-app" },
   { id: "astro", signal: "a package.json depending on astro", piece: "astro-site" },
   { id: "hono", signal: "hono dependency next to a wrangler config", piece: "hono-worker" },
@@ -625,9 +652,10 @@ export function assess(root) {
       return null;
     }
   };
-  const npm = dirs.filter((d) => json(d));
+  const deps = (d) => depNames(json(d));
+  // A package.json with no dependencies (helper scripts only) is not a JS package.
+  const npm = dirs.filter((d) => json(d) && (deps(d).length || json(d).workspaces));
   const cargo = dirs.filter((d) => read(at(d, "Cargo.toml")) !== null);
-  const deps = (d) => Object.keys({ ...json(d)?.dependencies, ...json(d)?.devDependencies });
   // A workspace root holds the packages; it is not an app itself.
   const workspaceRoot = has("pnpm-workspace.yaml") || Boolean(json(".")?.workspaces);
   const apps = npm.filter((d) => !(d === "." && workspaceRoot));
@@ -657,11 +685,9 @@ export function assess(root) {
     signal: r.signal,
     evidence: hits[r.id],
   }));
-  const template = hits.pnpm.length
-    ? "template"
-    : hits["cargo-only"].length
-      ? "template-rust"
-      : null;
+  const template =
+    lockedTemplate(root) ??
+    (hits.pnpm.length ? "template" : hits["cargo-only"].length ? "template-rust" : null);
   const nameOf = (from, rust) => {
     if (from !== ".") return from.split("/").pop();
     const n = rust ? /^name\s*=\s*"([^"]+)"/m.exec(read("Cargo.toml") ?? "")?.[1] : json(".")?.name;
@@ -721,7 +747,7 @@ export function assess(root) {
   const named = pieces.filter((p) => p.unsure === null).map((p) => `${p.piece}:${p.name}`);
   const next = template
     ? adoptNext(adoptCommand(template, [...new Set(named)]))
-    : "no package.json or Cargo.toml: channels only (decisions, bosun init), no template";
+    : "no JS package or Cargo.toml: channels only (decisions, bosun init), no template";
   const confidence = unsure.length ? "low" : "high";
   const stack = template ? STACKS[template] : null;
   return {

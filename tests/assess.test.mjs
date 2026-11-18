@@ -201,7 +201,7 @@ test("a piece target that already exists (and is not the source) is a clash", as
 
 test("files under .github/ or .claude/ that the template does not write are no clash", async () => {
   const root = await repo({
-    "package.json": pkg({}),
+    "package.json": pkg({ lodash: "4" }),
     ".github/ISSUE_TEMPLATE/bug.md": "x\n",
     ".github/workflows/ci.yml": "on: push\n",
     ".claude/agents/mine.md": "x\n",
@@ -254,7 +254,7 @@ test("mixed signals are unsure with low confidence, never forced", async () => {
   let a = assess(mixed);
   assert.equal(a.confidence, "low");
   assert.ok(a.unsure.some((n) => /Cargo.*small JS/.test(n)));
-  const yarn = await repo({ "package.json": pkg({}), "yarn.lock": "" });
+  const yarn = await repo({ "package.json": pkg({ lodash: "4" }), "yarn.lock": "" });
   a = assess(yarn);
   assert.ok(a.unsure.some((n) => /npm or yarn/.test(n)));
   const ui = await repo({
@@ -361,4 +361,29 @@ test("the CLI prints the same schema", async () => {
   const a = JSON.parse(r.stdout);
   checkShape(a);
   assert.equal(a.stack, "ts-pnpm");
+});
+
+// Client feedback 2026-11-18: take the stack from .splice/lock.toml; a package.json with no
+// dependencies is not a JS stack.
+test("--assess: the lock's source decides the template; a helper-only package.json is ignored", async () => {
+  const helper = JSON.stringify({ private: true, scripts: { dev: "bash scripts/dev.sh" } });
+  const locked = await repo({
+    ".splice/lock.toml": '[template]\nsource = "gh:keelstackhq/hull//template-rust"\n',
+    "Cargo.toml": '[package]\nname = "tool"\n',
+    "src/main.rs": "",
+    "package.json": helper,
+  });
+  let a = assess(locked);
+  assert.equal(a.template, "template-rust");
+  assert.equal(a.stack, "rust");
+  const unlocked = await repo({
+    "Cargo.toml": '[package]\nname = "tool"\n',
+    "src/main.rs": "",
+    "package.json": helper,
+  });
+  a = assess(unlocked);
+  assert.equal(a.template, "template-rust");
+  assert.equal(a.stack, "rust");
+  assert.ok(!a.signals.some((s) => s.id === "pnpm"));
+  assert.ok(!a.unsure.some((n) => /small JS/.test(n)));
 });
