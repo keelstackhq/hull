@@ -9,6 +9,9 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- guard.mjs (both templates): any `/proc/**/environ` path is a secret read, and so are
+  whole-environment reads in more runtimes: PHP `getenv()`, `$_SERVER` and `$_ENV`, `Bun.env`,
+  `Deno.env.toObject()`, Python `os.environb`.
 - guard.mjs (both templates) judges the commands that run, not text: interpreter heredocs and
   `-c`/`-e` bodies are data only when every statement is inert (print a literal, read a
   literal path); `gh api` with an explicit GET and

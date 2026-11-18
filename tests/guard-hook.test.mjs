@@ -1006,3 +1006,23 @@ test("deny reason names the matched rule and the exact command", () => {
   assert.match(e, /`push`/);
   assert.match(decide(tool("Read", { file_path: ".env" }), c).reason, /rule secret.*`\.env`/);
 });
+
+test("follow-up: every /proc/**/environ path and whole-env reads in more runtimes deny", () => {
+  for (const cmd of [
+    "cat /proc/self/task/123/environ",
+    "cat /proc/thread-self/environ",
+    "php -r 'print_r(getenv());'",
+    "php -r 'var_dump($_SERVER);'",
+    "php -r 'print_r($_ENV);'",
+    "bun -e 'console.log(Bun.env)'",
+    "deno eval 'console.log(Deno.env.toObject())'",
+    "python3 -c 'import os; print(os.environb)'",
+  ])
+    assert.equal(decide(bash(cmd), ctx)?.decision, "deny", cmd);
+  for (const cmd of [
+    "php -r 'echo getenv(\"HOME\");'",
+    "bun -e 'console.log(Bun.env.HOME)'",
+    "cat /proc/self/status",
+  ])
+    assert.equal(decide(bash(cmd), ctx), null, cmd);
+});
