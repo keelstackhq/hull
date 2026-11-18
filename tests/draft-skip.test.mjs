@@ -40,7 +40,11 @@ function prWorkflows() {
   return out;
 }
 
-const all = prWorkflows();
+// bosun channel workflows are owned by bosun (its own draft and `edited` handling), not hull.
+const BOSUN = new Set(
+  ["bosun", "risk", "verdict", "main-open", "main-health"].map((n) => `.github/workflows/${n}.yml`),
+);
+const all = prWorkflows().filter((w) => !BOSUN.has(w.rel));
 
 test("PR-triggered workflows are found (hull, template, template-rust)", () => {
   const rels = all.map((w) => w.rel);

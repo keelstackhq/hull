@@ -144,6 +144,15 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 
 ## hull's own workflows
 
+### .github/workflows/bosun.yml
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
+| `actions/setup-node` | v5.0.0 | `a0853c24544627f65ddf259abe73b1d18a591444` |
+| `keelstackhq/hoard` | v0.6.1 | `4a6d185fb73af3d973eaa256a88bc0d02c68b63a` |
+| `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
+
 ### .github/workflows/ci.yml
 
 | Action | Version | Commit SHA |
@@ -165,12 +174,30 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `dtolnay/rust-toolchain` | stable branch, 2026-10-28 | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
 
+### .github/workflows/main-health.yml
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
+
+### .github/workflows/main-open.yml
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
+
 ### .github/workflows/release.yml
 
 | Action | Version | Commit SHA |
 | --- | --- | --- |
 | `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
 | `actions/setup-node` | v5.0.0 | `a0853c24544627f65ddf259abe73b1d18a591444` |
+
+### .github/workflows/risk.yml
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
 
 ### .github/workflows/splice.yml
 
@@ -179,3 +206,9 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `actions/checkout` | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
 | `actions/create-github-app-token` | v3.3.0 | `64ab729a6294000f5aa4a4bc0b73d1f32bc45510` |
 | `keelstackhq/splice/action` | v0.5.0 | `85c95b63f53836301f2405368767c6ae9138109f` |
+
+### .github/workflows/verdict.yml
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |

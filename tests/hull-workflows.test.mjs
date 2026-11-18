@@ -126,6 +126,15 @@ test("hull release.yml plans on main pushes and releases behind the release envi
   }
 });
 
+// bosun channel workflows (owned by bosun, no package-manager cache by design) are not checked.
+const BOSUN_OWNED = new Set([
+  "bosun.yml",
+  "risk.yml",
+  "verdict.yml",
+  "main-open.yml",
+  "main-health.yml",
+]);
+
 // setup-node@v5 turns on the package-manager cache by itself when package.json has
 // `packageManager`; without pnpm on PATH it then fails ("Unable to locate executable file: pnpm").
 test("every setup-node step disables the package-manager cache unless pnpm is set up first under the same condition", async () => {
@@ -135,7 +144,9 @@ test("every setup-node step disables the package-manager cache unless pnpm is se
   ];
   const bad = [];
   for (const dir of dirs)
-    for (const f of (await readdir(dir)).filter((n) => n.endsWith(".yml"))) {
+    for (const f of (await readdir(dir)).filter(
+      (n) => n.endsWith(".yml") && !(dir === DIR && BOSUN_OWNED.has(n)),
+    )) {
       const wf = YAML.parse(await readFile(dir + f, "utf8"));
       for (const [name, job] of Object.entries(wf.jobs ?? {})) {
         const pnpm = new Set(); // `if` conditions under which pnpm is set up ("" = always)
