@@ -9,6 +9,9 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- guard.mjs (both templates): any `/proc/**/environ` path is a secret read, and so are
+  whole-environment reads in more runtimes: PHP `getenv()`, `$_SERVER` and `$_ENV`, `Bun.env`,
+  `Deno.env.toObject()`, Python `os.environb`.
 - hull's dev renderer matches globs (contract §9.1: `*`, `**`, dotfiles) with a built-in matcher
   and no longer depends on `picomatch` (ReDoS advisory GHSA-fc5q-39xc-vjpf, no patched version;
   it turned main red through bosun's deps gate). Same results on every template path.
