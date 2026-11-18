@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { test } from "node:test";
-import picomatch from "picomatch";
 import { loadTemplate } from "../scripts/lib/manifest.mjs";
-import { outputPath, overlaps } from "../scripts/lib/ownership.mjs";
+import { outputPath, overlaps, globMatcher } from "../scripts/lib/ownership.mjs";
 import { checkSubset } from "../scripts/lib/subset.mjs";
 import { assertSameBranches, elifBranches } from "./invariants.mjs";
 import { REAL_TEMPLATE, renderCombo } from "./helpers.mjs";
@@ -53,7 +52,7 @@ test("every [merge] key names a shared file", async () => {
     const paths = (await pieceFiles(piece)).map((f) => f.path);
     const shared = paths.filter((p) => overlaps(p, piece.files).includes("shared"));
     for (const key of Object.keys(piece.merge)) {
-      const isMatch = picomatch(key, { dot: true });
+      const isMatch = globMatcher([key]);
       assert.ok(
         shared.some((p) => isMatch(p)),
         `${piece.id}: [merge] "${key}" matches no shared file`,
