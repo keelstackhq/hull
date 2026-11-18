@@ -7,9 +7,9 @@
 // outside single quotes (also in heredocs with an unquoted delimiter), and shell heredocs. Quoted
 // heredoc bodies and quoted prose are data. `eval`, `sh`/interpreter fed from a pipe, `$VAR` or
 // `$(...)` in command position and git `-c alias.x=` deny when the text mentions push, publish or
-// release; interpreter code (`-c`/`-e`, heredoc) is data only when it is an allowlisted inert form
-// (`inert()`: literals printed, a file read or parsed, json/yaml/re imported); any other code is
-// scanned (fail closed). Code from stdin (`source /dev/stdin`, `bash <(...)`, `xargs`) is scanned
+// release; interpreter code (`-c`/`-e`, heredoc) is data only when every statement is inert
+// (`inert()`: print/echo of literals or names; Python: read or json/yaml-safe-load a literal path);
+// any other code is scanned (fail closed). Code from stdin (`source /dev/stdin`, `bash <(...)`, `xargs`) is scanned
 // as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and `$'...'` escapes are read
 // like the shell; joined string literals are checked for secret file names.
 // `gh api` with an explicit GET and graphql queries are reads. A deny names its rule and the match.
@@ -37,64 +37,60 @@ const RISKY_RE = /\b(push|publish|unpublish|release|dist-tag|gh|secrets?|sops)\b
 const EXEC_RE =
   /\b(git|gh|npm|pnpm|yarn|bun|cargo|make|hoist|sops)\b[^\n]*\b(push|publish|unpublish|release|dist-tag|secrets?|merge|decrypt)\b/i;
 const INLINE_RE = /^-[a-zA-Z]*[ceEp]$|^--eval$/;
-/** Names inert interpreter code may use: printing literals, reading and parsing a file. */
-const INERT_NAMES = new Set(
-  (
-    "print puts printf echo say console log error warn info open read readlines readline with as " +
-    "strip rstrip lstrip split splitlines join replace upper lower startswith endswith format len " +
-    "str int float bool list dict tuple sorted reversed enumerate range min max sum any all keys " +
-    "values items get json loads load dumps dump JSON parse stringify yaml safe_load safe_dump " +
-    "in not and or is if else elif for while True False None true false null undefined nil const " +
-    "let var length trim includes indexOf slice"
-  ).split(" "),
+// The only inert statements (on code whose strings are replaced by S): print/echo string literals
+// or plain names, and (Python) read or json/yaml-safe-load a literal path with open()'s default
+// read mode. Everything else is code and gets the full scan.
+const ARG = String.raw`(?:S|[A-Za-z_]\w*|S\s+in\s+[A-Za-z_]\w*)`;
+const PRINT_RE = new RegExp(
+  String.raw`^(?:print|console\.log|puts|echo|say)\s*(?:\(\s*(?:${ARG}(?:\s*,\s*${ARG})*)?\s*\)|${ARG}(?:\s*,\s*${ARG})*)?$`,
 );
-const INERT_IMPORT_RE =
-  /\b(?:import\s+(?:json|yaml|re)\b(?:\s*,\s*(?:json|yaml|re)\b)*|from\s+(?:json|yaml|re)\s+import\s+[\w ,]+)/g;
+const PY_INERT_RES = [
+  /^[A-Za-z_]\w*\s*=\s*open\s*\(\s*S\s*\)\s*\.\s*read\s*\(\s*\)(?:\s*\.\s*(?:strip|splitlines)\s*\(\s*\)|\s*\.\s*split\s*\(\s*S?\s*\))?$/,
+  /^[A-Za-z_]\w*\s*=\s*(?:json\s*\.\s*load|yaml\s*\.\s*safe_load)\s*\(\s*open\s*\(\s*S\s*\)\s*\)$/,
+  /^import\s+(?:json|yaml)(?:\s*,\s*(?:json|yaml))?$/,
+];
 
-/** True when interpreter code is an allowlisted inert form: literals printed, a file read or
- * parsed, json/yaml/re imported; no other call, attribute, import or interpolation. Anything
- * else is code and is scanned (fail closed). */
+/** True when interpreter code is only inert statements (PRINT_RE, PY_INERT_RES): literals printed,
+ * a literal path read or safe-loaded. Anything else is code and is scanned (fail closed). */
 export function inert(body, prog) {
   const lang = /^(ruby|perl|php)/.test(prog) ? "rpp" : /^python/.test(prog) ? "py" : "js";
   let code = "";
   for (let i = 0; i < body.length; i++) {
     const c = body[i];
+    // A comment ends at the newline, whatever quotes it holds.
+    if ((lang !== "js" && c === "#") || (lang === "js" && c === "/" && body[i + 1] === "/")) {
+      const nl = body.indexOf("\n", i);
+      if (nl < 0) break;
+      i = nl - 1;
+      continue;
+    }
     if (c === "`" && lang === "rpp") return false; // backticks run a program
-    if (c === "`" && /[\w$)\]]\s*$/.test(code)) return false; // a tagged template is a call
     if (c !== "'" && c !== '"' && c !== "`") {
       code += c;
       continue;
     }
     let j = i + 1;
     while (j < body.length && body[j] !== c) j += body[j] === "\\" ? 2 : 1;
-    const content = body.slice(i + 1, j);
-    if (/[$#@]\{/.test(content) || (/[fF]$/.test(code) && content.includes("{"))) return false;
-    if (lang === "py" && /[fF]$/.test(code)) code = code.slice(0, -1);
+    if (j >= body.length) return false; // unterminated
+    if (/[$#@]\{|\{\$/.test(body.slice(i + 1, j))) return false; // interpolation
     code += " S ";
     i = j;
   }
-  code = code
-    .replace(lang === "js" ? /\/\/.*$/gm : /#.*$/gm, "")
-    .replace(INERT_IMPORT_RE, "")
-    .replace(/\b\d[\w.]*/g, "0");
-  if (/\bS\s*\(/.test(code)) return false; // a string called as a function
-  if (/[\])]\s*\(/.test(code)) return false; // a call on a call or subscript result
-  if (code.includes("__")) return false; // dunder attributes reach builtins and modules
-  if (lang === "js" && code.includes("/")) return false; // a regex literal can hide code
-  if (/\bopen\s*\((?!\s*S\b)/.test(code)) return false; // read only a literal path (secret scan)
-  const declared = new Set();
-  for (const m of code.matchAll(
-    /(?<![.\w$])([A-Za-z_$][\w$]*)\s*=(?![=>~])|\b(?:for|as|const|let|var)\s+([A-Za-z_$][\w$]*)/g,
-  ))
-    declared.add(m[1] ?? m[2]);
-  for (const m of code.matchAll(/[A-Za-z_$][\w$]*/g)) {
-    const name = m[0];
-    if (name === "S") continue;
-    const call = /^\s*\(/.test(code.slice(m.index + name.length));
-    const ok = INERT_NAMES.has(name) && !(lang === "rpp" && name === "open");
-    if (!ok && (call || !declared.has(name))) return false;
-  }
-  return true;
+  if (/[^\x20-\x7e\t\n\r]/.test(code)) return false; // full-width names are names (NFKC)
+  const stmts = code
+    .split(/[;\n]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return stmts.every(
+    (x) => PRINT_RE.test(x) || (lang === "py" && PY_INERT_RES.some((re) => re.test(x))),
+  );
+}
+
+/** Escapes in string text decoded (`".\x65nv"` is `.env`), for secret scans. */
+function unescape(body) {
+  return body.replace(/\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\([0-7]{1,3})/g, (_, x, u, o) =>
+    String.fromCharCode(Number.parseInt(x ?? u ?? o, x || u ? 16 : 8)),
+  );
 }
 
 /** Adjacent or joined string literals merged (`".en" "v"`, `".en" + "v"`) for secret scans. */
@@ -499,7 +495,7 @@ export function commands(cmd) {
       p + (parts[i + 1] ?? ""),
       p + (parts[i + 1] ?? "") + (parts[i + 2] ?? ""),
     ]);
-    for (const text of [body, joinStrings(body), built.join(" ")])
+    for (const text of [body, joinStrings(body), built.join(" "), unescape(joinStrings(body))])
       for (const m of text.matchAll(/[^\s"'`()<>=,;:{}[\]]+/g)) {
         if (secretLike(m[0])) out.push(["cat", m[0]]);
       }
@@ -553,7 +549,8 @@ export function commands(cmd) {
       for (const inner of commands(body)) out.push(inner);
     }
     const noArgs = t.slice(1).every((x) => x === "-" || x === "-s") && !seg.docs?.length;
-    const runs = (body) => !inert(body, prog);
+    // stripPrefixes drops a token's trailing `)`: give it back before the inert test.
+    const runs = (body) => ![body, `${body})`, `${body}))`].some((b) => inert(b, prog));
     // `bash <<< 'cmd'`: the here-string is evaluated.
     const hs = t.findIndex((x) => x.startsWith("<<<"));
     if (hs >= 0 && (SHELLS.has(prog) || INTERPRETERS.test(prog))) {

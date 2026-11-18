@@ -492,8 +492,8 @@ settings pin no main-session model (the session's own choice stands).
   `gh api` with an explicit GET or a graphql query (not a mutation) is a read. Indirection (`eval`,
   `sh` or an interpreter fed from a pipe, `$VAR`/`$(...)` as the command, `git -c alias.x=`) denies
   when the text mentions push, publish or release; interpreter code (`-c`/`-e`, heredoc) is data
-  only when it matches an allowlist of inert forms (printing literals, reading or parsing a file,
-  importing json/yaml/re), else scanned; code read from stdin (`source
+  only when every statement is inert (print/echo of literals or names; Python: read or
+  json/yaml-safe-load a literal path), else scanned; code read from stdin (`source
   /dev/stdin`, `bash <(...)`, `xargs sh -c`) is scanned as text; `$'...'` escapes are decoded. A deny reason ends with `(rule <key>, matched `<command or token>`)`; `setsid`, `ionice`, `stdbuf`, `watch`, `busybox` are looked through.
   `cd`/`pushd` and any `-C`/`--chdir`/`--directory`/`--work-tree`/`--prefix` flag (`env`, `tar`,
   `make`, `git`) into `.claude`, `.claude/hooks`, `.bosun` or `.github/workflows` deny, also through a
