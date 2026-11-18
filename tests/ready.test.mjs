@@ -214,7 +214,11 @@ name = "api"
 
 const readyRepo = async () => {
   const d = await mkdtemp(join(tmpdir(), "ready-"));
-  await put(d, "package.json", '{"packageManager":"pnpm@12.11.2"}\n');
+  await put(
+    d,
+    "package.json",
+    '{"packageManager":"pnpm@12.11.2","devDependencies":{"turbo":"2.9.0"}}\n',
+  );
   await put(d, ".splice/lock.toml", LOCK);
   await put(
     d,
@@ -802,4 +806,44 @@ test("report: manual items with the same note share one line and no per-item fix
   assert.match(text, /^manual +repo, actions, rulesets +gh is not logged in/m);
   assert.doesNotMatch(text, /fix repo/);
   assert.match(text, /URL/);
+});
+
+// Client feedback 2026-11-18: a helper-only package.json in a template-rust repo is not a JS stack.
+test("template-rust repo with a helper-only package.json: no pnpm needed, profile from the lock", async () => {
+  const root = await rustRepo();
+  await put(root, "package.json", '{"private":true,"scripts":{"dev":"bash scripts/dev.sh"}}\n');
+  assert.equal(profileOf(root), "template-rust");
+  const results = runChecks({ root, run: rustRun(), node: "24.0.0" });
+  const env = results.find((r) => r.id === "environment");
+  assert.equal(env.status, "pass", env.note);
+  assert.doesNotMatch(env.note ?? "", /pnpm/);
+});
+
+test("profileOf without a lock ignores a package.json with no dependencies", async () => {
+  const d = await mkdtemp(join(tmpdir(), "ready-"));
+  await put(d, "Cargo.toml", "[workspace]\n");
+  await put(d, "package.json", '{"scripts":{"x":"echo"}}\n');
+  assert.equal(profileOf(d), "template-rust");
+  await put(d, "package.json", '{"devDependencies":{"vite":"8.0.0"}}\n');
+  assert.equal(profileOf(d), "template");
+});
+
+test("template-rust repo whose root package.json has dependencies still needs pnpm", async () => {
+  const root = await rustRepo();
+  await put(root, "package.json", '{"devDependencies":{"vite":"8.0.0"}}\n');
+  const env = runChecks({ root, run: rustRun(), node: "24.0.0" }).find(
+    (r) => r.id === "environment",
+  );
+  assert.equal(env.status, "fail");
+  assert.match(env.note, /pnpm/);
+});
+
+test("profileOf without a lock: workspaces or pnpm-workspace.yaml are JS; malformed JSON is not", async () => {
+  const d = await mkdtemp(join(tmpdir(), "ready-"));
+  await put(d, "package.json", '{"workspaces":["apps/*"]}\n');
+  assert.equal(profileOf(d), "template");
+  await put(d, "package.json", "{ not json");
+  assert.equal(profileOf(d), "template-rust");
+  await put(d, "pnpm-workspace.yaml", "packages: []\n");
+  assert.equal(profileOf(d), "template");
 });
