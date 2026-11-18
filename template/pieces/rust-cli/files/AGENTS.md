@@ -16,3 +16,5 @@ Distributable CLI in the root Cargo workspace; the binary is named like the crat
 - `build` is a debug build; release binaries come from the release workflow, a human pushes the
   tag `<name>-v<version>` after bumping `version` in `Cargo.toml`.
 - One integration-test binary per crate: add `mod`s under `tests/`, not new top-level `tests/*.rs` files (each links its own binary and slows CI).
+- Crate graph: split a kitchen-sink crate whose parts change apart; keep proc-macro crates and heavy
+  derive deps at the leaves. Local rebuilds: `RUSTC_WRAPPER=sccache` if you have it (CI caches `target/`).

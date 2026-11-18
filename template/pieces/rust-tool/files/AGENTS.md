@@ -9,3 +9,6 @@ A crate in the root Cargo workspace (`Cargo.toml`, `crates/*`), run by Turborepo
 - `Cargo.lock` lives at the repo root and is committed; edit dependencies with `cargo add -p <crate>`.
 - This is for in-repo tools. For a distributed CLI (npm, GitHub release) use `rust-cli`.
 - One integration-test binary per crate: `tests/it/main.rs` with `mod` per topic, not one file per test (each top-level file in `tests/` links its own binary and slows CI).
+- Crate graph: split a kitchen-sink crate whose parts change apart; keep proc-macro crates and
+  heavy derive deps at the leaves, not in a crate everything depends on. Local rebuilds: set
+  `RUSTC_WRAPPER=sccache` if you have it (CI restores `target/` with its cache instead).

@@ -117,7 +117,7 @@ test("cache: save only on main, restore skipped on main, no ~/.cargo/bin, keyed 
   assert.deepEqual(restores[0].when.steps[0].restore_cache.keys, [save.key]);
   assert.doesNotMatch(ciOk, /\.cargo\/bin"?\]|paths:.*\.cargo\/bin/);
   assert.match(ciOk, /echo skip > \.rust-cache-key/);
-  assert.match(ciOk, /Cargo\.lock rust-toolchain\.toml/);
+  assert.match(ciOk, /Cargo\.lock Cargo\.toml rust-toolchain\.toml/);
   assert.match(ciOk, /\$HOME\/\.hull-tools/);
   assert.match(ciOk, /echo "[^"]*budget: 75 s typical PR, 30 s docs-only/);
 });

@@ -27,7 +27,7 @@ steps:
         t="$(mktemp -d)"
         node .github/scripts/docs-only.mjs > "$t/out"
         if grep -qx "skip=true" "$t/out"; then circleci-agent step halt; fi
-        { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key
+        { cat Cargo.lock Cargo.toml rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key
   # step: ci-pre
   - run:
       name: Repo CI prelude (scripts/ci-pre.sh)

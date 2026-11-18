@@ -52,3 +52,49 @@ test("Rust crate notes: one integration-test binary per crate", async () => {
   assert.match(await read(c.dir, "crates/cli/AGENTS.md"), re);
   assert.match(await read(await renderRust(["base", "rust-cli:cli"]), "crates/cli/AGENTS.md"), re);
 });
+
+test("root Cargo.toml: dev profile trims debug info, dependencies get none", async () => {
+  const check = (text, label) => {
+    assert.match(text, /\[profile\.dev\]\ndebug = "line-tables-only"/, label);
+    assert.match(text, /\[profile\.dev\.package\."\*"\]\ndebug = false/, label);
+  };
+  check(await read(await renderRust(["base"]), "Cargo.toml"), "template-rust");
+  for (const pieces of [
+    ["base", "rust-cli:cli"],
+    ["base", "preact-app:web", "tauri-app:desktop"],
+  ]) {
+    check(await read((await renderCombo(pieces)).dir, "Cargo.toml"), pieces.join("+"));
+  }
+});
+
+test("Rust crate notes mention proc-macro leaves and sccache", async () => {
+  for (const rel of [
+    "template/pieces/rust-tool/files/AGENTS.md",
+    "template/pieces/rust-cli/files/AGENTS.md",
+    "template-rust/pieces/rust-cli/files/AGENTS.md",
+  ]) {
+    const text = await read(fileURLToPath(new URL("..", import.meta.url)), rel);
+    assert.match(text, /proc-macro/, rel);
+    assert.match(text, /sccache/, rel);
+  }
+});
+
+test("no template ships .cargo/config.toml (no linker or rustc-wrapper imposed)", async () => {
+  const { dir } = await renderCombo(["base", "rust-cli:cli"]);
+  for (const d of [dir, await renderRust(["base", "rust-cli:cli"])]) {
+    await assert.rejects(read(d, ".cargo/config.toml"), { code: "ENOENT" });
+  }
+  for (const tpl of [REAL_TEMPLATE, RUST]) {
+    await assert.rejects(read(tpl, "pieces/base/files/.cargo/config.toml"), { code: "ENOENT" });
+  }
+});
+
+test("CircleCI Rust cache key hashes the root Cargo.toml (a profile change rebuilds the cache)", async () => {
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  for (const rel of [
+    "template/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml",
+    "template-rust/pieces/circleci/files/.circleci/src/jobs/ci-ok.yml",
+  ]) {
+    assert.match(await read(root, rel), /cat Cargo\.lock Cargo\.toml rust-toolchain\.toml/, rel);
+  }
+});

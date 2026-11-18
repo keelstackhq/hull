@@ -12,6 +12,13 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 
+[profile.dev]
+debug = "line-tables-only"
+
+# Dependencies need no debug info; keeps target/ (and the CI cache) about a quarter smaller.
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 lto = "thin"
 {% elif "rust-tool" in pieces %}[workspace]
@@ -28,6 +35,13 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 
+[profile.dev]
+debug = "line-tables-only"
+
+# Dependencies need no debug info; keeps target/ (and the CI cache) about a quarter smaller.
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 lto = "thin"
 {% elif "tauri-app" in pieces %}[workspace]
@@ -43,6 +57,13 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+[profile.dev]
+debug = "line-tables-only"
+
+# Dependencies need no debug info; keeps target/ (and the CI cache) about a quarter smaller.
+[profile.dev.package."*"]
+debug = false
 
 [profile.release]
 lto = "thin"

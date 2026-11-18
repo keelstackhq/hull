@@ -16,3 +16,5 @@ Distributable CLI in the root Cargo workspace; the binary is named like the crat
 - Releases: the crate is `publish = false` until a human enables it (`docs/agents/project.md`);
   then hoist's release PR bumps `version`, and merging it releases `dist/<bin>-<target>` binaries.
 - One integration-test binary per crate: add `mod`s under `tests/`, not new top-level `tests/*.rs` files (each links its own binary and slows CI).
+- Crate graph: split a kitchen-sink crate whose parts change apart; keep proc-macro crates and heavy
+  derive deps at the leaves. Local rebuilds: `RUSTC_WRAPPER=sccache` if you have it (CI caches `target/`).
