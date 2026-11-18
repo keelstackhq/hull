@@ -2,9 +2,9 @@
 // Parses every .github/workflows/*.yml|yaml and exits 1 on a syntax error or a duplicate key:
 // GitHub skips a workflow it cannot parse without failing any check. Uses the `yaml` package
 // (zero dependencies) from its registry tarball, pinned by version and integrity; Node built-ins
-// otherwise. HULL_YAML_DIR names an unpacked yaml package instead (tests, offline);
-// HULL_YAML_URL overrides the tarball URL (tests). A failed
-// download warns and exits 0, like the turbo step; an integrity mismatch fails.
+// otherwise. A failed download or an integrity mismatch fails (a skipped check is the bug this
+// step exists for). HULL_YAML_DIR names an unpacked yaml package and skips download and integrity:
+// tests and offline use only, never CI. HULL_YAML_URL overrides the tarball URL (tests).
 import { createHash } from "node:crypto";
 import {
   mkdirSync,
@@ -83,8 +83,7 @@ async function loadYaml() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       tgz = Buffer.from(await res.arrayBuffer());
     } catch (err) {
-      console.log(`::warning::workflows: could not download yaml ${YAML_VERSION} (${err.message})`);
-      return null;
+      throw new Error(`could not download yaml ${YAML_VERSION} from ${url} (${err.message})`);
     }
     if (integrity(tgz) !== YAML_INTEGRITY) throw new Error(`${url}: integrity mismatch`);
     const out = mkdtempSync(join(tmpdir(), "yaml-"));
@@ -106,11 +105,13 @@ const isMain = () => {
   }
 };
 if (isMain()) {
-  const lib = await loadYaml();
-  if (lib) {
-    const found = problems(lib);
+  try {
+    const found = problems(await loadYaml());
     for (const p of found) console.log(`::error::${p}`);
     if (found.length) process.exit(1);
     console.log("workflows: every .github/workflows file parses");
+  } catch (err) {
+    console.log(`::error::workflows: ${err.message}`);
+    process.exit(1);
   }
 }

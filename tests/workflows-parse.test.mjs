@@ -118,7 +118,7 @@ for (const t of ["template", "template-rust"]) {
   });
 }
 
-test("a failed download warns and exits 0; a pax entry in the tarball fails loudly", async () => {
+test("a failed download fails the step; a pax entry in the tarball fails loudly", async () => {
   const d = repo({ "ci.yml": "name: a : b\non: push\n" });
   const { HULL_YAML_DIR: _drop, ...env } = process.env;
   const r = spawnSync("node", [SCRIPT], {
@@ -126,8 +126,8 @@ test("a failed download warns and exits 0; a pax entry in the tarball fails loud
     encoding: "utf8",
     env: { ...env, HULL_YAML_URL: "http://127.0.0.1:9/yaml.tgz" },
   });
-  assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /::warning::workflows: could not download yaml/);
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stdout, /::error::workflows: could not download yaml/);
   const src = await mkdtemp(join(tmpdir(), "wf-pax-"));
   mkdirSync(join(src, "package"), { recursive: true });
   writeFileSync(join(src, "package/x.js"), "1\n");
