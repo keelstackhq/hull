@@ -126,17 +126,10 @@ test("hull release.yml plans on main pushes and releases behind the release envi
   }
 });
 
-// bosun channel workflows (owned by bosun, no package-manager cache by design) are not checked.
-const BOSUN_OWNED = new Set([
-  "bosun.yml",
-  "risk.yml",
-  "verdict.yml",
-  "main-open.yml",
-  "main-health.yml",
-]);
-
 // setup-node@v5 turns on the package-manager cache by itself when package.json has
 // `packageManager`; without pnpm on PATH it then fails ("Unable to locate executable file: pnpm").
+// setup-node v4 (bosun's workflows pin it) has no automatic cache, so its steps need no opt-out.
+const SETUP_NODE_V4 = "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020";
 test("every setup-node step disables the package-manager cache unless pnpm is set up first under the same condition", async () => {
   const dirs = [
     DIR,
@@ -144,15 +137,14 @@ test("every setup-node step disables the package-manager cache unless pnpm is se
   ];
   const bad = [];
   for (const dir of dirs)
-    for (const f of (await readdir(dir)).filter(
-      (n) => n.endsWith(".yml") && !(dir === DIR && BOSUN_OWNED.has(n)),
-    )) {
+    for (const f of (await readdir(dir)).filter((n) => n.endsWith(".yml"))) {
       const wf = YAML.parse(await readFile(dir + f, "utf8"));
       for (const [name, job] of Object.entries(wf.jobs ?? {})) {
         const pnpm = new Set(); // `if` conditions under which pnpm is set up ("" = always)
         for (const step of job.steps ?? []) {
           if (String(step.uses).startsWith("pnpm/action-setup")) pnpm.add(step.if ?? "");
           if (!String(step.uses).startsWith("actions/setup-node")) continue;
+          if (step.uses === SETUP_NODE_V4 && !step.with?.cache) continue;
           const covered = pnpm.has("") || pnpm.has(step.if ?? "");
           if (!covered && step.with?.["package-manager-cache"] !== false)
             bad.push(`${dir === DIR ? "hull" : "template"}/${f} ${name}`);
