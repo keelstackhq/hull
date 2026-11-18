@@ -235,6 +235,7 @@ Root files (class in brackets):
 - `Cargo.toml.jinja` [owned] root virtual workspace, rendered only for rust-cli, rust-tool or tauri-app:
   `resolver = "3"`, `members` built per piece (`"crates/*"` only with rust-cli or rust-tool, via a nested marked chain;
   `"apps/*/src-tauri"` only with tauri-app; cargo errors on a glob that matches nothing), `[workspace.lints]`,
+  `[profile.dev]` (`debug = "line-tables-only"`, dependencies `debug = false`, §15 "Build speed"),
   `[profile.release] lto = "thin"`. `rust-toolchain.toml.jinja` [owned], same condition: `channel = "1.99.1"` with
   `clippy`, `rustfmt` when rust-cli is present (the crate's `rust-version` is the same number), otherwise `stable`
   (`clippy` + `rustfmt` with rust-tool, `rustfmt` for tauri-app alone).
@@ -1134,6 +1135,7 @@ circleci-only), no template `[vars]`. hull's `v<semver>` tags version all three 
 - `base` (root): `Cargo.toml.jinja` [shared, toml]: a virtual workspace, `resolver = "3"`,
   `members = ["crates/*"]`, `[workspace.package]` (`edition = "2024"`,
   `rust-version = "1.99.1"`), `[workspace.lints]` (`unsafe_code = "forbid"`, clippy `all` warn),
+  `[profile.dev]` (`debug = "line-tables-only"`, dependencies `debug = false`),
   `[profile.release] lto = "thin"`. Cargo errors on a virtual workspace without members, so `base`
   ships the seed crate `crates/common` (`publish = false`, a lib with one unit test and one doc
   test), like `packages/shared` in §6.1. `members` has no `"apps/*"`: cargo rejects a member glob
@@ -1223,3 +1225,36 @@ lists the workspace crates from each `crates/*/Cargo.toml`.
 own `"vars"`. dogfood renders it from that template and runs `RUST_CI_STEPS` in place of turbo.
 `affected-combos` maps `template-rust/**` to its combos. The new combo is `rust`: base +
 `rust-cli:cli`.
+
+**Build speed (2026-11-18).** Audit of the common Rust build-speed practices, for both
+templates (root workspace `Cargo.toml` of `template/` and `template-rust/`). Measured on the
+`rust` combo, local, cargo CI steps (clippy, nextest, doc tests), toolchain 1.99.1:
+
+| `[profile.dev]` variant                              | cold   | warm (crate touched) | `target/` |
+| ---------------------------------------------------- | ------ | -------------------- | --------- |
+| `debug = "line-tables-only"` (before)                | 17.0 s | 1.16 s               | 392 MB    |
+| + `[profile.dev.package."*"] debug = false` (now)    | 15.8 s | 1.14 s               | 288 MB    |
+| `CARGO_INCREMENTAL=0` (rust-cache sets it in CI)     | 24.6 s | 2.07 s               | 362 MB    |
+
+The first two rows ran back to back; the third ran earlier on a busier machine (its baseline then
+was 21.5 s cold), so read it only as "not faster".
+
+- Done: dev builds keep line tables for workspace crates only; dependencies get no debug info,
+  so the `target/` cache that rust-cache or CircleCI restores is about a quarter smaller. Both
+  roots carry `[profile.dev] debug = "line-tables-only"`. Already in place: cargo-nextest,
+  rust-cache (GitHub) and the `target/` cache (CircleCI), one integration-test binary per crate.
+- `template/` members (rust-cli, rust-tool, `src-tauri`) drop from full dev debug info to line
+  tables (no local variables in a debugger); `CARGO_PROFILE_DEV_DEBUG=true` restores it locally.
+  Release builds (`desktop.yml`, release workflows) are unchanged.
+- Cache keys follow the profile: rust-cache v2 keys on the workspace manifests (version fields
+  stripped, so `[profile]` counts); the CircleCI key now hashes `Cargo.lock`, `Cargo.toml` and
+  `rust-toolchain.toml`, so the old cache with debug-info dependencies is not restored forever.
+- Template guidance (per-crate `AGENTS.md`): split kitchen-sink crates, keep proc-macros and heavy
+  derive deps at the leaves; local `RUSTC_WRAPPER=sccache` is opt-in.
+- Not done: sccache in CI (rust-cache already restores `target/`; sccache adds a second cache and
+  per-crate round trips and cannot cache incremental crates); a `.cargo/config.toml` wrapper
+  (breaks machines without sccache); mold or an lld setting (rustc already links with LLD on
+  `x86_64-unknown-linux-gnu`, checked with `readelf -p .comment`; mold needs an install step on
+  every CI run and Linux-only config); `codegen-units` (release default 16 with thin LTO is the
+  fast choice, release builds run only in release workflows); explicit `incremental` (cargo's
+  defaults are already on for dev, off for release).

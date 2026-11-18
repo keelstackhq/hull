@@ -110,7 +110,7 @@ steps:
         fi
         if [ "$rust" = true ]; then
           echo "export RUST=true" >> "$BASH_ENV"
-          { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key
+          { cat Cargo.lock Cargo.toml rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key
         fi
   # step: rust-toolchain
   - run:

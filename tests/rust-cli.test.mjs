@@ -280,7 +280,7 @@ test("rust-tool without rust-cli renders Cargo.toml, rust-toolchain.toml, rust-a
   const { dir } = await renderCombo(["base", "rust-tool:tool"]);
   assert.equal(
     await read(dir, "Cargo.toml"),
-    '[workspace]\nresolver = "3"\nmembers = [\n  "crates/*",\n]\n\n[workspace.lints.rust]\nunsafe_code = "forbid"\n\n[workspace.lints.clippy]\nall = { level = "warn", priority = -1 }\n\n[profile.release]\nlto = "thin"\n',
+    '[workspace]\nresolver = "3"\nmembers = [\n  "crates/*",\n]\n\n[workspace.lints.rust]\nunsafe_code = "forbid"\n\n[workspace.lints.clippy]\nall = { level = "warn", priority = -1 }\n\n[profile.dev]\ndebug = "line-tables-only"\n\n# Dependencies need no debug info; keeps target/ (and the CI cache) about a quarter smaller.\n[profile.dev.package."*"]\ndebug = false\n\n[profile.release]\nlto = "thin"\n',
   );
   assert.equal(
     await read(dir, "rust-toolchain.toml"),
@@ -295,7 +295,7 @@ test("rust-tool without rust-cli renders Cargo.toml, rust-toolchain.toml, rust-a
   const tauri = await renderCombo(["base", "preact-app:web", "tauri-app:desktop"]);
   assert.equal(
     await read(tauri.dir, "Cargo.toml"),
-    '[workspace]\nresolver = "3"\nmembers = [\n  "apps/*/src-tauri",\n]\n\n[workspace.lints.rust]\nunsafe_code = "forbid"\n\n[workspace.lints.clippy]\nall = { level = "warn", priority = -1 }\n\n[profile.release]\nlto = "thin"\n',
+    '[workspace]\nresolver = "3"\nmembers = [\n  "apps/*/src-tauri",\n]\n\n[workspace.lints.rust]\nunsafe_code = "forbid"\n\n[workspace.lints.clippy]\nall = { level = "warn", priority = -1 }\n\n[profile.dev]\ndebug = "line-tables-only"\n\n# Dependencies need no debug info; keeps target/ (and the CI cache) about a quarter smaller.\n[profile.dev.package."*"]\ndebug = false\n\n[profile.release]\nlto = "thin"\n',
   );
   assert.equal(
     await read(tauri.dir, "rust-toolchain.toml"),

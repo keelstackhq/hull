@@ -18,5 +18,9 @@ all = { level = "warn", priority = -1 }
 [profile.dev]
 debug = "line-tables-only"
 
+# Dependencies need no debug info; keeps target/ (and the CI cache) about a quarter smaller.
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 lto = "thin"

@@ -312,7 +312,7 @@ const CIRCLECI = {
     '        if [ "$rust" = true ]; then',
     '          echo "export RUST=true" >> "$BASH_ENV"',
     // Missing files are fine (cat exits 1, so `|| true` keeps bash -eo pipefail alive).
-    '          { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key',
+    '          { cat Cargo.lock Cargo.toml rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key',
     "        fi",
   ),
   "rust-toolchain": yml(
@@ -486,7 +486,7 @@ export const RUST_CI_PLAN = Object.freeze(
           '        node .github/scripts/docs-only.mjs > "$t/out"',
           '        if grep -qx "skip=true" "$t/out"; then circleci-agent step halt; fi',
           // Missing files are fine (cat exits 1, so `|| true` keeps bash -eo pipefail alive).
-          '        { cat Cargo.lock rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key',
+          '        { cat Cargo.lock Cargo.toml rust-toolchain.toml 2>/dev/null || true; } | sha256sum | cut -d" " -f1 > .rust-cache-key',
         ),
       ),
     },

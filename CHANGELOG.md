@@ -7,6 +7,15 @@ Releases are automatic: merging a change to `main` whose top heading is a new da
 `v<version>` and publishes the GitHub release after the owner approves the `release` environment.
 Keep `unreleased` while changes accumulate.
 
+## v0.14.0 — unreleased
+
+- Rust (both templates): root `Cargo.toml` adds `[profile.dev.package."*"] debug = false`
+  (dependencies without debug info: `target/` and the CI cache about 27 % smaller, build time
+  unchanged); `template/`'s root also gets `[profile.dev] debug = "line-tables-only"`. Per-crate
+  `AGENTS.md` adds crate-graph guidance and local opt-in sccache. `template/` crates now get line
+  tables instead of full dev debug info (`CARGO_PROFILE_DEV_DEBUG=true` restores it). CircleCI's Rust
+  cache key also hashes the root `Cargo.toml`. Spec §15 "Build speed".
+
 ## v0.13.0 — 2026-11-17
 
 - Base (both templates): `scripts/licenses.mjs` writes `THIRD_PARTY_LICENSES.md` and
