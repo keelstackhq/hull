@@ -3,7 +3,7 @@
 //   node scripts/pins.mjs --shell          PIN_RUST=1.99.1 lines for eval/source
 //   node scripts/pins.mjs --github-output  key=value lines for $GITHUB_OUTPUT
 //   node scripts/pins.mjs --check          exit 1 when rust-toolchain.toml or Cargo.toml disagree
-import { readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,6 +36,23 @@ export function checkRust(pins, toolchain, cargo) {
   return problems;
 }
 
+/** CircleCI downloads are sha256-pinned per version (bump them by hand): report drift. */
+export function checkCircleci(pins, text, file) {
+  const problems = [];
+  const want = {
+    nextest: /cargo-nextest-(\d+\.\d+\.\d+)/g,
+    cargo_deny: /cargo-deny-(\d+\.\d+\.\d+)/g,
+  };
+  for (const [key, re] of Object.entries(want)) {
+    for (const [, v] of text.matchAll(re))
+      if (v !== pins[key])
+        problems.push(
+          `${file} downloads ${key.replace("cargo_", "cargo-")} ${v}, pins.toml has ${pins[key]}`,
+        );
+  }
+  return [...new Set(problems)];
+}
+
 function main(argv) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const pins = parsePins(readFileSync(join(root, "pins.toml"), "utf8"));
@@ -48,8 +65,13 @@ function main(argv) {
       readFileSync(join(root, "rust-toolchain.toml"), "utf8"),
       readFileSync(join(root, "Cargo.toml"), "utf8"),
     );
+    for (const f of [".circleci/src/jobs/ci-ok.yml", ".circleci/config.yml"]) {
+      if (existsSync(join(root, f)))
+        problems.push(...checkCircleci(pins, readFileSync(join(root, f), "utf8"), f));
+    }
     if (problems.length > 0) {
-      for (const p of problems) console.error(`pins: ${p} (fix: set all three to the same version)`);
+      for (const p of problems)
+        console.error(`pins: ${p} (fix: make them equal; CircleCI urls need new sha256 sums)`);
       return 1;
     }
   }

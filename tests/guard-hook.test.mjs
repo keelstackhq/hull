@@ -1057,6 +1057,7 @@ const READ_ONLY = [
   "ls -t .github/workflows/*.yml",
   "grep -o 'uses: [^ ]*' .github/workflows/*.yml",
   "cat .bosun/*.toml",
+  "cd .bosun && grep -C 3 risk bosun.toml",
 ];
 for (const c of READ_ONLY) {
   test(`read-only allow: ${c}`, () => assert.equal(decide(bash(c), ctx), null));
@@ -1075,6 +1076,20 @@ for (const c of [
   "cat .env",
   "cd .bosun && rm -rf .",
   'cd "$D" && ls',
+  // review round 1: writes hidden behind read-only tools or before the `cd`
+  "tree -o .claude/settings.json",
+  "tree -o.claude/settings.json",
+  "less -o .claude/settings.json README.md",
+  "cd .claude && git diff --output=settings.json",
+  "cd .claude && git log --output hooks/guard.mjs",
+  "cd .bosun && git show HEAD --output=x.toml",
+  "cd .claude && echo $(rm settings.json)",
+  "cd .claude && echo `rm settings.json`",
+  "cd .claude && cat <(rm settings.json)",
+  "cd .claude && git -c core.pager='rm settings.json' log",
+  "cd .claude && git -c alias.status='!rm settings.json' status",
+  "cd .claude && rg --pre ./x foo",
+  "cd .claude && file -C -m hooks/guard",
 ]) {
   test(`rail stays: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
 }

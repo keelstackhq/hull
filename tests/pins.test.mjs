@@ -106,3 +106,18 @@ test("no template-rust workflow hardcodes nextest, cargo-deny or hoist versions"
     }
   }
 });
+
+test("pins.mjs --check also catches drift in the sha-pinned CircleCI downloads", async () => {
+  const d = await sandbox();
+  await mkdir(join(d, ".circleci/src/jobs"), { recursive: true });
+  const cc = await readFile(CC, "utf8");
+  await writeFile(join(d, ".circleci/src/jobs/ci-ok.yml"), cc);
+  assert.equal(run(d, "--check").status, 0);
+  await writeFile(
+    join(d, ".circleci/src/jobs/ci-ok.yml"),
+    cc.replaceAll(`cargo-nextest-${pins.nextest}`, "cargo-nextest-0.0.1"),
+  );
+  const r = run(d, "--check");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /ci-ok\.yml.*nextest 0\.0\.1/);
+});

@@ -1,6 +1,7 @@
 # Tool pins: the one source for CI workflows, the environment setup script and docs.
 # Move a pin here only (Renovate or a reviewed PR); `node scripts/pins.mjs --check` (CI) keeps
-# rust-toolchain.toml and Cargo.toml rust-version equal to `rust`.
+# rust-toolchain.toml, Cargo.toml rust-version and the sha256-pinned CircleCI downloads (bumped
+# by hand with their checksums) equal to these.
 [pins]
 rust = "1.99.1"
 nextest = "0.9.148"

@@ -11,7 +11,7 @@ Keep `unreleased` while changes accumulate.
 
 - template-rust bootstrap friction (client feedback): `pins.toml` + `scripts/pins.mjs` are the one
   source of tool versions (rust, nextest, cargo-deny, splice, bosun, hoist); CI and release.yml read
-  them, CI checks rust-toolchain.toml and Cargo.toml against them (hoist 0.5.0 → 0.5.1). A shipped
+  them, CI checks rust-toolchain.toml and Cargo.toml against them (hoist 0.5.0 → 0.5.1, latest per `npm view` on 2026-11-20). A shipped
   `Cargo.lock` keeps `--locked` green on the first push; var `no_placeholder` renders without
   `crates/common`. `scripts/proxy-ca.sh` trusts the cloud agent proxy CA for `docker build`.
 - guard.mjs (both templates): `cd`/`pushd` into a guarded dir is allowed when the rest of the
@@ -39,7 +39,7 @@ Keep `unreleased` while changes accumulate.
   command. Fixes false positives reported from a client repo.
 - Generated CI (both templates, GitHub and CircleCI): a `Workflows parse?` step runs
   `node .github/scripts/workflows.mjs` before the affected/docs-only exit and fails on any
-  `.github/workflows/*.yml` that does not parse (an unquoted ` : ` once disabled a client repo's
+  `.github/workflows/*.yml` that does not parse (an unquoted `:` once disabled a client repo's
   workflow silently for a day). Uses the pinned, integrity-checked `yaml` 2.9.1 tarball; < 1 s; a
   failed download fails the step.
 - `ready.mjs` (both templates): the stack comes from `.splice/lock.toml`'s source; a package.json
@@ -414,19 +414,19 @@ it with `scripts/render.mjs` (the dev renderer).
 
 **Pieces** (`base` is always included; the others are opt-in, some `multiple`):
 
-| Piece | What it adds |
-|---|---|
-| `base` | pnpm 12 workspace with an exact catalog, Turborepo, TypeScript 7, Vite+ (one Vite per repo), one-job CI with an affected early exit, Renovate preset, release workflow, AI layer |
-| `preact-app` | Preact app on Vite+ with cascivo components, deployed to Cloudflare static assets |
-| `ui-storybook` | Preact UI package on cascivo with Storybook 10.6 |
-| `astro-site` | Astro 7 static site with Preact islands on the shared Vite+ core |
-| `hono-worker` | Hono on Cloudflare Workers: JSON request logs without query strings, headers or bodies; optional scrubbed Sentry |
-| `rust-tool` | Rust crate in a root Cargo workspace, run by Turborepo (clippy, rustfmt, nextest) |
-| `rust-cli` | Production Rust CLI: one JSON object per run, fixed exit codes, pinned toolchain, cargo-deny |
-| `npm-cli` | npm launcher and per-platform packages that ship a `rust-cli` binary (requires `rust-cli`) |
-| `ts-lib` | Publishable ESM TypeScript library with publint and attw |
-| `tauri-app` | Tauri v2 desktop shell around a `preact-app`; Rust builds only in the scheduled `desktop.yml` |
-| `docs` | docspack: local, version-locked docs for agents, with a packs manifest |
+| Piece          | What it adds                                                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`         | pnpm 12 workspace with an exact catalog, Turborepo, TypeScript 7, Vite+ (one Vite per repo), one-job CI with an affected early exit, Renovate preset, release workflow, AI layer |
+| `preact-app`   | Preact app on Vite+ with cascivo components, deployed to Cloudflare static assets                                                                                                |
+| `ui-storybook` | Preact UI package on cascivo with Storybook 10.6                                                                                                                                 |
+| `astro-site`   | Astro 7 static site with Preact islands on the shared Vite+ core                                                                                                                 |
+| `hono-worker`  | Hono on Cloudflare Workers: JSON request logs without query strings, headers or bodies; optional scrubbed Sentry                                                                 |
+| `rust-tool`    | Rust crate in a root Cargo workspace, run by Turborepo (clippy, rustfmt, nextest)                                                                                                |
+| `rust-cli`     | Production Rust CLI: one JSON object per run, fixed exit codes, pinned toolchain, cargo-deny                                                                                     |
+| `npm-cli`      | npm launcher and per-platform packages that ship a `rust-cli` binary (requires `rust-cli`)                                                                                       |
+| `ts-lib`       | Publishable ESM TypeScript library with publint and attw                                                                                                                         |
+| `tauri-app`    | Tauri v2 desktop shell around a `preact-app`; Rust builds only in the scheduled `desktop.yml`                                                                                    |
+| `docs`         | docspack: local, version-locked docs for agents, with a packs manifest                                                                                                           |
 
 **AI layer.** A canonical `AGENTS.md` (≤ 60 lines) with a thin `CLAUDE.md` (≤ 20), the subagents
 `Explore` (haiku), `implementer`, `reviewer`, `ci-fixer`, the skills `verify` and `add-piece`, a

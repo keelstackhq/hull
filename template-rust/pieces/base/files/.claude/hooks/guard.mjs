@@ -539,7 +539,7 @@ export function commands(cmd) {
     }
     if (seg.docs) t.docs = seg.docs;
     // `ls -d`, `grep -o`, `sort -t`: these flags take no directory in read-only tools.
-    if (!READ_ONLY_PROGS.has(base(t[0]))) for (const d of chdirs(seg)) out.push(["@chdir", d]);
+    if (!NO_DIR_FLAGS.has(base(t[0]))) for (const d of chdirs(seg)) out.push(["@chdir", d]);
     out.push(t);
     const prog = base(t[0]);
     const segText = seg.join(" ");
@@ -833,19 +833,26 @@ function chdirs(tokens) {
   return out;
 }
 
-/** Tools that only read (no flag of theirs writes a file); a redirect still counts as a write. */
+/** Tools whose -d/-o/-t/-C/-O flags never name a directory or an output file. */
+const NO_DIR_FLAGS = new Set("ls grep egrep fgrep head tail wc cat du stat diff".split(" "));
+/** Tools that only read; a redirect still counts as a write. Not tree/less (-o writes). */
 const READ_ONLY_PROGS = new Set(
   (
-    "ls cat head tail wc grep egrep fgrep rg ag stat file du tree less more diff cmp jq bat pwd " +
-    "echo printf true false test [ cd pushd popd basename dirname realpath readlink sha256sum md5sum"
+    "ls cat head tail wc grep egrep fgrep rg ag stat du diff cmp jq pwd echo printf true false " +
+    "test [ cd pushd popd basename dirname realpath readlink sha256sum md5sum"
   ).split(" "),
 );
 const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "ls-files", "blame", "rev-parse"]);
+/** Flags that write a file or run a program even in a read-only tool. */
+const RUNS_OR_WRITES_RE = /^(--output|--pre\b|--config-env|--exec-path|--ext-diff)/;
 
 /** True when a command cannot write: a read-only tool, no redirect except to /dev/null. */
 function readOnly(t) {
   const prog = base(t[0]);
   if (prog === "git" ? !READ_ONLY_GIT.has(gitSub(t).sub) : !READ_ONLY_PROGS.has(prog)) return false;
+  if (t.slice(1).some((x) => RUNS_OR_WRITES_RE.test(x))) return false;
+  // git -c/-C (config can run a program, -C moves the repo).
+  if (prog === "git" && t.slice(1).some((x) => /^-[cC]/.test(x))) return false;
   return !t.some((x, i) => {
     if (!writesTarget(t, i)) return false;
     return (
@@ -1162,7 +1169,15 @@ export function decide(input, ctx) {
     // A cwd persisted inside a guarded dir (an earlier `cd .bosun`) starts the chain read-only.
     const guarded = cwd !== ctx.projectDir && guardedDir(cwd, ctx.projectDir, ctx.projectDir);
     const chain = { made: new Set(), tainted: new Set(), guarded };
-    for (const t of commands(ti.command)) {
+    const cmds = commands(ti.command);
+    // A `cd` into a guarded dir anywhere in the command makes all of it read-only: substitutions
+    // are listed before the command that holds them.
+    chain.guarded ||= cmds.some(
+      (t) =>
+        ["cd", "pushd"].includes(base(t[0])) &&
+        t.slice(1).some((d) => !d.startsWith("-") && guardedDir(d, ctx.projectDir, cwd)),
+    );
+    for (const t of cmds) {
       const rule = bashRule(t, ctx.projectDir, cwd, chain);
       if (rule) return deny(rule, matched(t));
       noteWrites(t, cwd, chain);
