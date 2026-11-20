@@ -3,6 +3,7 @@
 
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use hmac::{Hmac, KeyInit, Mac};
 use http_body_util::Full;
@@ -17,7 +18,8 @@ use tokio_rustls::TlsConnector;
 use super::backup::utc_stamp;
 
 /// Upload target, read from `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
-/// and the optional `BACKUP_S3_REGION` (default `auto`, what R2 expects).
+/// and the optional `BACKUP_S3_REGION` (default `auto`, what R2 expects) and
+/// `BACKUP_S3_TIMEOUT_SECS`. `R2_ENDPOINT` is `https://<host>` with no port or path.
 #[derive(Clone, PartialEq, Eq)]
 pub struct S3Config {
     pub endpoint: String,
@@ -25,6 +27,8 @@ pub struct S3Config {
     pub region: String,
     pub access_key_id: String,
     pub secret_access_key: String,
+    /// Limit for the whole upload (`BACKUP_S3_TIMEOUT_SECS`, default 300, at least 1).
+    pub timeout_secs: u64,
 }
 
 // Hand-written so a stray `{:?}` never prints the secret.
@@ -34,6 +38,7 @@ impl std::fmt::Debug for S3Config {
             .field("endpoint", &self.endpoint)
             .field("bucket", &self.bucket)
             .field("region", &self.region)
+            .field("timeout_secs", &self.timeout_secs)
             .finish_non_exhaustive()
     }
 }
@@ -66,13 +71,35 @@ impl S3Config {
         let [endpoint, bucket, access_key_id, secret_access_key] =
             <[String; 4]>::try_from(values.into_iter().flatten().collect::<Vec<_>>())
                 .map_err(|_| "R2_* variables".to_owned())?;
+        check_endpoint(&endpoint)?;
+        let timeout_secs =
+            match lookup("BACKUP_S3_TIMEOUT_SECS") {
+                None => 300,
+                Some(v) => v.parse::<u64>().ok().filter(|n| *n > 0).ok_or_else(|| {
+                    format!("BACKUP_S3_TIMEOUT_SECS must be at least 1, got {v:?}")
+                })?,
+            };
         Ok(Some(Self {
             endpoint,
             bucket,
             region: lookup("BACKUP_S3_REGION").unwrap_or_else(|| "auto".to_owned()),
             access_key_id,
             secret_access_key,
+            timeout_secs,
         }))
+    }
+}
+
+/// The endpoint must be `https://<host>`: uploads always go to port 443 and the host is signed.
+fn check_endpoint(endpoint: &str) -> Result<(), String> {
+    let host = endpoint.strip_prefix("https://").unwrap_or("");
+    let ok = !host.is_empty()
+        && !host.contains(['/', ':', '?', '#', '@'])
+        && !host.chars().any(char::is_whitespace);
+    if ok {
+        Ok(())
+    } else {
+        Err("R2_ENDPOINT must be https://<host>, with no port, path or http".to_owned())
     }
 }
 
@@ -137,13 +164,33 @@ pub fn authorization(
     )
 }
 
-/// PUTs `file` to `<endpoint>/<bucket>/backups/<file name>`.
+/// PUTs `file` to `<endpoint>/<bucket>/backups/<file name>`, giving up after `timeout_secs`.
 pub async fn upload(config: &S3Config, file: &Path) -> Result<(), String> {
+    with_timeout(
+        Duration::from_secs(config.timeout_secs),
+        upload_inner(config, file),
+    )
+    .await
+}
+
+/// Runs `work`, turning a timeout into an error (which carries no secrets).
+async fn with_timeout(
+    limit: Duration,
+    work: impl Future<Output = Result<(), String>>,
+) -> Result<(), String> {
+    tokio::time::timeout(limit, work)
+        .await
+        .unwrap_or_else(|_| Err(format!("upload timed out after {}s", limit.as_secs())))
+}
+
+async fn upload_inner(config: &S3Config, file: &Path) -> Result<(), String> {
     let name = file
         .file_name()
         .and_then(|n| n.to_str())
         .ok_or("bad snapshot name")?;
     let path = file.to_owned();
+    // The whole snapshot is read into memory (to hash and send it in one request): fine up to a few
+    // hundred MB. Past that, stream it with a multipart upload instead (see docs/restore.md).
     let body = tokio::task::spawn_blocking(move || std::fs::read(path))
         .await
         .map_err(|e| format!("read task failed: {e}"))?
@@ -216,7 +263,9 @@ pub async fn upload(config: &S3Config, file: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{S3Config, authorization, sha256_hex};
+    use std::time::Duration;
+
+    use super::{S3Config, authorization, sha256_hex, with_timeout};
 
     // AWS documentation, "Signature Calculations for the Authorization Header", GET Object example.
     #[test]
@@ -274,6 +323,63 @@ mod tests {
         ];
         let c = S3Config::from_lookup(&env(&all)).unwrap().unwrap();
         assert_eq!(c.region, "auto");
+        assert_eq!(c.timeout_secs, 300);
         assert!(!format!("{c:?}").contains("shh"));
+    }
+
+    #[test]
+    fn endpoint_must_be_plain_https_host() {
+        let with = |endpoint: &str| {
+            let all = [
+                ("R2_ENDPOINT", endpoint),
+                ("R2_BUCKET", "b"),
+                ("R2_ACCESS_KEY_ID", "id"),
+                ("R2_SECRET_ACCESS_KEY", "shh"),
+            ];
+            S3Config::from_lookup(&env(&all))
+        };
+        assert!(with("https://a.r2.cloudflarestorage.com").is_ok());
+        for bad in [
+            "http://a.example.com",
+            "https://a.example.com:8443",
+            "https://a.example.com/bucket",
+            "https://a.example.com/",
+            "https://",
+            "a.example.com",
+        ] {
+            let err = with(bad).unwrap_err();
+            assert!(err.contains("R2_ENDPOINT must be https://"), "{bad}: {err}");
+        }
+    }
+
+    #[test]
+    fn timeout_secs_is_read_and_at_least_one() {
+        let base = [
+            ("R2_ENDPOINT", "https://a.example.com"),
+            ("R2_BUCKET", "b"),
+            ("R2_ACCESS_KEY_ID", "id"),
+            ("R2_SECRET_ACCESS_KEY", "shh"),
+        ];
+        let with = |t: &'static str| {
+            let mut all = base.to_vec();
+            all.push(("BACKUP_S3_TIMEOUT_SECS", t));
+            S3Config::from_lookup(&env(&all))
+        };
+        assert_eq!(with("30").unwrap().unwrap().timeout_secs, 30);
+        assert!(with("0").unwrap_err().contains("BACKUP_S3_TIMEOUT_SECS"));
+        assert!(with("soon").unwrap_err().contains("BACKUP_S3_TIMEOUT_SECS"));
+    }
+
+    #[tokio::test]
+    async fn a_stalled_upload_times_out_with_an_error() {
+        let err = with_timeout(Duration::from_millis(50), std::future::pending())
+            .await
+            .unwrap_err();
+        assert!(err.contains("timed out"), "{err}");
+        assert!(
+            with_timeout(Duration::from_secs(5), async { Ok(()) })
+                .await
+                .is_ok()
+        );
     }
 }

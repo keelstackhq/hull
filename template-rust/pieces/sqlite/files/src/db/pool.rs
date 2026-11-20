@@ -1,6 +1,8 @@
 //! One writer connection and a pool of read-only connections, with durable pragmas.
 
+use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use sqlx::SqlitePool;
@@ -18,6 +20,8 @@ pub struct Db {
     pub writer: SqlitePool,
     pub readers: SqlitePool,
     pub path: PathBuf,
+    /// Held while the service runs, so `--restore` cannot replace the file under it.
+    lock: Option<Arc<File>>,
 }
 
 impl Db {
@@ -26,14 +30,17 @@ impl Db {
         std::fs::create_dir_all(&config.data_dir)
             .map_err(|e| format!("cannot create {}: {e}", config.data_dir.display()))?;
         check_writable(&config.data_dir)?;
-        Self::open_at(&config.db_path(), &config.data_dir, config.readers).await
+        let lock = super::lock::acquire(&config.db_path())?;
+        let mut db = Self::open_at(&config.db_path(), &config.data_dir, config.readers).await?;
+        db.lock = Some(Arc::new(lock));
+        Ok(db)
     }
 
     /// Opens the database at `path`; `tmp_dir` receives SQLite's temporary files.
     pub async fn open_at(path: &Path, tmp_dir: &Path, readers: u32) -> Result<Self, String> {
         let writer = SqlitePoolOptions::new()
             .max_connections(1)
-            .connect_with(options(path, tmp_dir).create_if_missing(true))
+            .connect_with(writer_options(path, tmp_dir).create_if_missing(true))
             .await
             .map_err(|e| format!("cannot open database {}: {e}", path.display()))?;
         MIGRATOR
@@ -42,13 +49,14 @@ impl Db {
             .map_err(|e| format!("migration failed: {e}"))?;
         let readers = SqlitePoolOptions::new()
             .max_connections(readers)
-            .connect_with(options(path, tmp_dir).read_only(true))
+            .connect_with(options(path).read_only(true))
             .await
             .map_err(|e| format!("cannot open read pool: {e}"))?;
         Ok(Self {
             writer,
             readers,
             path: path.to_owned(),
+            lock: None,
         })
     }
 
@@ -76,9 +84,8 @@ fn not_writable_message(dir: &Path, err: &std::io::Error) -> String {
     )
 }
 
-/// Connection options with the pragmas every connection needs. The temp directory is set with a
-/// pragma because `SQLITE_TMPDIR` would need `set_var`, which is unsafe (the workspace forbids it).
-pub fn options(path: &Path, tmp_dir: &Path) -> SqliteConnectOptions {
+/// Connection options with the pragmas every connection needs.
+pub fn options(path: &Path) -> SqliteConnectOptions {
     SqliteConnectOptions::new()
         .filename(path)
         // WAL: readers never block the writer and a crash cannot corrupt the file.
@@ -91,11 +98,18 @@ pub fn options(path: &Path, tmp_dir: &Path) -> SqliteConnectOptions {
         .busy_timeout(Duration::from_secs(5))
         // ON: deleted content is overwritten with zeros, so it cannot leak from free pages.
         .pragma("secure_delete", "ON")
-        // The data volume, not a small /tmp: sorts and VACUUM INTO spill there.
-        .pragma(
-            "temp_store_directory",
-            format!("'{}'", tmp_dir.display().to_string().replace('\'', "''")),
-        )
+}
+
+/// [`options`] for the writer, which also sets the temp directory. The setting is process-wide in
+/// SQLite and only valid before another connection opens, so only the writer (the first one) sets
+/// it; sorts and `VACUUM INTO` then spill to the data volume, not a small /tmp. It is a pragma
+/// because `SQLITE_TMPDIR` would need `set_var`, which is unsafe (the workspace forbids unsafe); the
+/// pragma is deprecated but the bundled SQLite still supports it.
+fn writer_options(path: &Path, tmp_dir: &Path) -> SqliteConnectOptions {
+    options(path).pragma(
+        "temp_store_directory",
+        format!("'{}'", tmp_dir.display().to_string().replace('\'', "''")),
+    )
 }
 
 #[cfg(test)]
@@ -105,7 +119,12 @@ mod tests {
 
     async fn pragma(pool: &sqlx::SqlitePool, name: &str) -> String {
         // Fixed pragma names from this file only.
-        let sql = format!("SELECT CAST({name} AS TEXT) FROM pragma_{name}");
+        let column = if name == "busy_timeout" {
+            "timeout"
+        } else {
+            name
+        };
+        let sql = format!("SELECT CAST({column} AS TEXT) FROM pragma_{name}");
         sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
             .fetch_one(pool)
             .await
@@ -129,6 +148,12 @@ mod tests {
         assert_eq!(pragma(&db.writer, "synchronous").await, "2");
         assert_eq!(pragma(&db.writer, "foreign_keys").await, "1");
         assert_eq!(pragma(&db.writer, "secure_delete").await, "1");
+        assert_eq!(pragma(&db.writer, "busy_timeout").await, "5000");
+        let tmp: String = sqlx::query_scalar("PRAGMA temp_store_directory")
+            .fetch_one(&db.writer)
+            .await
+            .unwrap();
+        assert_eq!(tmp, dir.display().to_string());
         let applied: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM _sqlx_migrations")
             .fetch_one(&db.writer)
             .await
@@ -145,6 +170,9 @@ mod tests {
             .execute(&db.readers)
             .await;
         assert!(attempt.is_err());
+        assert_eq!(pragma(&db.readers, "foreign_keys").await, "1");
+        assert_eq!(pragma(&db.readers, "busy_timeout").await, "5000");
+        assert_eq!(pragma(&db.readers, "secure_delete").await, "1");
         db.close().await;
     }
 

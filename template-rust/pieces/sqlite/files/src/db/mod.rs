@@ -5,6 +5,7 @@
 
 pub mod backup;
 pub mod config;
+pub mod lock;
 pub mod pool;
 pub mod restore;
 #[cfg(feature = "s3-backup")]

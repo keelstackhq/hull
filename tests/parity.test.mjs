@@ -134,6 +134,13 @@ test("rustComboSteps packs and checks .circleci only with the circleci piece", (
   assert.ok(!has(rustComboSteps("dev", ["base", "rust-cli:cli"], "/d")));
 });
 
+test("rustComboSteps adds the s3-backup lint and tests only with the sqlite piece", () => {
+  const feat = (steps) =>
+    steps.filter(([c, a]) => c === "cargo" && a.includes("s3-backup")).map(([, a]) => a[0]);
+  assert.deepEqual(feat(rustComboSteps("dev", ["rust-service", "sqlite"])), ["clippy", "nextest"]);
+  assert.deepEqual(feat(rustComboSteps("dev", ["rust-service"])), []);
+});
+
 test("parity: the ci-extra hook is in both GitHub workflows, both CircleCI jobs and dogfood", async () => {
   const hook = "bash scripts/ci-extra.sh";
   const guard = "[ -f scripts/ci-extra.sh ]";

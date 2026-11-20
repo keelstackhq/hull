@@ -1,6 +1,7 @@
 //! `--restore <snapshot>`: replace the database with a snapshot, then exit.
 //!
-//! Run it with the service stopped (see `docs/restore.md`): the live process holds the file open.
+//! Run it with the service stopped (see `docs/restore.md`): it takes the service's data-directory
+//! lock and refuses while a service holds it.
 
 use std::path::{Path, PathBuf};
 
@@ -8,23 +9,45 @@ use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Connection, SqliteConnection};
 
 /// Validates `snapshot` with `PRAGMA integrity_check`, then replaces the database at `db_path`.
-/// The old file is kept next to it as `<name>.pre-restore`; its WAL and shm files are removed.
+/// The old file is kept next to it as `<name>.pre-restore`, its WAL and shm files as
+/// `<name>.pre-restore-wal` and `-shm`; nothing is deleted. Refuses when a `.pre-restore*` file
+/// from an earlier restore is still there.
 pub async fn restore(snapshot: &Path, db_path: &Path) -> Result<(), String> {
+    if let Some(dir) = db_path.parent() {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    }
+    let _lock = super::lock::acquire(db_path)?;
     check(snapshot).await?;
+    for ext in PRE_RESTORE {
+        let old = suffixed(db_path, ext);
+        if old.exists() {
+            return Err(format!(
+                "{} exists from an earlier restore; move or delete it first",
+                old.display()
+            ));
+        }
+    }
     let tmp = suffixed(db_path, ".restoring");
     std::fs::copy(snapshot, &tmp)
         .map_err(|e| format!("cannot copy {}: {e}", snapshot.display()))?;
-    if db_path.exists() {
-        std::fs::rename(db_path, suffixed(db_path, ".pre-restore"))
-            .map_err(|e| format!("cannot move the old database aside: {e}"))?;
-    }
-    for ext in ["-wal", "-shm"] {
-        let _ = std::fs::remove_file(suffixed(db_path, ext));
+    for (live, kept) in [
+        ("", ".pre-restore"),
+        ("-wal", ".pre-restore-wal"),
+        ("-shm", ".pre-restore-shm"),
+    ] {
+        let live = suffixed(db_path, live);
+        if live.exists() {
+            std::fs::rename(&live, suffixed(db_path, kept))
+                .map_err(|e| format!("cannot move {} aside: {e}", live.display()))?;
+        }
     }
     std::fs::rename(&tmp, db_path).map_err(|e| format!("cannot put the snapshot in place: {e}"))?;
     eprintln!("restored {} from {}", db_path.display(), snapshot.display());
     Ok(())
 }
+
+const PRE_RESTORE: [&str; 3] = [".pre-restore", ".pre-restore-wal", ".pre-restore-shm"];
 
 async fn check(snapshot: &Path) -> Result<(), String> {
     if !snapshot.is_file() {
@@ -93,6 +116,72 @@ mod tests {
             .unwrap();
         assert_eq!(names, ["before"]);
         assert!(dir.join("app.db.pre-restore").exists());
+    }
+
+    #[tokio::test]
+    async fn the_old_wal_and_shm_are_kept_not_deleted() {
+        let dir = temp_dir("restore-wal");
+        let path = dir.join("app.db");
+        let db = Db::open_at(&path, &dir, 1).await.unwrap();
+        let snap = snapshot_at(&db.readers, &dir.join("b"), 3, "20260101T000000Z")
+            .await
+            .unwrap();
+        db.close().await;
+        std::fs::write(dir.join("app.db-wal"), b"wal").unwrap();
+        std::fs::write(dir.join("app.db-shm"), b"shm").unwrap();
+
+        restore(&snap, &path).await.unwrap();
+
+        assert_eq!(
+            std::fs::read(dir.join("app.db.pre-restore-wal")).unwrap(),
+            b"wal"
+        );
+        assert_eq!(
+            std::fs::read(dir.join("app.db.pre-restore-shm")).unwrap(),
+            b"shm"
+        );
+        assert!(!dir.join("app.db-wal").exists());
+    }
+
+    #[tokio::test]
+    async fn an_earlier_pre_restore_file_blocks_the_restore() {
+        let dir = temp_dir("restore-twice");
+        let path = dir.join("app.db");
+        let db = Db::open_at(&path, &dir, 1).await.unwrap();
+        let snap = snapshot_at(&db.readers, &dir.join("b"), 3, "20260101T000000Z")
+            .await
+            .unwrap();
+        db.close().await;
+        std::fs::write(dir.join("app.db.pre-restore"), b"precious").unwrap();
+
+        let err = restore(&snap, &path).await.unwrap_err();
+
+        assert!(
+            err.contains("app.db.pre-restore") && err.contains("move or delete"),
+            "{err}"
+        );
+        assert_eq!(
+            std::fs::read(dir.join("app.db.pre-restore")).unwrap(),
+            b"precious"
+        );
+        assert!(path.exists());
+    }
+
+    #[tokio::test]
+    async fn a_running_service_blocks_the_restore() {
+        let dir = temp_dir("restore-locked");
+        let path = dir.join("app.db");
+        let db = Db::open_at(&path, &dir, 1).await.unwrap();
+        let snap = snapshot_at(&db.readers, &dir.join("b"), 3, "20260101T000000Z")
+            .await
+            .unwrap();
+        db.close().await;
+        let _running = crate::db::lock::acquire(&path).unwrap();
+
+        let err = restore(&snap, &path).await.unwrap_err();
+
+        assert!(err.contains("locked"), "{err}");
+        assert!(!dir.join("app.db.pre-restore").exists());
     }
 
     #[tokio::test]

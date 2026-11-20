@@ -52,6 +52,14 @@ export function rustComboSteps(renderer = "dev", pieces = [], dir = ".") {
           LICENSES,
         ];
   const steps = [...setup, ...ci, CI_EXTRA, ...CHECKS];
+  // the sqlite piece's upload code is off in RUST_CI_STEPS (default features): lint and test it here
+  if (pieces.some((p) => p.split(":")[0] === "sqlite")) {
+    const feature = ["--workspace", "--features", "s3-backup", "--locked"];
+    steps.push(
+      ["cargo", ["clippy", ...feature, "--all-targets", "--", "-D", "warnings"]],
+      ["cargo", ["nextest", "run", ...feature, "--profile", "ci"]],
+    );
+  }
   // pack .circleci/src with the pinned CLI and check it (S§12 item 3)
   if (pieces.some((p) => p.split(":")[0] === "circleci"))
     steps.push(["node", [CHECK_CIRCLECI, dir]]);

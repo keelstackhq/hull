@@ -1305,7 +1305,10 @@ Fly.io, in `template-rust/`. They share one piece var `service` (crate and binar
   `R2_SECRET_ACCESS_KEY` (all four or none) and optional `BACKUP_S3_REGION` (default `auto`); the
   names follow the owner's Cloudflare R2 secrets. `SQLITE_TMPDIR` is not used: setting it needs
   `std::env::set_var`, which is unsafe in edition 2024 and the workspace forbids unsafe, so the
-  temp directory is `PRAGMA temp_store_directory` on every connection. When `DATA_DIR` is not
+  temp directory is `PRAGMA temp_store_directory`, set once on the writer (the first connection). The
+  service holds a lock on `$DATA_DIR/app.db.lock`; `--restore` refuses while it is held and keeps
+  the old files as `app.db.pre-restore*`. `BACKUP_KEEP` is at least 1; the upload has a
+  `BACKUP_S3_TIMEOUT_SECS` limit (300) and `R2_ENDPOINT` is `https://host`. When `DATA_DIR` is not
   writable the error names `DATA_DIR`, uid 65532 and `docs/fly.md` (Volume ownership).
 - `fly` (root files, requires `rust-service`): `Dockerfile` (builder `rust:<pins.rust>-alpine`
   for an explicit musl target, `FROM scratch`, user 65532; the build fails on an `INTERP` header,

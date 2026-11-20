@@ -15,7 +15,7 @@ pub struct DbConfig {
     pub readers: u32,
     /// Where snapshots go (`BACKUP_DIR`, default `$DATA_DIR/backups`).
     pub backup_dir: PathBuf,
-    /// Newest snapshots to keep (`BACKUP_KEEP`, default 7).
+    /// Newest snapshots to keep (`BACKUP_KEEP`, default 7, at least 1).
     pub backup_keep: usize,
     /// Seconds between snapshots (`BACKUP_INTERVAL_SECS`, default 86400, 0 = off).
     pub backup_interval_secs: u64,
@@ -41,10 +41,14 @@ impl DbConfig {
         }
         let backup_dir =
             lookup("BACKUP_DIR").map_or_else(|| data_dir.join("backups"), PathBuf::from);
+        let backup_keep: usize = number(&lookup, "BACKUP_KEEP", 7)?;
+        if backup_keep == 0 {
+            return Err("BACKUP_KEEP must be at least 1".to_owned());
+        }
         Ok(Self {
             readers,
             backup_dir,
-            backup_keep: number(&lookup, "BACKUP_KEEP", 7)?,
+            backup_keep,
             backup_interval_secs: number(&lookup, "BACKUP_INTERVAL_SECS", 86_400)?,
             ttl_sweep_secs: number(&lookup, "TTL_SWEEP_SECS", 0)?,
             #[cfg(feature = "s3-backup")]
@@ -101,5 +105,11 @@ mod tests {
         assert!(err.unwrap_err().contains("BACKUP_KEEP"));
         let err = DbConfig::from_lookup(|k| (k == "DB_READERS").then(|| "0".to_owned()));
         assert!(err.unwrap_err().contains("DB_READERS"));
+    }
+
+    #[test]
+    fn keeping_no_snapshots_is_an_error() {
+        let err = DbConfig::from_lookup(|k| (k == "BACKUP_KEEP").then(|| "0".to_owned()));
+        assert!(err.unwrap_err().contains("BACKUP_KEEP must be at least 1"));
     }
 }

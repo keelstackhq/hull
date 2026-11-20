@@ -82,10 +82,18 @@ pub async fn snapshot_at(
     )
     .await
     .map_err(|e| format!("cannot open snapshot: {e}"))?;
-    let scrubbed = scrub_pii(&mut conn).await;
+    // Scrub first, then VACUUM, so the scrubbed rows leave free pages instead of lingering in them.
+    let scrubbed = match scrub_pii(&mut conn).await {
+        Ok(()) => sqlx::query("VACUUM").execute(&mut conn).await.map(|_| ()),
+        Err(e) => Err(e),
+    };
     let closed = conn.close().await;
     scrubbed.map_err(|e| format!("scrub_pii failed: {e}"))?;
     closed.map_err(|e| format!("cannot close snapshot: {e}"))?;
+    // The data must be on disk before the name says the snapshot is complete.
+    std::fs::File::open(&partial)
+        .and_then(|f| f.sync_all())
+        .map_err(|e| format!("cannot sync snapshot: {e}"))?;
     std::fs::rename(&partial, &target).map_err(|e| format!("cannot finish snapshot: {e}"))?;
     prune(dir, keep)?;
     Ok(target)
@@ -108,6 +116,20 @@ pub fn list(dir: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 fn prune(dir: &Path, keep: usize) -> Result<(), String> {
+    // A crash mid-snapshot leaves a `.partial`; it is never listed, so remove it here.
+    for entry in std::fs::read_dir(dir)
+        .map_err(|e| format!("cannot read {}: {e}", dir.display()))?
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        let stale = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.starts_with(PREFIX) && n.ends_with(".partial"));
+        if stale {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
     let all = list(dir)?;
     let excess = all.len().saturating_sub(keep);
     for old in &all[..excess] {
@@ -158,6 +180,21 @@ mod tests {
         assert_eq!(stamp_at(1_369_353_600), "20130524T000000Z");
         assert_eq!(stamp_at(951_782_399), "20000228T235959Z");
         assert_eq!(stamp_at(951_782_400), "20000229T000000Z");
+    }
+
+    #[tokio::test]
+    async fn stale_partial_files_are_pruned() {
+        let dir = temp_dir("partial");
+        let db = Db::open_at(&dir.join("app.db"), &dir, 1).await.unwrap();
+        let out = dir.join("backups");
+        std::fs::create_dir_all(&out).unwrap();
+        let stale = out.join("snapshot-20250101T000000Z.db.partial");
+        std::fs::write(&stale, b"half").unwrap();
+        snapshot_at(&db.readers, &out, 2, "20260101T000000Z")
+            .await
+            .unwrap();
+        assert!(!stale.exists());
+        assert_eq!(list(&out).unwrap().len(), 1);
     }
 
     #[tokio::test]
