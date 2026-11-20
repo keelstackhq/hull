@@ -152,3 +152,38 @@ test("pins.mjs exits 1 when a key release.yml or CI reads is missing", async () 
     assert.match(r.stderr, /missing pin hoist/);
   }
 });
+
+const crates = parseToml(await read("pins.toml")).crates;
+const SERVICE_CARGO = (vers = crates) =>
+  `[package]\nname = "svc"\n\n[dependencies]\ntokio = { version = "=${vers.tokio}", features = ["net"] }\naxum = "=${vers.axum}"\nserde = "=1.0.1"\n`;
+
+test("pins.toml [crates] holds exact versions of the service crates, apart from [pins]", () => {
+  assert.deepEqual(Object.keys(crates), ["tokio", "axum", "tower"]);
+  for (const v of Object.values(crates)) assert.match(v, /^\d+\.\d+\.\d+$/);
+  assert.deepEqual(parsePins(`[pins]\na = "1.0.0"\n[crates]\nb-c = "2.0.0"\n`, "crates"), {
+    "b-c": "2.0.0",
+  });
+});
+
+test("pins.mjs --check passes a crate that pins [crates] versions, fails on a drifted pin", async () => {
+  const d = await sandbox();
+  await mkdir(join(d, "crates/svc"), { recursive: true });
+  await writeFile(join(d, "crates/svc/Cargo.toml"), SERVICE_CARGO());
+  assert.equal(run(d, "--check").status, 0);
+  await writeFile(
+    join(d, "crates/svc/Cargo.toml"),
+    SERVICE_CARGO({ tokio: "0.0.1", axum: crates.axum }),
+  );
+  const r = run(d, "--check");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /crates\/svc\/Cargo\.toml pins tokio to =0\.0\.1.*=\d+\.\d+\.\d+/);
+});
+
+test("pins.mjs refuses a [crates] value that is not an exact X.Y.Z", async () => {
+  const d = await sandbox({
+    "pins.toml": (await read("pins.toml")).replace(`tokio = "${crates.tokio}"`, 'tokio = "^1"'),
+  });
+  const r = run(d, "--check");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /tokio .*not an exact version/);
+});

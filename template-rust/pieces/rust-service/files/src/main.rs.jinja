@@ -1,0 +1,51 @@
+mod app;
+mod client_ip;
+mod config;
+{% if "sqlite" in pieces %}mod db;
+{% endif %}
+use std::process::ExitCode;
+
+use tokio::net::TcpListener;
+use tokio::signal::unix::{SignalKind, signal};
+
+use crate::config::Config;
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    match run().await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(message) => {
+            eprintln!("error: {message}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+async fn run() -> Result<(), String> {
+    let config = Config::from_env()?;
+    {% if "sqlite" in pieces %}// sqlite: open the pool, run migrations, handle --restore and start the backup and sweeper tasks here.
+    {% endif %}let listener = TcpListener::bind(config.bind_addr())
+        .await
+        .map_err(|e| format!("cannot bind {}: {e}", config.bind_addr()))?;
+    eprintln!("listening on {}", config.bind_addr());
+    axum::serve(listener, app::router())
+        .with_graceful_shutdown(shutdown())
+        .await
+        .map_err(|e| format!("server error: {e}"))
+}
+
+/// Resolves on SIGTERM (Fly stop) or SIGINT (Ctrl-C), so in-flight requests finish.
+async fn shutdown() {
+    let term = signal(SignalKind::terminate());
+    let int = signal(SignalKind::interrupt());
+    match (term, int) {
+        (Ok(mut term), Ok(mut int)) => {
+            tokio::select! {
+                _ = term.recv() => {}
+                _ = int.recv() => {}
+            }
+        }
+        // No signal handlers: serve until the process is killed.
+        _ => std::future::pending::<()>().await,
+    }
+}

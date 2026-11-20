@@ -1,0 +1,20 @@
+id = "rust-service"
+description = "A Rust HTTP service crate (tokio, axum): env config, GET /healthz, graceful shutdown"
+requires = ["base"]
+target = "crates/{{ service }}"
+
+[vars]
+service = { prompt = "service crate and binary name", default = "server", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = ["AGENTS.md"]
+shared = ["Cargo.toml"]
+seed = ["src/**", "CLAUDE.md"]
+
+[merge]
+"Cargo.toml" = "toml"
+
+[[post]]
+# Chained: Cargo.lock changes after base's licenses post may have run.
+run = "cargo update --workspace && node scripts/licenses.mjs"
+when = ["add"]

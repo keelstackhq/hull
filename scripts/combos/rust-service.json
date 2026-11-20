@@ -1,0 +1,6 @@
+{
+  "name": "rust-service",
+  "template": "template-rust",
+  "pieces": ["base", "rust-service"],
+  "vars": {}
+}
