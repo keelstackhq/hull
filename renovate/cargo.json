@@ -1,0 +1,56 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Exact Cargo pins; the crate list in the last rule mirrors pins.toml [crates].",
+  "rangeStrategy": "pin",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "minimumReleaseAge": "0 days",
+    "schedule": ["at any time"],
+    "labels": ["security"]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on monday"]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)pins\\.toml$/"],
+      "matchStringsStrategy": "recursive",
+      "matchStrings": [
+        "\\[crates\\]\\n[^\\[]*",
+        "^(?<depName>[a-z0-9_-]+) = \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
+      ],
+      "datasourceTemplate": "crate"
+    }
+  ],
+  "packageRules": [
+    {
+      "groupName": "cargo minor",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "schedule": ["before 5am on monday"]
+    },
+    {
+      "description": "Transitive crates (libsqlite3-sys, DNS crates) must keep moving via lockFileMaintenance.",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["libsqlite3-sys"],
+      "enabled": true
+    },
+    {
+      "groupName": "rust service crates",
+      "matchPackageNames": [
+        "tokio",
+        "axum",
+        "sqlx",
+        "hyper",
+        "hyper-util",
+        "http-body-util",
+        "rustls",
+        "tokio-rustls",
+        "webpki-roots"
+      ]
+    }
+  ]
+}
