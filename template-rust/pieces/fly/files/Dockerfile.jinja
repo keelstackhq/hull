@@ -1,0 +1,30 @@
+# Static musl image for {{ service }}. Build behind the agent proxy with
+#   bash scripts/proxy-ca.sh docker build .
+# FEATURES: cargo features of the service crate (for example s3-backup), set in fly.toml [build.args].
+# The build fails when the binary is not fully static or is larger than MAX_BYTES.
+FROM scratch AS proxy-ca
+
+FROM rust:1.99.1-alpine AS build
+COPY --from=proxy-ca / /usr/local/share/ca-certificates/
+RUN apk add --no-cache musl-dev binutils ca-certificates && update-ca-certificates
+ARG FEATURES=""
+ARG MAX_BYTES=25000000
+ENV RUSTFLAGS="-C target-feature=+crt-static"
+WORKDIR /src
+COPY . .
+RUN cargo build --release --locked -p {{ service }} ${FEATURES:+--features "$FEATURES"} \
+ && cp target/release/{{ service }} /{{ service }} \
+ && strip /{{ service }} \
+ && mkdir -p /data \
+ && if readelf -l /{{ service }} | grep -q INTERP; then echo "gate: {{ service }} has an INTERP header (not static)" >&2; exit 1; fi \
+ && if readelf -d /{{ service }} 2>/dev/null | grep -q NEEDED; then echo "gate: {{ service }} has NEEDED libraries (not static)" >&2; exit 1; fi \
+ && size="$(stat -c %s /{{ service }})" \
+ && if [ "$size" -gt "$MAX_BYTES" ]; then echo "gate: {{ service }} is $size bytes, over MAX_BYTES=$MAX_BYTES" >&2; exit 1; fi
+
+FROM scratch
+COPY --from=build /{{ service }} /{{ service }}
+COPY --from=build --chown=65532:65532 /data /data
+ENV PORT=8080 DATA_DIR=/data
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["/{{ service }}"]

@@ -55,6 +55,7 @@ test("template-rust manifest: format 1, hull-rust, base, min_splice 0.3.0, no va
     "base",
     "circleci",
     "circleci-only",
+    "fly",
     "rust-cli",
     "rust-service",
   ]);

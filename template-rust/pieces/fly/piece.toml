@@ -1,0 +1,18 @@
+id = "fly"
+description = "Deploy the service to Fly.io: static-musl Dockerfile with size and linkage gates, fly.toml with one volume, idempotent setup script, deploy workflow"
+requires = ["rust-service"]
+
+[vars]
+service = { prompt = "service crate and binary name", default = "server", pattern = "^[a-z][a-z0-9-]*$" }
+app = { prompt = "Fly app name", default = "app", pattern = "^[a-z][a-z0-9-]*$" }
+
+[files]
+owned = [
+  "Dockerfile",
+  "scripts/fly-setup.sh",
+  "scripts/smoke.sh",
+  ".github/workflows/deploy.yml",
+  ".github/workflows/image.yml",
+  "docs/fly.md",
+]
+seed = ["fly.toml"]

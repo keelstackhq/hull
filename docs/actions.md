@@ -26,6 +26,7 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 | `keelstackhq/hoist/secrets` | v0.5.0 | `85cb17573f8a835a577bce1fdaa653ffca5723b1` |
 | `keelstackhq/splice/action` | v0.5.0 | `85c95b63f53836301f2405368767c6ae9138109f` |
 | `pnpm/action-setup` | v4.4.0 | `fc06bc1257f339d1d5d8b3a19a8cae5388b55320` |
+| `superfly/flyctl-actions/setup-flyctl` | v1.6.0 | `ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1` |
 | `Swatinem/rust-cache` | v2.9.3 | `d1527c8f67ef9af357290475d4af4b0fab8f12e0` |
 | `taiki-e/install-action` | v2.87.32 | `5488ac5a951645ce95062214902ac4b6bc1a1037` |
 
@@ -132,6 +133,13 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 ### template-rust/circleci-only
 
 - none
+
+### template-rust/fly
+
+| Action | Version | Commit SHA |
+| --- | --- | --- |
+| `actions/checkout` | v5.1.0 | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` |
+| `superfly/flyctl-actions/setup-flyctl` | v1.6.0 | `ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1` |
 
 ### template-rust/rust-cli
 

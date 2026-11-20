@@ -1,0 +1,35 @@
+name: image
+
+# Builds the Docker image on pull requests, so the static-linkage and size gates fail before merge.
+# No secrets, no environment, no push: pull-request code never meets FLY_API_TOKEN (deploy.yml).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - Dockerfile
+      - fly.toml
+      - Cargo.toml
+      - Cargo.lock
+      - crates/**
+      - .github/workflows/image.yml
+
+concurrency:
+  group: image-${{ github.event.pull_request.number }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: docker build (features from fly.toml [build.args])
+        run: |
+          features="$(sed -n 's/^FEATURES *= *"\(.*\)".*/\1/p' fly.toml | head -n 1)"
+          docker build --build-arg "FEATURES=$features" .

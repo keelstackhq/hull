@@ -1,0 +1,44 @@
+# Fly app config. Seed file: edit freely. Setup: bash scripts/fly-setup.sh (docs/fly.md).
+app = "{{ app }}"
+primary_region = "iad"
+
+[build]
+
+[build.args]
+# Cargo features of the service crate, for example "s3-backup" (with the sqlite piece).
+FEATURES = ""
+
+[env]
+PORT = "8080"
+DATA_DIR = "/data"
+
+# One machine with one volume: SQLite files live on /data and a volume attaches to a single machine.
+[mounts]
+source = "data"
+destination = "/data"
+auto_extend_size_threshold = 80
+auto_extend_size_increment = "1GB"
+auto_extend_size_limit = "10GB"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = "off"
+auto_start_machines = true
+min_machines_running = 1
+
+[http_service.concurrency]
+type = "requests"
+soft_limit = 200
+hard_limit = 250
+
+[[http_service.checks]]
+method = "GET"
+path = "/healthz"
+interval = "15s"
+timeout = "3s"
+grace_period = "10s"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "256mb"
