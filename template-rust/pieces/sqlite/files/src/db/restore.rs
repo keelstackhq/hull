@@ -31,6 +31,10 @@ pub async fn restore(snapshot: &Path, db_path: &Path) -> Result<(), String> {
     let tmp = suffixed(db_path, ".restoring");
     std::fs::copy(snapshot, &tmp)
         .map_err(|e| format!("cannot copy {}: {e}", snapshot.display()))?;
+    // The copy must be on disk before its name replaces the database.
+    std::fs::File::open(&tmp)
+        .and_then(|f| f.sync_all())
+        .map_err(|e| format!("cannot sync the restored copy: {e}"))?;
     for (live, kept) in [
         ("", ".pre-restore"),
         ("-wal", ".pre-restore-wal"),
@@ -43,6 +47,13 @@ pub async fn restore(snapshot: &Path, db_path: &Path) -> Result<(), String> {
         }
     }
     std::fs::rename(&tmp, db_path).map_err(|e| format!("cannot put the snapshot in place: {e}"))?;
+    // Persist the renames too. Windows cannot open a directory, so this is unix only.
+    #[cfg(unix)]
+    if let Some(dir) = db_path.parent() {
+        std::fs::File::open(dir)
+            .and_then(|d| d.sync_all())
+            .map_err(|e| format!("cannot sync {}: {e}", dir.display()))?;
+    }
     eprintln!("restored {} from {}", db_path.display(), snapshot.display());
     Ok(())
 }

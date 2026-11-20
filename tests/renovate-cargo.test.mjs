@@ -14,19 +14,32 @@ test("renovate cargo preset pins exactly, alerts on vulnerabilities, keeps trans
   const p = await read("../renovate/cargo.json");
   assert.equal(p.rangeStrategy, "pin");
   assert.equal(p.osvVulnerabilityAlerts, true);
-  assert.equal(p.vulnerabilityAlerts.enabled, true);
-  assert.equal(p.vulnerabilityAlerts.minimumReleaseAge, "0 days");
-  assert.deepEqual(p.vulnerabilityAlerts.schedule, ["at any time"]);
-  assert.deepEqual(p.vulnerabilityAlerts.labels, ["security"]);
-  assert.equal(p.lockFileMaintenance.enabled, true);
-  assert.deepEqual(p.lockFileMaintenance.schedule, ["before 5am on monday"]);
+  assert.deepEqual(p.vulnerabilityAlerts, {
+    enabled: true,
+    minimumReleaseAge: "0 days",
+    schedule: ["at any time"],
+    labels: ["security"],
+  });
+  assert.deepEqual(p.lockFileMaintenance, {
+    enabled: true,
+    schedule: ["before 5am on monday"],
+  });
   const grouped = p.packageRules.find((r) => r.groupName === "cargo minor");
-  assert.deepEqual(grouped.matchManagers, ["cargo"]);
-  assert.deepEqual(grouped.matchUpdateTypes, ["minor", "patch"]);
-  assert.deepEqual(grouped.schedule, ["before 5am on monday"]);
+  assert.deepEqual(grouped, {
+    matchManagers: ["cargo"],
+    matchUpdateTypes: ["minor", "patch"],
+    groupName: "cargo minor",
+    schedule: ["before 5am on monday"],
+  });
   const sqlite = p.packageRules.find((r) => r.matchPackageNames?.includes("libsqlite3-sys"));
-  assert.ok(sqlite && sqlite.enabled !== false);
-  assert.ok(!p.packageRules.some((r) => r.enabled === false));
+  assert.deepEqual(sqlite, {
+    description:
+      "Transitive crates (libsqlite3-sys, DNS crates) must keep moving via lockFileMaintenance.",
+    matchManagers: ["cargo"],
+    matchPackageNames: sqlite.matchPackageNames,
+    enabled: true,
+  });
+  assert.equal(p.packageRules.length, 3);
 });
 
 test("renovate cargo preset reads pins.toml [crates] and groups the crates across managers", async () => {
@@ -56,8 +69,11 @@ test("renovate cargo preset reads pins.toml [crates] and groups the crates acros
   );
   const rule = p.packageRules.find((r) => r.groupName === "rust service crates");
   for (const c of PIN_CRATES) assert.ok(rule.matchPackageNames.includes(c), `group lacks ${c}`);
-  assert.deepEqual(rule.schedule, ["before 5am on monday"]);
-  assert.equal(rule.matchManagers, undefined);
+  assert.deepEqual(rule, {
+    groupName: "rust service crates",
+    matchPackageNames: rule.matchPackageNames,
+    schedule: ["before 5am on monday"],
+  });
 });
 
 test("template-rust renovate.json extends both presets", async () => {

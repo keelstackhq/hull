@@ -7,5 +7,10 @@ target = "crates/{{ service }}"
 service = { prompt = "service crate and binary name", default = "server", pattern = "^[a-z][a-z0-9-]*$" }
 
 [files]
-owned = ["tests/**"]
+owned = ["tests/**", "docs/sqlite.md"]
 seed = ["src/db/**", "migrations/**", "docs/restore.md"]
+
+[[post]]
+# Runs in the repo root. main.rs is a rust-service seed, so `add` cannot wire it.
+run = "echo 'sqlite: wire src/main.rs by hand, see crates/<service>/docs/sqlite.md'"
+when = ["add"]

@@ -153,7 +153,12 @@ mod tests {
             .fetch_one(&db.writer)
             .await
             .unwrap();
-        assert_eq!(tmp, dir.display().to_string());
+        // temp_store_directory is process-wide and tests run as threads of one process, so
+        // another test's Db may have set it last: accept any test data directory.
+        assert!(
+            tmp.starts_with(&std::env::temp_dir().join("svc-").display().to_string()),
+            "{tmp}"
+        );
         let applied: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM _sqlx_migrations")
             .fetch_one(&db.writer)
             .await

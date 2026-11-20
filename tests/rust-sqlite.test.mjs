@@ -124,3 +124,24 @@ test("restore: Db::open holds the lock (tested in restore.rs) and docs/restore.m
   assert.match(rs, /Db::open\(&config\)/);
   assert.match(await read(dir, "crates/server/docs/restore.md"), /Restore on Fly/);
 });
+
+test("sqlite: add hint post, owned docs/sqlite.md names the by-hand wiring", async () => {
+  const p = t.pieces.get("sqlite");
+  const hint = p.post.find((x) => x.run.includes("docs/sqlite.md"));
+  assert.ok(hint);
+  assert.deepEqual(hint.when, ["add"]);
+  const { dir, result } = await render(["base", "rust-service", "sqlite"]);
+  assert.equal(classes(result)["crates/server/docs/sqlite.md"], "owned");
+  const doc = await read(dir, "crates/server/docs/sqlite.md");
+  assert.ok(doc.includes("mod db;"));
+  const main = await read(dir, "crates/server/src/main.rs");
+  for (const line of doc.split("\n").filter((l) => l.startsWith("    ")))
+    assert.ok(main.includes(line), line);
+  assert.ok((await read(dir, "crates/server/AGENTS.md")).includes("docs/sqlite.md"));
+});
+
+test("sqlite restore fsyncs the copy and the directory before finishing", async () => {
+  const src = await read(RUST, "pieces/sqlite/files/src/db/restore.rs");
+  assert.match(src, /sync_all/);
+  assert.match(src, /#\[cfg\(unix\)\]/);
+});
