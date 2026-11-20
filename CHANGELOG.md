@@ -12,8 +12,8 @@ Keep `unreleased` while changes accumulate.
 - template-rust bootstrap friction (client feedback): `pins.toml` + `scripts/pins.mjs` are the one
   source of tool versions (rust, nextest, cargo-deny, splice, bosun, hoist); CI and release.yml read
   them, CI checks rust-toolchain.toml and Cargo.toml against them (hoist 0.5.0 → 0.5.1, latest per `npm view` on 2026-11-20). A shipped
-  `Cargo.lock` keeps `--locked` green on the first push; var `no_placeholder` renders without
-  `crates/common`. `scripts/proxy-ca.sh` trusts the cloud agent proxy CA for `docker build`.
+  `Cargo.lock` keeps `--locked` green on the first push; `crates/common` and its
+  test are documented as removable in the bootstrap PR. `scripts/proxy-ca.sh` trusts the cloud agent proxy CA for `docker build`.
 - guard.mjs (both templates): `cd`/`pushd` into a guarded dir is allowed when the rest of the
   command only reads; `ls -d`, `grep -o`, `sort -t`-style flags of read-only tools are no longer
   read as a target dir. New `docs/agents/guard.md` (safe patterns), linked from AGENTS.md.

@@ -2,6 +2,3 @@ format = 1
 name = "hull-rust"
 min_splice = "0.3.0"
 base = "base"
-
-[vars]
-no_placeholder = { prompt = "skip the placeholder crate crates/common (yes, or empty to keep it); needs another crate such as rust-cli", default = "" }

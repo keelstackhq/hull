@@ -36,9 +36,9 @@ Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
 
 ## Crates
 
-{% if no_placeholder %}{% else %}- `crates/common`: shared library code (seed, unpublished). Template tests (crates/common, its test)
+- `crates/common`: shared library code (seed, unpublished). Template tests (crates/common, its test)
   are removable in the bootstrap PR: `git rm -r crates/common`, then `cargo generate-lockfile`.
-{% endif %}{% if "rust-cli" in pieces %}- `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit
+{% if "rust-cli" in pieces %}- `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit
   codes and cargo-deny; see `crates/<name>/AGENTS.md`.
 {% endif %}
 ## Where to look

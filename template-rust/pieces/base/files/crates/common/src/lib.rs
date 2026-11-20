@@ -1,4 +1,4 @@
-{% if no_placeholder %}{% else %}//! Code shared by the crates of this workspace.
+//! Code shared by the crates of this workspace.
 
 /// Returns the greeting for `name`.
 ///
@@ -18,4 +18,4 @@ mod tests {
     fn greets_by_name() {
         assert_eq!(greeting("rust"), "hello, rust");
     }
-}{% endif %}
+}

@@ -46,11 +46,11 @@ const { docsOnly, pendingMod, indexMod } = {
   indexMod: await import(join(BASE, "scripts/agents-index.mjs")),
 };
 
-test("template-rust manifest: format 1, hull-rust, base, min_splice 0.3.0, only no_placeholder var", () => {
+test("template-rust manifest: format 1, hull-rust, base, min_splice 0.3.0, no vars", () => {
   assert.equal(t.name, "hull-rust");
   assert.equal(t.base, "base");
   assert.equal(t.minSplice, "0.3.0");
-  assert.deepEqual(Object.keys(t.vars ?? {}), ["no_placeholder"]);
+  assert.deepEqual(Object.keys(t.vars ?? {}), []);
   assert.deepEqual([...t.pieces.keys()].sort(), ["base", "circleci", "circleci-only", "rust-cli"]);
 });
 
@@ -425,11 +425,7 @@ test("base ships the Cargo.lock cargo writes for the placeholder workspace", asy
   assert.match(await readFile(join(dir, "AGENTS.md"), "utf8"), /git rm -r crates\/common/);
 });
 
-test("no_placeholder drops crates/common and the shipped Cargo.lock", async () => {
-  const { dir } = await render(["base", "rust-cli:cli"], { no_placeholder: "yes" });
-  assert.equal(existsSync(join(dir, "crates/common")), false);
-  assert.equal(existsSync(join(dir, "Cargo.lock")), false);
-  const agents = await readFile(join(dir, "AGENTS.md"), "utf8");
-  assert.doesNotMatch(agents, /crates\/common/);
-  assert.ok(lineCount(agents) <= 60);
+test("crates/common stays plain (no .jinja): a rename would read as a deleted test", () => {
+  assert.ok(existsSync(join(BASE, "crates/common/src/lib.rs")));
+  assert.ok(existsSync(join(BASE, "Cargo.lock")));
 });
