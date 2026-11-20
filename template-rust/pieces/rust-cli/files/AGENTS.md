@@ -11,7 +11,7 @@ Distributable CLI in the root Cargo workspace; the binary is named like the crat
   (`set_var` is unsafe in edition 2024, the workspace forbids unsafe).
 - Snapshots are inline; review changes with `cargo insta review`, never blind-accept. `--help`
   snapshots replace the binary name with `[BIN]`.
-- Network code uses rustls; the root `deny.toml` bans openssl and native-tls (CI runs `cargo deny`).
+- Network code uses rustls; the root `deny.toml` bans openssl and native-tls (CI runs `node scripts/deny.mjs`).
 - Pin dependencies `=x.y.z`; run one crate with `-p <crate>`, always `--locked`.
 - Releases: the crate is `publish = false` until a human enables it (`docs/agents/project.md`);
   then hoist's release PR bumps `version`, and merging it releases `dist/<bin>-<target>` binaries.

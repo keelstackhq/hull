@@ -24,7 +24,7 @@ const SKIP = new Set(["target", "dist", ".git", "progress.d", "changelog.d"]);
 export const COMMANDS = [
   ["fmt", "cargo fmt --all --check"],
   ["clippy", "cargo clippy --workspace --all-targets --locked -- -D warnings"],
-  ["deny", "node scripts/deny.mjs --locked check bans licenses sources"],
+  ["deny", "node scripts/deny.mjs"],
   ["test", "cargo nextest run --workspace --locked --profile ci"],
   ["doctest", "cargo test --workspace --doc --locked"],
   ["index", "node scripts/agents-index.mjs"],

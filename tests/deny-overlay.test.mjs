@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const SCRIPT = fileURLToPath(
   new URL("../template/pieces/base/files/scripts/deny.mjs", import.meta.url),
 );
-const { mergeAllow } = await import(SCRIPT);
+const { mergeAllow, mergeOverlay } = await import(SCRIPT);
 
 const BASE = `[licenses]
 allow = ["MIT", "ISC"]
@@ -51,12 +51,16 @@ async function shim() {
   await chmod(join(bin, "cargo"), 0o755);
   return { bin, log };
 }
-const run = (cwd, bin, args) =>
+const CLEAN = { ...process.env };
+for (const k of ["GITHUB_EVENT_NAME", "CIRCLECI", "CIRCLE_PULL_REQUEST"]) delete CLEAN[k];
+const run = (cwd, bin, args, env = {}) =>
   execFileSync("node", [SCRIPT, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...CLEAN, PATH: `${bin}:${process.env.PATH}`, ...env },
   });
+const future = "2999-01-01";
 
 test("deny.mjs: without deny.local.toml it runs cargo deny with the arguments unchanged", async () => {
   const { bin, log } = await shim();
@@ -101,4 +105,97 @@ test("mergeAllow accepts TOML literal strings and keeps `$` in a name literal", 
 
 test("mergeAllow throws when the list has entries but none is a string", () => {
   assert.throws(() => mergeAllow(BASE, `[licenses]\nallow = [MPL]\n`), /deny\.local\.toml/);
+});
+
+const ADV = `[advisories]\nignore = [\n  { id = "RUSTSEC-2024-0001", reason = "not reachable # here", expires = "${future}" },\n]\n`;
+
+test("mergeOverlay merges advisories ignores as { id, reason } without expires", () => {
+  const base = `[advisories]\nyanked = "deny"\n\n[licenses]\nallow = ["MIT"]\n`;
+  const out = mergeOverlay(base, `[licenses]\nallow = ["Zlib"]\n${ADV}`, "2026-11-20");
+  assert.match(
+    out,
+    /\[advisories\]\nignore = \[\{ id = "RUSTSEC-2024-0001", reason = "not reachable # here" \}\]/,
+  );
+  assert.doesNotMatch(out, /expires/);
+  assert.match(out, /allow = \["MIT", "Zlib"\]/);
+});
+
+test("mergeOverlay rejects an ignore without reason or valid expires, or expired, naming the id", () => {
+  const mk = (body) => `[advisories]\nignore = [${body}]\n`;
+  const today = "2026-11-20";
+  const bad = [
+    `{ id = "RUSTSEC-1", expires = "${future}" }`,
+    `{ id = "RUSTSEC-2", reason = "x" }`,
+    `{ id = "RUSTSEC-3", reason = "x", expires = "soon" }`,
+    `{ id = "RUSTSEC-4", reason = "x", expires = "2026-11-19" }`,
+    `{ id = "RUSTSEC-5", reason = "x", expires = "2026-13-40" }`,
+  ];
+  for (const b of bad) {
+    const id = b.match(/RUSTSEC-\d/)[0];
+    assert.throws(() => mergeOverlay(BASE, mk(b), today), new RegExp(id));
+  }
+  assert.doesNotThrow(() =>
+    mergeOverlay(BASE, mk(`{ id = "A", reason = "x", expires = "${today}" }`), today),
+  );
+});
+
+test("deny.mjs: no arguments run all four checks with --locked", async () => {
+  const { bin, log } = await shim();
+  const d = await mkdtemp(join(tmpdir(), "deny-proj-"));
+  await writeFile(join(d, "deny.toml"), BASE);
+  run(d, bin, []);
+  assert.equal(
+    (await readFile(log, "utf8")).trim(),
+    "deny --locked check advisories bans licenses sources",
+  );
+});
+
+test("deny.mjs: on a push to the default branch advisories are dropped from the default list", async () => {
+  const { bin, log } = await shim();
+  const d = await mkdtemp(join(tmpdir(), "deny-proj-"));
+  await writeFile(join(d, "deny.toml"), BASE);
+  const want = "deny --locked check bans licenses sources";
+  run(d, bin, [], { GITHUB_EVENT_NAME: "push" });
+  assert.equal((await readFile(log, "utf8")).trim(), want);
+  run(d, bin, [], { CIRCLECI: "true" });
+  assert.equal((await readFile(log, "utf8")).trim(), want);
+  for (const env of [
+    { GITHUB_EVENT_NAME: "pull_request" },
+    { GITHUB_EVENT_NAME: "merge_group" },
+    { CIRCLECI: "true", CIRCLE_PULL_REQUEST: "https://github.com/o/r/pull/1" },
+  ]) {
+    run(d, bin, [], env);
+    assert.match(await readFile(log, "utf8"), /check advisories bans/);
+  }
+  run(d, bin, ["--locked", "check", "advisories"], { GITHUB_EVENT_NAME: "push" });
+  assert.equal((await readFile(log, "utf8")).trim(), "deny --locked check advisories");
+});
+
+test("deny.mjs: an expired ignore exits 1 naming the id before cargo deny runs", async () => {
+  const { bin, log } = await shim();
+  const d = await mkdtemp(join(tmpdir(), "deny-proj-"));
+  await writeFile(join(d, "deny.toml"), BASE);
+  await writeFile(
+    join(d, "deny.local.toml"),
+    `[advisories]\nignore = [{ id = "RUSTSEC-9", reason = "r", expires = "2020-01-01" }]\n`,
+  );
+  assert.throws(
+    () => run(d, bin, []),
+    (e) => e.status === 1 && /RUSTSEC-9/.test(e.stderr),
+  );
+  await assert.rejects(readFile(log, "utf8"));
+});
+
+test("hull: the owned deny.toml keeps no advisory ignores and no file names a bare cargo deny", async () => {
+  const root = fileURLToPath(new URL("../template-rust/pieces/base/files/", import.meta.url));
+  assert.doesNotMatch(await readFile(join(root, "deny.toml"), "utf8"), /^\s*ignore\s*=/m);
+  const { RUST_CI_STEPS } = await import("../scripts/lib/ci-tasks.mjs");
+  assert.ok(RUST_CI_STEPS.includes("node scripts/deny.mjs"));
+  const { execFileSync: ex } = await import("node:child_process");
+  const hits = ex("grep", ["-rIl", "cargo deny", "."], { cwd: root, encoding: "utf8" })
+    .split("\n")
+    .filter((f) => f && f !== "./scripts/deny.mjs");
+  assert.deepEqual(hits, []);
+  const rel = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
+  assert.match(rel, /node scripts\/deny\.mjs --locked check advisories/);
 });

@@ -80,7 +80,7 @@ jobs:
       # step: deny
       - name: Dependency policy
         if: steps.affected.outputs.skip != 'true'
-        run: node scripts/deny.mjs --locked check bans licenses sources
+        run: node scripts/deny.mjs
       # step: nextest
       - name: Tests
         if: steps.affected.outputs.skip != 'true'
