@@ -69,3 +69,18 @@ test("proxy-ca install: only PROXY_CA_BUNDLE or the agent proxy CA, copied once"
   const again = run(["install"], { ...env, PROXY_CA_BUNDLE: ca });
   assert.match(again.stdout, /unchanged/);
 });
+
+test("proxy-ca install: a failed trust-store update leaves no copy, so a later run retries", () => {
+  const store = mkdtempSync(join(tmpdir(), "proxy-ca-store-"));
+  const ca = join(mkdtempSync(join(tmpdir(), "proxy-ca-")), "ca.crt");
+  writeFileSync(ca, "CERT\n");
+  const r = run(["install"], {
+    HTTPS_PROXY: "http://127.0.0.1:9",
+    PROXY_CA_BUNDLE: ca,
+    PROXY_CA_STORE: store,
+    PROXY_CA_UPDATE: "false",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /update failed/);
+  assert.equal(existsSync(join(store, "agent-proxy-ca.crt")), false);
+});

@@ -34,15 +34,26 @@ case "${1:-}" in
       exit 0
     fi
     cp "$trust" "$dest"
-    # PROXY_CA_STORE is for tests: then the system store and the daemon stay untouched.
-    [ -z "${PROXY_CA_STORE:-}" ] || exit 0
-    if command -v update-ca-certificates >/dev/null; then
-      update-ca-certificates >/dev/null || echo "proxy-ca: update-ca-certificates failed" >&2
-    else
-      echo "proxy-ca: no update-ca-certificates; add $dest to the trust store by hand" >&2
+    # PROXY_CA_STORE and PROXY_CA_UPDATE are for tests; without an update command a test stops here.
+    update="${PROXY_CA_UPDATE:-}"
+    if [ -z "$update" ]; then
+      [ -z "${PROXY_CA_STORE:-}" ] || exit 0
+      if command -v update-ca-certificates >/dev/null; then update=update-ca-certificates; fi
+    fi
+    # On a failure the copy goes again, so the next run (cmp -s) retries instead of skipping.
+    if [ -z "$update" ]; then
+      rm -f "$dest"
+      echo "proxy-ca: no update-ca-certificates; add $trust to the trust store by hand" >&2
+      exit 0
+    fi
+    if ! "$update" >/dev/null; then
+      rm -f "$dest"
+      echo "proxy-ca: trust-store update failed; removed $dest so the next run retries" >&2
+      exit 0
     fi
     # The daemon reads the trust store at start: restart it (only now that the CA changed).
-    if command -v systemctl >/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
+    if [ -z "${PROXY_CA_STORE:-}" ] && command -v systemctl >/dev/null &&
+      systemctl is-active --quiet docker 2>/dev/null; then
       systemctl restart docker || echo "proxy-ca: restart docker to load the CA" >&2
     fi
     ;;

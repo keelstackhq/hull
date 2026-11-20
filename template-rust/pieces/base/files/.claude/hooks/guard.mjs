@@ -149,7 +149,7 @@ const FAIL_CLOSED_RE = /\.claude\/(hooks|settings)|workflows\/release|\.bosun\/|
 const isProtected = (p) => PROTECTED_RES.some((re) => re.test(p));
 const stripTok = (x) =>
   x
-    .replace(/^\d*[>&]*/, "")
+    .replace(/^\d*(<>|[>&]*)/, "")
     .replace(/^(of=)?(\.\/)?/, "")
     .replace(/(.)\/+$/, "$1");
 
@@ -293,6 +293,11 @@ function docSubs(body) {
 /** Split a command line into simple commands (token lists), ignoring quotes' content for splitting.
  * `segments.subs` holds the command substitutions the shell runs: `$(...)`, backticks and `<(...)`
  * outside single quotes, and those in heredocs whose delimiter is unquoted. */
+/** A quoted or escaped `<`/`>` is data, not a redirect: kept as a sentinel until after splitRedirect. */
+const MARKS = { ">": "\uE001", "<": "\uE002" };
+const mark = (c) => MARKS[c] ?? c;
+const unmark = (x) => x.replaceAll("\uE001", ">").replaceAll("\uE002", "<");
+
 function split(cmd) {
   const segments = [];
   const subs = [];
@@ -331,7 +336,7 @@ function split(cmd) {
         cur += ch;
         i += len;
       } else if (c === "'") quote = "";
-      else cur += c;
+      else cur += mark(c);
     } else if (!quote && c === "$" && cmd[i + 1] === "'") {
       quote = "$'";
       has = true;
@@ -351,13 +356,13 @@ function split(cmd) {
       i = e;
     } else if (quote) {
       if (c === quote) quote = "";
-      else if (c === "\\" && quote === '"' && i + 1 < cmd.length) cur += cmd[++i];
-      else cur += c;
+      else if (c === "\\" && quote === '"' && i + 1 < cmd.length) cur += mark(cmd[++i]);
+      else cur += mark(c);
     } else if (c === "'" || c === '"') {
       quote = c;
       has = true;
     } else if (c === "\\" && i + 1 < cmd.length) {
-      cur += cmd[++i];
+      cur += mark(cmd[++i]);
       has = true;
     } else if (c === "<" && cmd.startsWith("<<<", i)) {
       endToken(); // a here-string: its word is data fed to the command
@@ -532,7 +537,7 @@ export function commands(cmd) {
   if (segs.subs.unclosed) out.push(["@evade", text]);
   for (const sub of segs.subs) for (const inner of commands(sub)) out.push(inner);
   for (const seg of segs) {
-    const t = stripPrefixes(seg).flatMap(splitRedirect);
+    const t = stripPrefixes(seg).flatMap(splitRedirect).map(unmark);
     // An assignment that makes git or a pager run a program (`GIT_EXTERNAL_DIFF=x git diff`).
     if (seg.some((x) => RUNS_ENV_RE.test(x))) out.push(["@runs-env", seg.join(" ")]);
     if (!t.length) {
@@ -776,8 +781,8 @@ function pushRule(args, projectDir) {
 /** True when the command `t` writes, moves or deletes its operand at index `i`. */
 function writesTarget(t, i) {
   const tok = t[i];
-  if (/^\d*>[>|]?/.test(tok) || /^&>>?/.test(tok)) return true;
-  if (/^\d*>[>|]?$|^&>>?$/.test(t[i - 1] ?? "")) return true;
+  if (/^\d*>[>|]?/.test(tok) || /^&>>?/.test(tok) || /^\d*<>/.test(tok)) return true;
+  if (/^\d*>[>|]?$|^&>>?$|^\d*<>$/.test(t[i - 1] ?? "")) return true;
   const prog = base(t[0]);
   if (
     ["tee", "mv", "rm", "truncate", "touch", "chmod", "chown", "shred", "unlink", "rmdir"].includes(

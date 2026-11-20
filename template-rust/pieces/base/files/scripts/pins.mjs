@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const EXACT = /^\d+\.\d+\.\d+$/;
+export const REQUIRED = ["rust", "nextest", "cargo_deny", "splice", "bosun", "hoist"];
 
 /** Parses the `[pins]` table: `key = "value"` lines. */
 export function parsePins(text) {
@@ -58,6 +59,12 @@ export function checkCircleci(pins, text, file) {
 function main(argv) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const pins = parsePins(readFileSync(join(root, "pins.toml"), "utf8"));
+  // Every key CI and release.yml read must be there: an empty output would install `latest`.
+  const missing = REQUIRED.filter((k) => !(k in pins));
+  if (missing.length > 0) {
+    for (const k of missing) console.error(`pins: missing pin ${k} in pins.toml`);
+    return 1;
+  }
   // Release workflows install these with release credentials: only an exact X.Y.Z is a pin.
   const bad = Object.entries(pins).filter(([, v]) => !EXACT.test(v));
   if (bad.length > 0) {

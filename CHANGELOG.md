@@ -19,7 +19,8 @@ Keep `unreleased` while changes accumulate.
   read as a target dir. New `docs/agents/guard.md` (safe patterns), linked from AGENTS.md.
   A redirect glued to a word (`x>file`) is a write; `GIT_*=`/`PAGER=` prefixes deny in guarded
   chains; `git push <remote> v1.2.3` (a version-shaped ref) is a tag push; `pins.toml` is a rail.
-  `pins.mjs` accepts only exact `X.Y.Z` pins and quotes `--shell` values.
+  `pins.mjs` accepts only exact `X.Y.Z` pins, requires every key CI and release read, and quotes
+  `--shell` values. `<>` (read-write open) is a write; a quoted or escaped `>` is data.
 - ready.mjs: documents the non-interactive `--answer` form; stops early (exit 3) on Node < 24 or
   without splice on PATH. start-checklist: the SPLICE_BOT_TOKEN PAT scopes with a pre-filled link,
   `gh api` commands for the `splice-bot` environment, docker behind the proxy.

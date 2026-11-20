@@ -140,3 +140,15 @@ test("pins.mjs --shell quotes each value", async () => {
   const r = run(await sandbox(), "--shell");
   assert.match(r.stdout, new RegExp(`^PIN_HOIST='${pins.hoist.replaceAll(".", "\\.")}'$`, "m"));
 });
+
+test("pins.mjs exits 1 when a key release.yml or CI reads is missing", async () => {
+  const d = await sandbox({
+    "pins.toml": (await read("pins.toml")).replace(/^hoist = .*\n/m, ""),
+  });
+  for (const flag of ["--github-output", "--shell", "--check"]) {
+    const r = run(d, flag);
+    assert.equal(r.status, 1, flag);
+    assert.equal(r.stdout, "");
+    assert.match(r.stderr, /missing pin hoist/);
+  }
+});

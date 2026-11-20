@@ -1061,6 +1061,9 @@ const READ_ONLY = [
   "cd .bosun && ls 2>/dev/null >&2",
   "git push origin feat/v1-docs",
   "cat pins.toml",
+  "cd .bosun && grep 'a>b' bosun.toml",
+  'cd .claude && grep -n "x>y" settings.json',
+  "cd .bosun && grep a\\>b bosun.toml",
 ];
 for (const c of READ_ONLY) {
   test(`read-only allow: ${c}`, () => assert.equal(decide(bash(c), ctx), null));
@@ -1108,6 +1111,12 @@ for (const c of [
   "git push origin v1.2.3",
   "git push origin cli-v0.4.0",
   "echo 1 > pins.toml",
+  // review round 3: `<>` opens the file read-write
+  "cd .claude/hooks && echo x <>guard.mjs >&0",
+  "cd .claude/hooks && echo x <> guard.mjs 1>&0",
+  "echo x <>.claude/settings.json >&0",
+  "echo x 3<>.claude/settings.json",
+  "cd .claude && echo x<>settings.json",
 ]) {
   test(`rail stays: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
 }
