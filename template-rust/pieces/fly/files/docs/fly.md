@@ -43,6 +43,8 @@ The throwaway machine chowns `/data` and is removed (`--rm`). Verify the flags a
 in environment `production`, then polls `/healthz` with `scripts/smoke.sh`. `image.yml` builds the
 image on pull requests with no secrets and no push.
 
+A manual run (`workflow_dispatch`) deploys the default branch head, which may not have passed ci.
+
 ## DNS: Cloudflare grey cloud
 
 Point the hostname at Fly with DNS-only records (grey cloud, not proxied). Fly issues and renews the

@@ -19,6 +19,8 @@
 #
 # Exit codes: 0 ok, 2 usage, 3 missing tool or not logged in (fly; gh with --set-gh-secret),
 #             4 a fly or gh step failed.
+# No -e on purpose: every step reports its own failure through fail() with a documented exit code (4),
+# and read-only checks like `listed` use a non-zero status as an answer, not an error.
 set -uo pipefail
 
 app="" region="" host="" ghenv="" deploy=0 fixvol=0 dry=0 stdin_secrets=0
@@ -82,7 +84,19 @@ listed() { # listed VALUE CMD...: does the read-only listing contain VALUE as a 
   local v="$1" out
   shift
   out="$("$@" 2>/dev/null)" || fail "$*"
-  grep -Eq "(^|[^A-Za-z0-9_.-])$v([^A-Za-z0-9_.-]|\$)" <<<"$out"
+  # Literal match (grep -F, no regex from $v); then check the word boundaries on each hit.
+  local line rest
+  while IFS= read -r line; do
+    rest="$line"
+    while [[ "$rest" == *"$v"* ]]; do
+      local before="${rest%%"$v"*}" after="${rest#*"$v"}"
+      if [[ ! "${before: -1}" =~ [A-Za-z0-9_.-] && ! "${after:0:1}" =~ [A-Za-z0-9_.-] ]]; then
+        return 0
+      fi
+      rest="$after"
+    done
+  done < <(grep -F -- "$v" <<<"$out")
+  return 1
 }
 app_exists=0
 listed "$app" fly apps list --json && app_exists=1

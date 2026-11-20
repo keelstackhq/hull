@@ -9,6 +9,7 @@ app = { prompt = "Fly app name", default = "app", pattern = "^[a-z][a-z0-9-]*$" 
 [files]
 owned = [
   "Dockerfile",
+  ".dockerignore",
   "scripts/fly-setup.sh",
   "scripts/smoke.sh",
   ".github/workflows/deploy.yml",

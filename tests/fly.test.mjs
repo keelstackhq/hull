@@ -120,7 +120,12 @@ test("deploy.yml: tested sha, production environment, never cancelled, no pull_r
   assert.match(wf.jobs.deploy.if, /conclusion == 'success'/);
   assert.match(wf.jobs.deploy.if, /head_branch == github\.event\.repository\.default_branch/);
   assert.match(text, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/);
-  assert.match(text, /SMOKE_URL: https:\/\/my-api\.fly\.dev/);
+  assert.match(wf.jobs.deploy.if, /workflow_run\.event == 'push'/);
+  assert.match(wf.jobs.deploy.if, /workflow_run\.head_repository\.full_name == github\.repository/);
+  assert.equal(wf.on.workflow_run.branches, undefined);
+  assert.doesNotMatch(text, /my-api\.fly\.dev/);
+  assert.match(text, /fly\.toml/);
+  assert.match(text, /SMOKE_URL="https:\/\/\$app\.fly\.dev"/);
   assert.match(text, /bash scripts\/smoke\.sh/);
   assert.match(text, /superfly\/flyctl-actions\/setup-flyctl@[0-9a-f]{40} # v\d+\.\d+\.\d+/);
 });
@@ -132,6 +137,28 @@ test("image.yml: pull_request build with no secrets, environment or push; passes
   assert.doesNotMatch(text, /secrets\.|environment:|--push|login/);
   assert.match(text, /docker build/);
   assert.deepEqual(Object.keys(YAML.parse(text).on), ["pull_request"]);
+});
+
+test("image.yml: paths cover toolchain, pins and .dockerignore; .dockerignore is owned and excludes build junk", async () => {
+  const { dir, result } = await render();
+  const wf = YAML.parse(await read(dir, ".github/workflows/image.yml"));
+  for (const p of ["rust-toolchain.toml", "pins.toml", ".dockerignore"])
+    assert.ok(wf.on.pull_request.paths.includes(p), p);
+  assert.equal(result.changes.find((c) => c.path === ".dockerignore").class, "owned");
+  const ignore = (await read(dir, ".dockerignore")).split("\n");
+  for (const e of ["target", ".git", ".env*", "node_modules", "*.db*", "/data"])
+    assert.ok(ignore.includes(e), e);
+});
+
+test("docs/fly.md: manual deploy runs the branch head, which may not have passed ci", async () => {
+  const { dir } = await render();
+  assert.match(await read(dir, "docs/fly.md"), /may not have passed ci/);
+});
+
+test("fly-setup.sh: listed matches literally; documents why -e is not set", async () => {
+  const sh = await readFile(SETUP, "utf8");
+  assert.match(sh, /grep -F -- /);
+  assert.match(sh, /No -e on purpose/);
 });
 
 test("docs/fly.md: grey cloud, rollback, proxy-ca build, Fly-Client-IP", async () => {
