@@ -160,7 +160,12 @@ test("rendered template-rust circleci-only: the status workflow has no secrets, 
     vars: {},
   });
   const wfDir = join(out, ".github/workflows");
-  assert.deepEqual(readdirSync(wfDir).sort(), ["circleci-status.yml", "release.yml", "splice.yml"]);
+  assert.deepEqual(readdirSync(wfDir).sort(), [
+    "advisories.yml",
+    "circleci-status.yml",
+    "release.yml",
+    "splice.yml",
+  ]);
   const text = readFileSync(join(wfDir, "circleci-status.yml"), "utf8");
   const wf = YAML.parse(text);
   assert.deepEqual(triggers(wf), ["status"]);

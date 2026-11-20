@@ -112,6 +112,13 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 - 2026-11-17 · release · `release: v0.13.0` · CHANGELOG dated (committed third-party license list + `licenses` CI step, #113; minor: new generated files and a new CI step in every generated repo). `ready.mjs` changed (new sha256 189a681d…), adopt.md URL and sha moved to v0.13.0. Human: host assess/v0.13.0.mjs on keelstack.dev; release.yml tags v0.13.0 after the owner approves the `release` environment.
 - 2026-11-17 · licenses · `feat: third-party licenses list in generated repos` · `scripts/licenses.mjs` (both templates) writes THIRD_PARTY_LICENSES.md + third-party-licenses.json (pnpm licenses / cargo metadata); CI step `licenses` = lockfile sha256 gate (~0.05 s, no install); dogfood base, cli, rust green via splice 0.4.0 (cli: 180 npm incl. 102 platform builds + 79 cargo, 0 UNKNOWN; pnpm's env lockfile doc skipped)
 - 2026-11-20 · bootstrap-friction · `fix: template-rust bootstrap friction from a client repo` · pins.toml + scripts/pins.mjs (CI/release read it), shipped Cargo.lock + removable crates/common, ready.mjs preflight (Node 24, splice) + non-interactive docs, guard read-only `cd`/flag fixes + docs/agents/guard.md, start-checklist PAT/splice-bot gh api/proxy CA, scripts/proxy-ca.sh
+- 2026-11-20 · rust-service/1 · `feat(template-rust): one deny command with advisories in PR CI` · `scripts/deny.mjs` default check list, advisories skipped on default-branch push, `deny.local.toml` ignores need reason + expires
+- 2026-11-20 · rust-service/2 · `feat(template-rust): daily advisory scan opens one issue` · `advisories.yml` weekly (D-007; owner ruling 2026-11-20); PR CI checks advisories
+- 2026-11-20 · rust-service/3 · `feat(renovate): cargo preset with exact pins`
+- 2026-11-20 · rust-service/4 · `feat(template-rust): rust-service piece with /healthz`
+- 2026-11-20 · rust-service/5 · `feat(template-rust): sqlite piece` · reader/writer pools, STRICT migrations, backups, `--restore`, optional `s3-backup` (R2_* env)
+- 2026-11-20 · rust-service/6 · `feat(template-rust): fly piece` · static-musl scratch image (docker build verified), fly-setup.sh, deploy.yml + image.yml split
+- 2026-11-20 · rust-service/7 · `docs: rust service pieces in spec, pieces doc and progress` · spec §15 Service pieces, combo `rust-service-full`, AGENTS lines; `fix(template-rust): explain a root-owned Fly volume` (error hint, docs/fly.md, `--fix-volume-owner`). `docs/pieces.md` is generated from `template/` only: unchanged. Unverified: `fly machine run` flags against a real flyctl (docs say to check `--help`).
 
 ## Measurements
 
@@ -177,6 +184,8 @@ One short line per finished task: `YYYY-MM-DD · plan/task · commit`. Test coun
 Written 2026-10-15 when the build loop stopped. Plans 01 and 02 are fully checked. Plan 03 Tasks 1–5
 are checked; Tasks 6–8 are Blocked (hoard and splice are unreleased; the release needs a human).
 Milestones 1, 2 and 3 are reviewed (lines above). Updated 2026-10-17 after the milestone 4 final review: 580 tests pass, lint and format are clean.
+
+Updated 2026-11-20: plan `rust-service-sqlite-fly` Tasks 1-7 done (template-rust service pieces; spec §15 Service pieces); the final chunked review is the orchestrator's.
 
 **Milestone 4 (2026-10-17, plan 04 agent layer and skeletons, Tasks 1–12):** `AGENTS.md` canonical with a thin `CLAUDE.md`, project `Explore` on haiku, PreToolUse guard hook (asks on owned edits), generated docs index with a CI check, per-instance `AGENTS.md`, new pieces `ts-lib`, `rust-cli`, `npm-cli`, tag-driven `release.yml` with provenance, combos `cli` and `lib` dogfooded. Spec: `docs/superpowers/specs/2026-10-17-hull-agent-layer-and-skeletons-design.md` (approved; base spec amended). Final review 2026-10-17: with fixes, all fixed in one wave (Done line `04/final review`). Task 12 (cli CI timing on `keelstackhq/cli-canary`) is not done.
 

@@ -10,7 +10,7 @@ The CI steps, in order (run them all before saying a change is done):
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-node scripts/deny.mjs --locked check bans licenses sources
+node scripts/deny.mjs
 cargo nextest run --workspace --locked --profile ci
 cargo test --workspace --doc --locked
 ```
@@ -40,6 +40,11 @@ Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
   are removable in the bootstrap PR: `git rm -r crates/common`, then `cargo generate-lockfile`.
 {% if "rust-cli" in pieces %}- `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit
   codes and cargo-deny; see `crates/<name>/AGENTS.md`.
+{% endif %}{% if "rust-service" in pieces %}- `crates/*` (rust-service): HTTP service (axum) with env config and `GET /healthz`; see
+  `crates/<name>/AGENTS.md`.
+{% endif %}{% if "sqlite" in pieces %}- sqlite: `src/db/` in the service crate (pools, STRICT migrations, backups, `--restore`); restore guide
+  in `crates/<name>/docs/restore.md`.
+{% endif %}{% if "fly" in pieces %}- fly: `Dockerfile`, `fly.toml`, `scripts/fly-setup.sh`, deploy workflow; read `docs/fly.md` first.
 {% endif %}
 ## Where to look
 

@@ -3,7 +3,8 @@ name: release
 # Releases through hoist (keelstackhq/hoist), the way berth and bosun do it:
 # - detect: which workspace crates have a version without a tag (or a tag on HEAD)? Is releasing
 #   switched on (repository variable HOIST_RELEASE = enabled)?
-# - advisories: `cargo deny check advisories` (only here, never on pull requests).
+# - advisories: `node scripts/deny.mjs --locked check advisories` (pull request CI checks
+#   advisories too; advisories.yml scans main weekly).
 # - build: release binaries for 5 targets as dist/<bin>-<target>. Runs when a release is pending
 #   and enabled, or on a manual run (workflow_dispatch = dry run: builds; publish and prepare run
 #   only on a push to main).
@@ -66,7 +67,7 @@ jobs:
       - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-deny@${{ steps.pins.outputs.cargo_deny }}
-      - run: cargo deny --locked check advisories
+      - run: node scripts/deny.mjs --locked check advisories
 
   build:
     needs: detect

@@ -583,9 +583,9 @@ export const CLASH = {
       ".claude/hooks/guard.mjs .claude/hooks/session-start.sh .claude/hooks/stop-checks.sh " +
       ".claude/loop.md .claude/settings.json .claude/skills/add-piece/SKILL.md " +
       ".claude/skills/ready/SKILL.md .claude/skills/verify/SKILL.md .claude/statusline.sh " +
-      ".config/nextest.toml .github/scripts/docs-only.mjs .github/scripts/release-pending.mjs " +
-      ".github/scripts/workflows.mjs " +
-      ".github/workflows/ci.yml .github/workflows/release.yml .github/workflows/splice.yml " +
+      ".config/nextest.toml .github/scripts/advisory-issue.mjs .github/scripts/docs-only.mjs " +
+      ".github/scripts/release-pending.mjs .github/scripts/workflows.mjs " +
+      ".github/workflows/advisories.yml .github/workflows/ci.yml .github/workflows/release.yml .github/workflows/splice.yml " +
       ".gitattributes .gitignore CLAUDE.md deny.toml docs/agents/guard.md pins.toml renovate.json rust-toolchain.toml rustfmt.toml " +
       "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/pins.mjs scripts/proxy-ca.sh scripts/ready.mjs",
     shared: "Cargo.toml crates/common/Cargo.toml",

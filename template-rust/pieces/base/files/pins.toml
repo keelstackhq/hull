@@ -9,3 +9,19 @@ cargo_deny = "0.20.2"
 splice = "0.6.0"
 bosun = "0.21.0"
 hoist = "0.5.1"
+
+# Crates several pieces share: every workspace crate pins them to exactly these versions
+# (`=x.y.z`); `node scripts/pins.mjs --check` fails on drift. Checked on crates.io 2026-11-20.
+[crates]
+tokio = "1.54.1"
+axum = "0.8.9"
+tower = "0.5.3"
+sqlx = "0.9.1"
+hyper = "1.12.0"
+hyper-util = "0.1.21"
+http-body-util = "0.1.5"
+rustls = "0.23.46"
+tokio-rustls = "0.26.6"
+webpki-roots = "1.0.12"
+sha2 = "0.11.1"
+hmac = "0.13.0"

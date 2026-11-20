@@ -408,7 +408,7 @@ export const CI_PLAN = Object.freeze(
 export const RUST_CI_STEPS = Object.freeze([
   "cargo fmt --all --check",
   "cargo clippy --workspace --all-targets --locked -- -D warnings",
-  "node scripts/deny.mjs --locked check bans licenses sources",
+  "node scripts/deny.mjs",
   "cargo nextest run --workspace --locked --profile ci",
   "cargo test --workspace --doc --locked",
 ]);

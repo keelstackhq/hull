@@ -3,25 +3,25 @@
 //   node scripts/pins.mjs --shell          PIN_RUST='1.99.1' lines for eval/source
 //   node scripts/pins.mjs --github-output  key=value lines for $GITHUB_OUTPUT
 //   node scripts/pins.mjs --check          exit 1 when rust-toolchain.toml or Cargo.toml disagree
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const EXACT = /^\d+\.\d+\.\d+$/;
 export const REQUIRED = ["rust", "nextest", "cargo_deny", "splice", "bosun", "hoist"];
 
-/** Parses the `[pins]` table: `key = "value"` lines. */
-export function parsePins(text) {
+/** Parses one table (`[pins]` by default): `key = "value"` lines. */
+export function parsePins(text, table = "pins") {
   const pins = {};
   let inPins = false;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (line === "" || line.startsWith("#")) continue;
     if (line.startsWith("[")) {
-      inPins = line === "[pins]";
+      inPins = line === `[${table}]`;
       continue;
     }
-    const m = inPins && /^([a-z_][a-z0-9_]*)\s*=\s*"([^"]*)"\s*(#.*)?$/.exec(line);
+    const m = inPins && /^([a-z_][a-z0-9_-]*)\s*=\s*"([^"]*)"\s*(#.*)?$/.exec(line);
     if (m) pins[m[1]] = m[2];
   }
   return pins;
@@ -37,6 +37,30 @@ export function checkRust(pins, toolchain, cargo) {
   if (msrv !== pins.rust)
     problems.push(`Cargo.toml rust-version is ${msrv}, pins.toml rust is ${pins.rust}`);
   return problems;
+}
+
+/** Problems with a crate's dependency pins of `[crates]` crates: each must be `=<value>`. */
+export function checkCrates(crates, text, file) {
+  const problems = [];
+  for (const [name, want] of Object.entries(crates)) {
+    const esc = name.replace(/[-_]/g, "[-_]");
+    const re = new RegExp(
+      `^${esc}\\s*=\\s*(?:"([^"]*)"|\\{[^}]*\\bversion\\s*=\\s*"([^"]*)")`,
+      "gm",
+    );
+    for (const m of text.matchAll(re)) {
+      const got = m[1] ?? m[2];
+      if (got !== `=${want}`)
+        problems.push(`${file} pins ${name} to ${got}, pins.toml [crates] has =${want}`);
+    }
+  }
+  return problems;
+}
+
+/** Pins of `[crates]` crates in the root Cargo.toml `[workspace.dependencies]`. */
+export function checkWorkspaceDeps(crates, text) {
+  const m = /^\[workspace\.dependencies\][^\n]*\n([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(text);
+  return m ? checkCrates(crates, m[1], "Cargo.toml") : [];
 }
 
 /** CircleCI downloads are sha256-pinned per version (bump them by hand): report drift. */
@@ -66,7 +90,8 @@ function main(argv) {
     return 1;
   }
   // Release workflows install these with release credentials: only an exact X.Y.Z is a pin.
-  const bad = Object.entries(pins).filter(([, v]) => !EXACT.test(v));
+  const crates = parsePins(readFileSync(join(root, "pins.toml"), "utf8"), "crates");
+  const bad = Object.entries({ ...pins, ...crates }).filter(([, v]) => !EXACT.test(v));
   if (bad.length > 0) {
     for (const [k, v] of bad) console.error(`pins: ${k} = "${v}" is not an exact version (X.Y.Z)`);
     return 1;
@@ -83,6 +108,15 @@ function main(argv) {
     for (const f of [".circleci/src/jobs/ci-ok.yml", ".circleci/config.yml"]) {
       if (existsSync(join(root, f)))
         problems.push(...checkCircleci(pins, readFileSync(join(root, f), "utf8"), f));
+    }
+    problems.push(...checkWorkspaceDeps(crates, readFileSync(join(root, "Cargo.toml"), "utf8")));
+    const crateDir = join(root, "crates");
+    if (existsSync(crateDir)) {
+      for (const d of readdirSync(crateDir)) {
+        const f = join(crateDir, d, "Cargo.toml");
+        if (existsSync(f))
+          problems.push(...checkCrates(crates, readFileSync(f, "utf8"), `crates/${d}/Cargo.toml`));
+      }
     }
     if (problems.length > 0) {
       for (const p of problems)

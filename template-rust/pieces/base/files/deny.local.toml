@@ -1,5 +1,10 @@
-# Local additions to the license policy. deny.toml is owned (`splice update` rewrites it); this file
-# is yours and survives updates. scripts/deny.mjs merges `allow` into deny.toml before `cargo deny`.
-# Only `[licenses] allow` is merged.
+# Local additions to the deny policy. deny.toml is owned (`splice update` rewrites it); this file
+# is yours and survives updates. scripts/deny.mjs merges it into deny.toml before cargo-deny runs.
+# Only `[licenses] allow` and `[advisories] ignore` are merged.
+#
+# Advisory ignores need a reason and an expiry date (YYYY-MM-DD, UTC); an entry without either, or
+# whose date has passed, fails the check (exit 1) until you fix the advisory or renew the entry:
+#   [advisories]
+#   ignore = [{ id = "RUSTSEC-2024-0001", reason = "not reachable: we never parse X", expires = "2027-01-31" }]
 [licenses]
 allow = []

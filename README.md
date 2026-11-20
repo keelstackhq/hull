@@ -40,7 +40,8 @@ renderer instead.
 
 For a Rust-only project use the second template, `template-rust` (spec §15): a Cargo workspace
 (`crates/*`), pinned toolchain, cargo-deny, cargo-nextest, one CI job with a docs-only exit,
-releases through hoist, and the same AI layer. It has no Node, pnpm or Turborepo.
+releases through hoist, and the same AI layer. It has no Node, pnpm or Turborepo. Optional pieces `rust-service`, `sqlite` and `fly`
+add an HTTP service with SQLite and Fly.io deploys (combo `rust-service-full`).
 
 ```bash
 pnpm dlx @keelstackhq/splice new gh:keelstackhq/hull//template-rust my-repo --piece rust-cli:cli
