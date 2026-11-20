@@ -21,7 +21,7 @@ function body(report) {
   const text =
     report.length > MAX_REPORT ? `${report.slice(0, MAX_REPORT)}\n… (truncated)` : report;
   return [
-    "`cargo deny check advisories` reports findings (daily scan, advisories.yml).",
+    "`node scripts/deny.mjs --locked check advisories` reports findings (daily scan, advisories.yml).",
     "Update the dependency, or add a reviewed ignore with a reason to `deny.local.toml`.",
     "This issue closes itself when a scan is clean.",
     "",
