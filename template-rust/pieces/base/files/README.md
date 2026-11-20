@@ -15,6 +15,8 @@ node scripts/agents-index.mjs
 
 `.github/workflows/splice.yml` keeps the template and both channels fresh (weekly PR).
 
+Tool versions: `pins.toml`.
+
 ## Measure CI time
 
 Budget for job `ci`: 45 s on a typical PR, 15 s docs-only. With GitHub CI (no `circleci-only`
@@ -62,7 +64,9 @@ a ruleset requires `ci-ok`. Pick one:
    opens the PR itself. Its push is not by `GITHUB_TOKEN`, so CI runs; pushing changes to workflow
    files needs a credential with the workflow scope.
 
-Order: App, then PAT, then `github.token`.
+Order: App, then PAT, then `github.token`. The PAT's exact scopes, a pre-filled creation link and
+the `gh api` commands that create `splice-bot` (branch `main`): hull `docs/start-checklist.md`,
+item 6 (environments).
 
 `publish` pushes the release tags and creates the GitHub Release. With a tag ruleset covering them
 (`*-v*`, which matches `{name}-v{version}` tags and any crate name containing `-v`), put the App

@@ -23,6 +23,10 @@ steps:
   - run:
       name: Workflows parse?
       command: node .github/scripts/workflows.mjs
+  # step: pins
+  - run:
+      name: Pins current? (pins.toml)
+      command: node scripts/pins.mjs --check
   # step: docs-only
   - run:
       name: Docs only?

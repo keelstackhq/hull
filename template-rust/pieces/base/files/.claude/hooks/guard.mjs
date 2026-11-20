@@ -12,7 +12,8 @@
 // any other code is scanned (fail closed). Code from stdin (`source /dev/stdin`, `bash <(...)`, `xargs`) is scanned
 // as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and `$'...'` escapes are read
 // like the shell; joined string literals are checked for secret file names.
-// `gh api` with an explicit GET and graphql queries are reads. A deny names its rule and the match.
+// `gh api` with an explicit GET and graphql queries are reads. `cd` into a guarded dir is allowed when
+// the rest of the chain only reads (docs/agents/guard.md lists the safe patterns). A deny names its rule and the match.
 // Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
 // a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
 // piped in (refused) or made by a producer other than `git diff|show|format-patch -- <paths>`
@@ -142,12 +143,13 @@ const PROTECTED_RES = [
   /(^|\/)\.github\/workflows\/release[^/]*\.ya?ml$/i,
   /(^|\/)\.bosun(\/|$)/i,
   /(^|\/)\.claude$/i,
+  /(^|\/)pins\.toml$/i, // tool versions that release workflows install with release credentials
 ];
 const FAIL_CLOSED_RE = /\.claude\/(hooks|settings)|workflows\/release|\.bosun\/|\.splice\/lock/i;
 const isProtected = (p) => PROTECTED_RES.some((re) => re.test(p));
 const stripTok = (x) =>
   x
-    .replace(/^\d*[>&]*/, "")
+    .replace(/^\d*(<>|[>&]*)/, "")
     .replace(/^(of=)?(\.\/)?/, "")
     .replace(/(.)\/+$/, "$1");
 
@@ -177,7 +179,7 @@ const REASON = {
     "Hidden or indirect push, publish or release is blocked: run the command directly (git push -u origin <feature-branch>) so the guard can see it.",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
   protected:
-    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md. Use paths from the repo root (no cd, -C, --chdir or --work-tree into guarded dirs) and apply patches from a file in the repo.",
+    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, pins.toml, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md. Use paths from the repo root (no cd, -C, --chdir or --work-tree into guarded dirs) and apply patches from a file in the repo.",
   failClosed:
     "The guard hit an internal error on a push, publish, release or secret call: retry the call; if it keeps failing, ask the human.",
 };
@@ -291,6 +293,11 @@ function docSubs(body) {
 /** Split a command line into simple commands (token lists), ignoring quotes' content for splitting.
  * `segments.subs` holds the command substitutions the shell runs: `$(...)`, backticks and `<(...)`
  * outside single quotes, and those in heredocs whose delimiter is unquoted. */
+/** A quoted or escaped `<`/`>` is data, not a redirect: kept as a sentinel until after splitRedirect. */
+const MARKS = { ">": "\uE001", "<": "\uE002" };
+const mark = (c) => MARKS[c] ?? c;
+const unmark = (x) => x.replaceAll("\uE001", ">").replaceAll("\uE002", "<");
+
 function split(cmd) {
   const segments = [];
   const subs = [];
@@ -329,7 +336,7 @@ function split(cmd) {
         cur += ch;
         i += len;
       } else if (c === "'") quote = "";
-      else cur += c;
+      else cur += mark(c);
     } else if (!quote && c === "$" && cmd[i + 1] === "'") {
       quote = "$'";
       has = true;
@@ -349,13 +356,13 @@ function split(cmd) {
       i = e;
     } else if (quote) {
       if (c === quote) quote = "";
-      else if (c === "\\" && quote === '"' && i + 1 < cmd.length) cur += cmd[++i];
-      else cur += c;
+      else if (c === "\\" && quote === '"' && i + 1 < cmd.length) cur += mark(cmd[++i]);
+      else cur += mark(c);
     } else if (c === "'" || c === '"') {
       quote = c;
       has = true;
     } else if (c === "\\" && i + 1 < cmd.length) {
-      cur += cmd[++i];
+      cur += mark(cmd[++i]);
       has = true;
     } else if (c === "<" && cmd.startsWith("<<<", i)) {
       endToken(); // a here-string: its word is data fed to the command
@@ -530,14 +537,17 @@ export function commands(cmd) {
   if (segs.subs.unclosed) out.push(["@evade", text]);
   for (const sub of segs.subs) for (const inner of commands(sub)) out.push(inner);
   for (const seg of segs) {
-    const t = stripPrefixes(seg);
+    const t = stripPrefixes(seg).flatMap(splitRedirect).map(unmark);
+    // An assignment that makes git or a pager run a program (`GIT_EXTERNAL_DIFF=x git diff`).
+    if (seg.some((x) => RUNS_ENV_RE.test(x))) out.push(["@runs-env", seg.join(" ")]);
     if (!t.length) {
       // A bare `env` (options and assignments only) prints the environment.
       if (base(seg[0].replace(/^[({]+/, "")) === "env") out.push(["printenv"]);
       continue;
     }
     if (seg.docs) t.docs = seg.docs;
-    for (const d of chdirs(seg)) out.push(["@chdir", d]);
+    // `ls -d`, `grep -o`, `sort -t`: these flags take no directory in read-only tools.
+    if (!NO_DIR_FLAGS.has(base(t[0]))) for (const d of chdirs(seg)) out.push(["@chdir", d]);
     out.push(t);
     const prog = base(t[0]);
     const segText = seg.join(" ");
@@ -748,6 +758,9 @@ function pushRule(args, projectDir) {
     }
   }
   if (del && refs.some((r) => isDefault(r, projectDir))) return "deleteDefault";
+  // A version-shaped dst (`v1.2.3`, `cli-v0.4.0`) is a release tag even when it is not local yet.
+  const TAG_LIKE = /^(?:refs\/tags\/)?(?:[\w.-]*-)?v?\d+\.\d+\.\d+(?:[-+][\w.]+)?$/;
+  if (refs.slice(1).some((r) => TAG_LIKE.test(r.slice(r.lastIndexOf(":") + 1)))) tag = true;
   if (tag) return "tag";
   // refs[0] is the remote; every later positional is a refspec whose dst must not be the default.
   for (const r of refs.slice(1)) {
@@ -768,8 +781,8 @@ function pushRule(args, projectDir) {
 /** True when the command `t` writes, moves or deletes its operand at index `i`. */
 function writesTarget(t, i) {
   const tok = t[i];
-  if (/^\d*>[>|]?/.test(tok) || /^&>>?/.test(tok)) return true;
-  if (/^\d*>[>|]?$|^&>>?$/.test(t[i - 1] ?? "")) return true;
+  if (/^\d*>[>|]?/.test(tok) || /^&>>?/.test(tok) || /^\d*<>/.test(tok)) return true;
+  if (/^\d*>[>|]?$|^&>>?$|^\d*<>$/.test(t[i - 1] ?? "")) return true;
   const prog = base(t[0]);
   if (
     ["tee", "mv", "rm", "truncate", "touch", "chmod", "chown", "shred", "unlink", "rmdir"].includes(
@@ -831,6 +844,46 @@ function chdirs(tokens) {
   return out;
 }
 
+const RUNS_ENV_RE =
+  /^(GIT_[A-Z0-9_]+|PAGER|LESSOPEN|LESSCLOSE|LD_PRELOAD|LD_LIBRARY_PATH|BASH_ENV|ENV|EDITOR|VISUAL|NODE_OPTIONS|PERL5OPT|PYTHONSTARTUP)=/;
+
+/** `x>file` is `x` plus a redirect `>file`; a bare fd prefix (`2>/dev/null`) stays one token. */
+function splitRedirect(tok) {
+  const m = /^(.+?)((?:\d*|&)>.*)$/s.exec(tok);
+  if (!m || /^(\d+|&)$/.test(m[1]) || /^[<>&]/.test(tok)) return [tok];
+  return [m[1], m[2]];
+}
+
+/** Tools whose -d/-o/-t/-C/-O flags never name a directory or an output file. */
+const NO_DIR_FLAGS = new Set("ls grep egrep fgrep head tail wc cat du stat diff".split(" "));
+/** Tools that only read; a redirect still counts as a write. Not tree/less (-o writes). */
+const READ_ONLY_PROGS = new Set(
+  (
+    "ls cat head tail wc grep egrep fgrep rg ag stat du diff cmp jq pwd echo printf true false " +
+    "test [ cd pushd popd basename dirname realpath readlink sha256sum md5sum"
+  ).split(" "),
+);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "ls-files", "blame", "rev-parse"]);
+/** Flags that write a file or run a program even in a read-only tool. */
+const RUNS_OR_WRITES_RE = /^(--output|--pre\b|--config-env|--exec-path|--ext-diff)/;
+
+/** True when a command cannot write: a read-only tool, no redirect except to /dev/null. */
+function readOnly(t) {
+  const prog = base(t[0]);
+  if (prog === "git" ? !READ_ONLY_GIT.has(gitSub(t).sub) : !READ_ONLY_PROGS.has(prog)) return false;
+  if (t.slice(1).some((x) => RUNS_OR_WRITES_RE.test(x))) return false;
+  // git -c/-C (config can run a program, -C moves the repo).
+  if (prog === "git" && t.slice(1).some((x) => /^-[cC]/.test(x))) return false;
+  return !t.some((x, i) => {
+    if (!writesTarget(t, i)) return false;
+    return (
+      !/^(\d*>[>|]?|&>>?)?\/dev\/null$/.test(x) &&
+      !/^\d*>&\d$/.test(x) &&
+      !(/^\d*>[>|]?$|^&>>?$/.test(x) && t[i + 1] === "/dev/null")
+    );
+  });
+}
+
 const dirOf = (cwd, x) => resolve(cwd, stripTok(x));
 
 function bashRule(
@@ -843,13 +896,17 @@ function bashRule(
   const args = t.slice(1);
   if (prog === "@evade") return RISKY_RE.test(t[1]) ? "evasion" : null;
   if (prog === "@evade-exec") return EXEC_RE.test(t[1]) ? "evasion" : null;
+  if (prog === "@runs-env") return chain.guarded ? "protected" : null;
   if (prog === "@chdir") return guardedDir(t[1], projectDir, cwd) ? "protected" : null;
   if (["cd", "pushd"].includes(prog)) {
     const dirs = args.filter((a) => !a.startsWith("-"));
     // `cd "$(echo .claude)"`, `cd $X`: the target is unknown, so it is refused.
-    if (dirs.some((d) => d && (/[$`]/.test(d) || guardedDir(d, projectDir, cwd))))
-      return "protected";
+    if (dirs.some((d) => d && /[$`]/.test(d))) return "protected";
+    // Into a guarded dir: allowed, but the rest of the chain must only read (relative names
+    // there would hide a protected write).
+    if (dirs.some((d) => d && guardedDir(d, projectDir, cwd))) chain.guarded = true;
   }
+  if (chain.guarded && !readOnly(t)) return "protected";
   if (prog === "patch" || (prog === "git" && gitSub(t).sub === "apply")) {
     // The diff names the files it writes: read it (file operand, <redirect or heredoc). Piped or
     // unreadable input cannot be checked, so it is refused; apply it from a file in the repo.
@@ -1131,8 +1188,18 @@ export function decide(input, ctx) {
   };
   const cwd = [ctx.cwd, input?.cwd].find((x) => typeof x === "string" && x) ?? ctx.projectDir;
   if (name === "Bash") {
-    const chain = { made: new Set(), tainted: new Set() };
-    for (const t of commands(ti.command)) {
+    // A cwd persisted inside a guarded dir (an earlier `cd .bosun`) starts the chain read-only.
+    const guarded = cwd !== ctx.projectDir && guardedDir(cwd, ctx.projectDir, ctx.projectDir);
+    const chain = { made: new Set(), tainted: new Set(), guarded };
+    const cmds = commands(ti.command);
+    // A `cd` into a guarded dir anywhere in the command makes all of it read-only: substitutions
+    // are listed before the command that holds them.
+    chain.guarded ||= cmds.some(
+      (t) =>
+        ["cd", "pushd"].includes(base(t[0])) &&
+        t.slice(1).some((d) => !d.startsWith("-") && guardedDir(d, ctx.projectDir, cwd)),
+    );
+    for (const t of cmds) {
       const rule = bashRule(t, ctx.projectDir, cwd, chain);
       if (rule) return deny(rule, matched(t));
       noteWrites(t, cwd, chain);
