@@ -1,0 +1,6 @@
+{
+  "name": "rust-sqlite",
+  "template": "template-rust",
+  "pieces": ["base", "rust-service", "sqlite"],
+  "vars": {}
+}

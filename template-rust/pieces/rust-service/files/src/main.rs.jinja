@@ -6,7 +6,6 @@ mod config;
 use std::process::ExitCode;
 
 use tokio::net::TcpListener;
-use tokio::signal::unix::{SignalKind, signal};
 
 use crate::config::Config;
 
@@ -23,7 +22,13 @@ async fn main() -> ExitCode {
 
 async fn run() -> Result<(), String> {
     let config = Config::from_env()?;
-    {% if "sqlite" in pieces %}// sqlite: open the pool, run migrations, handle --restore and start the backup and sweeper tasks here.
+    {% if "sqlite" in pieces %}let db_config = db::DbConfig::from_env()?;
+    if let Some(snapshot) = db::restore_snapshot_arg() {
+        return db::restore::restore(&snapshot, &db_config.db_path()).await;
+    }
+    let db = db::Db::open(&db_config).await?;
+    db::backup::spawn(&db, &db_config);
+    db::sweeper::spawn(&db, &db_config);
     {% endif %}let listener = TcpListener::bind(config.bind_addr())
         .await
         .map_err(|e| format!("cannot bind {}: {e}", config.bind_addr()))?;
@@ -35,7 +40,10 @@ async fn run() -> Result<(), String> {
 }
 
 /// Resolves on SIGTERM (Fly stop) or SIGINT (Ctrl-C), so in-flight requests finish.
+#[cfg(unix)]
 async fn shutdown() {
+    use tokio::signal::unix::{SignalKind, signal};
+
     let term = signal(SignalKind::terminate());
     let int = signal(SignalKind::interrupt());
     match (term, int) {
@@ -47,5 +55,13 @@ async fn shutdown() {
         }
         // No signal handlers: serve until the process is killed.
         _ => std::future::pending::<()>().await,
+    }
+}
+
+/// Resolves on Ctrl-C (no SIGTERM off unix).
+#[cfg(not(unix))]
+async fn shutdown() {
+    if tokio::signal::ctrl_c().await.is_err() {
+        std::future::pending::<()>().await;
     }
 }

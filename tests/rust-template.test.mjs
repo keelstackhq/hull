@@ -58,6 +58,7 @@ test("template-rust manifest: format 1, hull-rust, base, min_splice 0.3.0, no va
     "fly",
     "rust-cli",
     "rust-service",
+    "sqlite",
   ]);
 });
 

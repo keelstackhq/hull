@@ -51,7 +51,9 @@
         "rustls",
         "tokio-rustls",
         "webpki-roots",
-        "tower"
+        "tower",
+        "sha2",
+        "hmac"
       ],
       "schedule": ["before 5am on monday"]
     }

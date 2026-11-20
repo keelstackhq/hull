@@ -158,7 +158,20 @@ const SERVICE_CARGO = (vers = crates) =>
   `[package]\nname = "svc"\n\n[dependencies]\ntokio = { version = "=${vers.tokio}", features = ["net"] }\naxum = "=${vers.axum}"\nserde = "=1.0.1"\n`;
 
 test("pins.toml [crates] holds exact versions of the service crates, apart from [pins]", () => {
-  assert.deepEqual(Object.keys(crates), ["tokio", "axum", "tower"]);
+  assert.deepEqual(Object.keys(crates), [
+    "tokio",
+    "axum",
+    "tower",
+    "sqlx",
+    "hyper",
+    "hyper-util",
+    "http-body-util",
+    "rustls",
+    "tokio-rustls",
+    "webpki-roots",
+    "sha2",
+    "hmac",
+  ]);
   for (const v of Object.values(crates)) assert.match(v, /^\d+\.\d+\.\d+$/);
   assert.deepEqual(parsePins(`[pins]\na = "1.0.0"\n[crates]\nb-c = "2.0.0"\n`, "crates"), {
     "b-c": "2.0.0",

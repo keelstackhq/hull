@@ -149,6 +149,10 @@ hull itself has no Renovate config: its pins (including the `.yml.jinja` files a
 
 - none
 
+### template-rust/sqlite
+
+- none
+
 ## rigging
 
 ### rigging
