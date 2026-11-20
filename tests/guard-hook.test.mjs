@@ -1058,6 +1058,9 @@ const READ_ONLY = [
   "grep -o 'uses: [^ ]*' .github/workflows/*.yml",
   "cat .bosun/*.toml",
   "cd .bosun && grep -C 3 risk bosun.toml",
+  "cd .bosun && ls 2>/dev/null >&2",
+  "git push origin feat/v1-docs",
+  "cat pins.toml",
 ];
 for (const c of READ_ONLY) {
   test(`read-only allow: ${c}`, () => assert.equal(decide(bash(c), ctx), null));
@@ -1090,6 +1093,21 @@ for (const c of [
   "cd .claude && git -c alias.status='!rm settings.json' status",
   "cd .claude && rg --pre ./x foo",
   "cd .claude && file -C -m hooks/guard",
+  // review round 2: redirects glued to a word, program-running env prefixes, bare tags
+  "cd .claude/hooks && echo x>guard.mjs",
+  "cd .claude/hooks && echo x>>guard.mjs",
+  "cd .claude/hooks && cat /tmp/x>guard.mjs",
+  "(cd .claude/hooks && echo x>guard.mjs)",
+  "cd .bosun && echo x>approvals.toml",
+  "cd .claude && echo x>settings.json",
+  "echo x>.claude/settings.json",
+  "cd .claude && GIT_EXTERNAL_DIFF=./x git diff",
+  "cd .claude && PAGER='rm settings.json' git log",
+  "cd .bosun && GIT_PAGER=./x git log",
+  "cd .claude && env GIT_EXTERNAL_DIFF=./x git diff",
+  "git push origin v1.2.3",
+  "git push origin cli-v0.4.0",
+  "echo 1 > pins.toml",
 ]) {
   test(`rail stays: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
 }

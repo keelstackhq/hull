@@ -54,7 +54,7 @@ test("pins.mjs prints a key, exits 2 on an unknown key", async () => {
 
 test("pins.mjs --shell and --github-output", async () => {
   const d = await sandbox();
-  assert.match(run(d, "--shell").stdout, new RegExp(`^PIN_RUST=${pins.rust}\\nPIN_NEXTEST=`));
+  assert.match(run(d, "--shell").stdout, new RegExp(`^PIN_RUST='${pins.rust}'\\nPIN_NEXTEST=`));
   assert.match(run(d, "--github-output").stdout, new RegExp(`^rust=${pins.rust}\\nnextest=`));
 });
 
@@ -120,4 +120,23 @@ test("pins.mjs --check also catches drift in the sha-pinned CircleCI downloads",
   const r = run(d, "--check");
   assert.equal(r.status, 1);
   assert.match(r.stderr, /ci-ok\.yml.*nextest 0\.0\.1/);
+});
+
+test("pins.mjs refuses a value that is not an exact X.Y.Z (no npm alias or range)", async () => {
+  for (const bad of ["npm:evil@1.0.0", "^0.5.1", "0.5", "latest", "0.5.1 && x"]) {
+    const d = await sandbox({
+      "pins.toml": (await read("pins.toml")).replace(`hoist = "${pins.hoist}"`, `hoist = "${bad}"`),
+    });
+    for (const flag of ["--github-output", "--shell", "--check", "hoist"]) {
+      const r = run(d, flag);
+      assert.equal(r.status, 1, `${bad} ${flag}`);
+      assert.equal(r.stdout, "");
+      assert.match(r.stderr, /hoist .*not an exact version/);
+    }
+  }
+});
+
+test("pins.mjs --shell quotes each value", async () => {
+  const r = run(await sandbox(), "--shell");
+  assert.match(r.stdout, new RegExp(`^PIN_HOIST='${pins.hoist.replaceAll(".", "\\.")}'$`, "m"));
 });

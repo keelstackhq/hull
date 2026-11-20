@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -49,4 +49,23 @@ test("proxy-ca: install is a no-op without a CA, and the script is owned by base
   assert.equal(run(["install"], {}).status, 0);
   assert.equal(run(["nope"], {}).status, 2);
   assert.match(readFileSync(PIECE, "utf8"), /owned = \[[^\]]*"scripts\/proxy-ca\.sh"/);
+});
+
+test("proxy-ca install: only PROXY_CA_BUNDLE or the agent proxy CA, copied once", () => {
+  const store = mkdtempSync(join(tmpdir(), "proxy-ca-store-"));
+  const ca = join(mkdtempSync(join(tmpdir(), "proxy-ca-")), "ca.crt");
+  writeFileSync(ca, "CERT\n");
+  const env = {
+    HTTPS_PROXY: "http://127.0.0.1:9",
+    PROXY_CA_STORE: store,
+    PROXY_CA_AGENT: "/nonexistent",
+  };
+  // A CA named only by SSL_CERT_FILE is not trusted system-wide.
+  assert.equal(run(["install"], { ...env, SSL_CERT_FILE: ca }).status, 0);
+  assert.equal(existsSync(join(store, "agent-proxy-ca.crt")), false);
+  const first = run(["install"], { ...env, PROXY_CA_BUNDLE: ca });
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(readFileSync(join(store, "agent-proxy-ca.crt"), "utf8"), "CERT\n");
+  const again = run(["install"], { ...env, PROXY_CA_BUNDLE: ca });
+  assert.match(again.stdout, /unchanged/);
 });

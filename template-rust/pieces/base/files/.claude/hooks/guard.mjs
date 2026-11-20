@@ -143,6 +143,7 @@ const PROTECTED_RES = [
   /(^|\/)\.github\/workflows\/release[^/]*\.ya?ml$/i,
   /(^|\/)\.bosun(\/|$)/i,
   /(^|\/)\.claude$/i,
+  /(^|\/)pins\.toml$/i, // tool versions that release workflows install with release credentials
 ];
 const FAIL_CLOSED_RE = /\.claude\/(hooks|settings)|workflows\/release|\.bosun\/|\.splice\/lock/i;
 const isProtected = (p) => PROTECTED_RES.some((re) => re.test(p));
@@ -178,7 +179,7 @@ const REASON = {
     "Hidden or indirect push, publish or release is blocked: run the command directly (git push -u origin <feature-branch>) so the guard can see it.",
   lock: "only splice writes the lock (.splice/lock.toml): run `splice update` or `splice add` instead.",
   protected:
-    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md. Use paths from the repo root (no cd, -C, --chdir or --work-tree into guarded dirs) and apply patches from a file in the repo.",
+    "Guard rails (.claude/hooks, .claude/settings*.json, release workflows, .bosun/, pins.toml, git hooksPath and aliases) belong to the human: ask the human; put local rules in docs/agents/project.md. Use paths from the repo root (no cd, -C, --chdir or --work-tree into guarded dirs) and apply patches from a file in the repo.",
   failClosed:
     "The guard hit an internal error on a push, publish, release or secret call: retry the call; if it keeps failing, ask the human.",
 };
@@ -531,7 +532,9 @@ export function commands(cmd) {
   if (segs.subs.unclosed) out.push(["@evade", text]);
   for (const sub of segs.subs) for (const inner of commands(sub)) out.push(inner);
   for (const seg of segs) {
-    const t = stripPrefixes(seg);
+    const t = stripPrefixes(seg).flatMap(splitRedirect);
+    // An assignment that makes git or a pager run a program (`GIT_EXTERNAL_DIFF=x git diff`).
+    if (seg.some((x) => RUNS_ENV_RE.test(x))) out.push(["@runs-env", seg.join(" ")]);
     if (!t.length) {
       // A bare `env` (options and assignments only) prints the environment.
       if (base(seg[0].replace(/^[({]+/, "")) === "env") out.push(["printenv"]);
@@ -750,6 +753,9 @@ function pushRule(args, projectDir) {
     }
   }
   if (del && refs.some((r) => isDefault(r, projectDir))) return "deleteDefault";
+  // A version-shaped dst (`v1.2.3`, `cli-v0.4.0`) is a release tag even when it is not local yet.
+  const TAG_LIKE = /^(?:refs\/tags\/)?(?:[\w.-]*-)?v?\d+\.\d+\.\d+(?:[-+][\w.]+)?$/;
+  if (refs.slice(1).some((r) => TAG_LIKE.test(r.slice(r.lastIndexOf(":") + 1)))) tag = true;
   if (tag) return "tag";
   // refs[0] is the remote; every later positional is a refspec whose dst must not be the default.
   for (const r of refs.slice(1)) {
@@ -833,6 +839,16 @@ function chdirs(tokens) {
   return out;
 }
 
+const RUNS_ENV_RE =
+  /^(GIT_[A-Z0-9_]+|PAGER|LESSOPEN|LESSCLOSE|LD_PRELOAD|LD_LIBRARY_PATH|BASH_ENV|ENV|EDITOR|VISUAL|NODE_OPTIONS|PERL5OPT|PYTHONSTARTUP)=/;
+
+/** `x>file` is `x` plus a redirect `>file`; a bare fd prefix (`2>/dev/null`) stays one token. */
+function splitRedirect(tok) {
+  const m = /^(.+?)((?:\d*|&)>.*)$/s.exec(tok);
+  if (!m || /^(\d+|&)$/.test(m[1]) || /^[<>&]/.test(tok)) return [tok];
+  return [m[1], m[2]];
+}
+
 /** Tools whose -d/-o/-t/-C/-O flags never name a directory or an output file. */
 const NO_DIR_FLAGS = new Set("ls grep egrep fgrep head tail wc cat du stat diff".split(" "));
 /** Tools that only read; a redirect still counts as a write. Not tree/less (-o writes). */
@@ -875,6 +891,7 @@ function bashRule(
   const args = t.slice(1);
   if (prog === "@evade") return RISKY_RE.test(t[1]) ? "evasion" : null;
   if (prog === "@evade-exec") return EXEC_RE.test(t[1]) ? "evasion" : null;
+  if (prog === "@runs-env") return chain.guarded ? "protected" : null;
   if (prog === "@chdir") return guardedDir(t[1], projectDir, cwd) ? "protected" : null;
   if (["cd", "pushd"].includes(prog)) {
     const dirs = args.filter((a) => !a.startsWith("-"));

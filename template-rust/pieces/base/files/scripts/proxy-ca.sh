@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Proxy-CA hook: lets `docker build` work behind an HTTPS proxy that re-signs TLS (the Claude Code
-# cloud agent proxy). The CA bundle path comes from the env: PROXY_CA_BUNDLE, else SSL_CERT_FILE,
-# CURL_CA_BUNDLE or NODE_EXTRA_CA_CERTS. No CA or no HTTPS_PROXY: a no-op (local machines, CI).
+# cloud agent proxy). No HTTPS_PROXY or no CA: a no-op (local machines, CI). `install` trusts only
+# PROXY_CA_BUNDLE or the agent proxy's own bundle (/root/.ccr/ca-bundle.crt); `docker build` also
+# takes SSL_CERT_FILE, CURL_CA_BUNDLE or NODE_EXTRA_CA_CERTS.
 #   bash scripts/proxy-ca.sh install             as root (setup script, session start): trust the
 #                                                CA system-wide so the docker daemon pulls images
 #   bash scripts/proxy-ca.sh docker build ARGS   docker build with --network host, the proxy as
@@ -19,20 +20,30 @@ active() { [ -n "$proxy" ] && [ -n "$ca" ] && [ -f "$ca" ]; }
 
 case "${1:-}" in
   install)
-    active || exit 0
-    if [ "$(id -u)" != 0 ]; then
-      echo "proxy-ca: not root; skipping the system trust store" >&2
+    agent="${PROXY_CA_AGENT:-/root/.ccr/ca-bundle.crt}"
+    trust="${PROXY_CA_BUNDLE:-$agent}"
+    [ -n "$proxy" ] && [ -f "$trust" ] || exit 0
+    store="${PROXY_CA_STORE:-/usr/local/share/ca-certificates}"
+    dest="$store/agent-proxy-ca.crt"
+    if cmp -s "$trust" "$dest"; then
+      echo "proxy-ca: CA unchanged"
       exit 0
     fi
-    if [ -d /usr/local/share/ca-certificates ] && command -v update-ca-certificates >/dev/null; then
-      cp "$ca" /usr/local/share/ca-certificates/agent-proxy-ca.crt
-      update-ca-certificates >/dev/null
-      # The daemon reads the trust store at start: restart it when it runs under systemd.
-      if command -v systemctl >/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
-        systemctl restart docker || echo "proxy-ca: restart docker to load the CA" >&2
-      fi
+    if ! [ -d "$store" ] || ! [ -w "$store" ]; then
+      echo "proxy-ca: cannot write $store (not root?); skipping the system trust store" >&2
+      exit 0
+    fi
+    cp "$trust" "$dest"
+    # PROXY_CA_STORE is for tests: then the system store and the daemon stay untouched.
+    [ -z "${PROXY_CA_STORE:-}" ] || exit 0
+    if command -v update-ca-certificates >/dev/null; then
+      update-ca-certificates >/dev/null || echo "proxy-ca: update-ca-certificates failed" >&2
     else
-      echo "proxy-ca: no update-ca-certificates; add $ca to the system trust store by hand" >&2
+      echo "proxy-ca: no update-ca-certificates; add $dest to the trust store by hand" >&2
+    fi
+    # The daemon reads the trust store at start: restart it (only now that the CA changed).
+    if command -v systemctl >/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
+      systemctl restart docker || echo "proxy-ca: restart docker to load the CA" >&2
     fi
     ;;
   docker)

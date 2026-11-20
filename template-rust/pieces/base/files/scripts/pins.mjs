@@ -1,11 +1,13 @@
 // Reads pins.toml. Node built-ins only.
 //   node scripts/pins.mjs <key>            print one value (exit 2 on an unknown key)
-//   node scripts/pins.mjs --shell          PIN_RUST=1.99.1 lines for eval/source
+//   node scripts/pins.mjs --shell          PIN_RUST='1.99.1' lines for eval/source
 //   node scripts/pins.mjs --github-output  key=value lines for $GITHUB_OUTPUT
 //   node scripts/pins.mjs --check          exit 1 when rust-toolchain.toml or Cargo.toml disagree
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const EXACT = /^\d+\.\d+\.\d+$/;
 
 /** Parses the `[pins]` table: `key = "value"` lines. */
 export function parsePins(text) {
@@ -56,6 +58,12 @@ export function checkCircleci(pins, text, file) {
 function main(argv) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const pins = parsePins(readFileSync(join(root, "pins.toml"), "utf8"));
+  // Release workflows install these with release credentials: only an exact X.Y.Z is a pin.
+  const bad = Object.entries(pins).filter(([, v]) => !EXACT.test(v));
+  if (bad.length > 0) {
+    for (const [k, v] of bad) console.error(`pins: ${k} = "${v}" is not an exact version (X.Y.Z)`);
+    return 1;
+  }
   const flags = argv.filter((a) => a.startsWith("--"));
   const keys = argv.filter((a) => !a.startsWith("--"));
   let out = "";
@@ -76,7 +84,7 @@ function main(argv) {
     }
   }
   if (flags.includes("--shell"))
-    for (const [k, v] of Object.entries(pins)) out += `PIN_${k.toUpperCase()}=${v}\n`;
+    for (const [k, v] of Object.entries(pins)) out += `PIN_${k.toUpperCase()}='${v}'\n`;
   if (flags.includes("--github-output"))
     for (const [k, v] of Object.entries(pins)) out += `${k}=${v}\n`;
   for (const k of keys) {

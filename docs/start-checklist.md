@@ -92,15 +92,17 @@ GitHub hosts at least) and the install commands for hoist and bosun.
 
 Tool versions (template-rust): `pins.toml` at the repo root is the one source for rust,
 cargo-nextest, cargo-deny, splice, bosun and hoist; CI reads it, and a setup script reads it with
-`eval "$(node scripts/pins.mjs --shell)"` (`PIN_SPLICE=0.6.0`, ...) instead of its own numbers.
+`eval "$(node scripts/pins.mjs --shell)"` (`PIN_SPLICE='0.6.0'`, ...; every pin must be an exact
+`X.Y.Z`, else it exits 1; agents cannot edit `pins.toml`: the guard treats it as a rail) instead of its own numbers.
 Run `node scripts/ready.mjs` only after the setup script installed the tools: it needs Node 24 and
 splice on PATH and stops early (exit 3) otherwise. Unattended, answer in one call:
 `node scripts/ready.mjs --answer pieces=cli ci=github bosun=yes apps=claude,renovate`.
 
 `docker build` behind the cloud agent proxy (template-rust): containers cannot reach the proxy on
 127.0.0.1 and do not trust its CA. Add `bash scripts/proxy-ca.sh install` to the setup script (as
-root: trusts the CA bundle named by `SSL_CERT_FILE`, `CURL_CA_BUNDLE` or `NODE_EXTRA_CA_CERTS`
-system-wide, so the daemon pulls images; the session-start hook runs it too), and build with
+root: trusts `PROXY_CA_BUNDLE` or the agent proxy's own `/root/.ccr/ca-bundle.crt` system-wide,
+so the daemon pulls images, and restarts docker only when the CA changed; the session-start hook
+runs it too), and build with
 `bash scripts/proxy-ca.sh docker build -t app .` (host network, proxy build args, the CA as build
 context `proxy-ca`). The Dockerfile takes the CA in its first stages (empty without the proxy):
 
@@ -171,7 +173,8 @@ gh api "repos/$R/environments/splice-bot/deployment-branch-policies" --jq '.bran
 
 The same two `gh api` calls with another name create `release-pr`, `preview` and `prod`.
 
-PAT mode (`update_bot` = `pat`): `SPLICE_BOT_TOKEN` is a fine-grained personal access token,
+PAT mode (`update_bot` = `pat`) is legacy (see org decision D-014 for the preferred mode); for repos
+that still use it, `SPLICE_BOT_TOKEN` is a fine-grained personal access token,
 resource owner `keelstackhq`, repository access "Only select repositories" = this repo, with
 repository permissions Contents, Pull requests and Workflows: Read and write (GitHub adds
 Metadata: Read). Nothing else. Pre-filled form (pick the repo by hand and check the three

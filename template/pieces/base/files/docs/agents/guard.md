@@ -17,7 +17,8 @@ rule and the allowed alternative. Use the patterns below; they pass.
 
 After `cd` into `.claude/`, `.claude/hooks/`, `.bosun/` or `.github/workflows/`, the rest of the
 command may only read (`ls`, `cat`, `grep`, `head`, `git log`, ..., redirects to `/dev/null`
-only). Write from the repo root with the full path instead, so the guard sees the target.
+only; `x>file` counts as a write, and so do `GIT_*=`/`PAGER=` prefixes). Write from the repo root
+with the full path instead, so the guard sees the target.
 
 ## Rails that stay
 
@@ -25,7 +26,7 @@ only). Write from the repo root with the full path instead, so the guard sees th
   `gh release`, no `gh pr merge` without `--auto`: open a PR and run `gh pr merge --auto`.
 - No reads of secret files (`.env*`, keys, `~/.ssh`, `~/.config/gh`) or whole-environment dumps.
 - No edits of `.claude/hooks/`, `.claude/settings*.json`, release workflows, `.bosun/`,
-  `.splice/lock.toml`; template-owned files ask first (change them with `splice update`).
+  `pins.toml` (release workflows install its versions), `.splice/lock.toml`; template-owned files ask first (change them with `splice update`).
 - No `gh api` writes to repo settings (rulesets, environments, secrets): those are owner steps.
 - A target the guard cannot read (`cd "$D"`, `eval`, a pipe into `sh`) is refused when it could
   hide one of the above: spell the command out.
