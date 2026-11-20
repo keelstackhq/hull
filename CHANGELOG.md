@@ -9,6 +9,17 @@ Keep `unreleased` while changes accumulate.
 
 ## v0.14.0 — unreleased
 
+- template-rust bootstrap friction (client feedback): `pins.toml` + `scripts/pins.mjs` are the one
+  source of tool versions (rust, nextest, cargo-deny, splice, bosun, hoist); CI and release.yml read
+  them, CI checks rust-toolchain.toml and Cargo.toml against them (hoist 0.5.0 → 0.5.1). A shipped
+  `Cargo.lock` keeps `--locked` green on the first push; var `no_placeholder` renders without
+  `crates/common`. `scripts/proxy-ca.sh` trusts the cloud agent proxy CA for `docker build`.
+- guard.mjs (both templates): `cd`/`pushd` into a guarded dir is allowed when the rest of the
+  command only reads; `ls -d`, `grep -o`, `sort -t`-style flags of read-only tools are no longer
+  read as a target dir. New `docs/agents/guard.md` (safe patterns), linked from AGENTS.md.
+- ready.mjs: documents the non-interactive `--answer` form; stops early (exit 3) on Node < 24 or
+  without splice on PATH. start-checklist: the SPLICE_BOT_TOKEN PAT scopes with a pre-filled link,
+  `gh api` commands for the `splice-bot` environment, docker behind the proxy.
 - hull's dev renderer glob matcher: a `**` that is not a whole path segment (`a**b`, `**b`,
   `a/b**`) stays within one segment like `*`, as picomatch did; only a whole-segment `**` crosses
   segments (contract §9.1).

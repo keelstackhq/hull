@@ -483,6 +483,20 @@ export const RUST_CI_PLAN = Object.freeze(
     { id: "licenses", github: GITHUB_STEPS[3].github, circleci: CIRCLECI.licenses },
     { id: "workflows", github: GITHUB_STEPS[4].github, circleci: CIRCLECI.workflows },
     {
+      // Before docs-only: always runs: pins.toml, rust-toolchain.toml and Cargo.toml must agree.
+      id: "pins",
+      github: yml(
+        "      - name: Pins current? (pins.toml)",
+        "        id: pins",
+        '        run: node scripts/pins.mjs --check --github-output >> "$GITHUB_OUTPUT"',
+      ),
+      // CircleCI keeps sha256-pinned downloads (a checksum belongs to one version); a hull test
+      // keeps them equal to pins.toml.
+      circleci: yml(
+        ...ccRun("Pins current? (pins.toml)", "      command: node scripts/pins.mjs --check"),
+      ),
+    },
+    {
       id: "docs-only",
       github: yml(
         "      - name: Docs only?",
@@ -533,7 +547,7 @@ export const RUST_CI_PLAN = Object.freeze(
         "      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32",
         `        if: ${NOT_DOCS}`,
         "        with:",
-        "          tool: cargo-nextest@0.9.148,cargo-deny@0.20.2",
+        "          tool: cargo-nextest@${{ steps.pins.outputs.nextest }},cargo-deny@${{ steps.pins.outputs.cargo_deny }}",
       ),
       circleci: RUST_CIRCLECI_TOOLS,
     },

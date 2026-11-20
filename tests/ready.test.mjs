@@ -15,6 +15,7 @@ const DOC = fileURLToPath(new URL("../docs/start-checklist.md", import.meta.url)
 const {
   BOOTSTRAP_END,
   ITEMS,
+  preflight,
   QUESTIONS,
   TEMPLATES,
   profileOf,
@@ -548,9 +549,36 @@ test("base renders scripts/ready.mjs and the ready skill (owned); AGENTS.md neve
 
 test("ready.mjs runs as a script and exits 1 outside a ready repo", async () => {
   const d = await mkdtemp(join(tmpdir(), "ready-"));
-  const r = spawnSync(process.execPath, [SCRIPT], { cwd: d, encoding: "utf8", env: { PATH: "" } });
+  const bin = await mkdtemp(join(tmpdir(), "ready-bin-"));
+  await writeFile(join(bin, "splice"), "#!/bin/sh\necho splice 0.6.0\n", { mode: 0o755 });
+  const r = spawnSync(process.execPath, [SCRIPT], { cwd: d, encoding: "utf8", env: { PATH: bin } });
   assert.equal(r.status, 1, r.stderr);
   assert.match(r.stdout, /^ask +render /m);
+});
+
+test("ready.mjs stops early with a clear message when splice is not on PATH", async () => {
+  const d = await mkdtemp(join(tmpdir(), "ready-"));
+  const r = spawnSync(process.execPath, [SCRIPT], { cwd: d, encoding: "utf8", env: { PATH: "" } });
+  assert.equal(r.status, 3);
+  assert.equal(r.stdout, "");
+  assert.match(r.stderr, /splice is not on PATH/);
+  assert.match(r.stderr, /after the tools are installed/);
+  // --questions, --answer and --assess need no tools.
+  const q = spawnSync(process.execPath, [SCRIPT, "--questions"], { cwd: d, env: { PATH: "" } });
+  assert.equal(q.status, 0);
+});
+
+test("preflight: Node < 24 and a missing splice stop the check early", () => {
+  const has = (t) => t === "splice";
+  assert.equal(preflight({ node: "24.1.0", has }), null);
+  assert.match(preflight({ node: "22.11.0", has }), /Node 24 or newer.*22\.11\.0/);
+  assert.match(preflight({ node: "24.1.0", has: () => false }), /splice is not on PATH/);
+});
+
+test("ready.mjs documents its non-interactive flags", () => {
+  const src = readFileSync(SCRIPT, "utf8").split("\nimport")[0];
+  for (const flag of ["--answer pieces=", "bosun=yes", "apps=", "ci=github"])
+    assert.ok(src.includes(flag), flag);
 });
 
 test("after BOOTSTRAP_END, `owner` (not `bootstrap`) is the recommended approvals option", () => {
@@ -611,6 +639,7 @@ const rustRepo = async () => {
   const d = await readyRepo();
   spawnSync("rm", ["-f", join(d, "package.json")]);
   await put(d, "Cargo.toml", "[workspace]\n");
+  await put(d, "Cargo.lock", "version = 4\n");
   await put(d, ".splice/lock.toml", RUST_LOCK);
   await put(
     d,
@@ -846,4 +875,14 @@ test("profileOf without a lock: workspaces or pnpm-workspace.yaml are JS; malfor
   assert.equal(profileOf(d), "template-rust");
   await put(d, "pnpm-workspace.yaml", "packages: []\n");
   assert.equal(profileOf(d), "template");
+});
+
+test("render check fails when Cargo.toml has no Cargo.lock", async () => {
+  const root = await readyRepo();
+  await put(root, "Cargo.toml", "[workspace]\nmembers = []\n");
+  const r = runChecks({ root, run: fakeRun(GOOD_GH), node: "24.21.0" }).find(
+    (x) => x.id === "render",
+  );
+  assert.equal(r.status, "fail");
+  assert.match(r.note, /no Cargo\.lock: run `cargo generate-lockfile`/);
 });

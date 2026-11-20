@@ -20,6 +20,7 @@ export const SHARED = [
   ".claude/agents/reviewer.md",
   ".claude/agents/ci-fixer.md",
   "docs/agents/onboarding.toml",
+  "docs/agents/guard.md",
 ];
 
 const read = (p) => {

@@ -8,6 +8,8 @@ if command -v cargo >/dev/null 2>&1; then
 else
   status="cargo not found"
 fi
+# Behind the cloud agent proxy: trust its CA for docker (a no-op elsewhere or when not root).
+bash scripts/proxy-ca.sh install >/dev/null 2>&1 || true
 echo "session-start: $status"
 # Repo-local hooks (not owned by the template): every .claude/hooks/session-start.d/*.sh runs here;
 # a failing one is reported and ignored.

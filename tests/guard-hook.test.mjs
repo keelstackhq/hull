@@ -726,8 +726,12 @@ test("cd into a guarded dir, a persisted cwd there, patch and git apply do not h
     "cd .claude/hooks && sed -i s/a/b/ guard.mjs",
     "pushd .claude; tee settings.json",
     "cd .github/workflows && echo > release.yml",
-    "cd .bosun",
-    "cd ./.claude/",
+    "cd .bosun && echo x > policy.toml",
+    "cd ./.claude/ && rm settings.json",
+    "cd .bosun && ls > out.txt",
+    "cd .bosun && cat a | tee b",
+    "cd .bosun && find . -delete",
+    "(cd .bosun && ls); touch x",
     "git -C .claude checkout -- settings.json",
     "patch -p1 < evil.diff",
     "patch -p1 -i evil.diff",
@@ -819,12 +823,12 @@ test("chdir flags and globs into a guarded dir are treated like cd", () => {
     "make --directory=.bosun all",
     "git --work-tree=.claude checkout -- .",
     "git --work-tree .claude restore .",
-    "cd .cla*",
-    "cd .?laude/hooks",
-    "cd .[c]laude",
-    "cd .claud{e,x}",
-    "cd .git*/workflows",
-    "cd .bos*",
+    "cd .cla* && touch x",
+    "cd .?laude/hooks && touch x",
+    "cd .[c]laude && touch x",
+    "cd .claud{e,x} && touch x",
+    "cd .git*/workflows && touch x",
+    "cd .bos* && touch x",
     "pnpm --prefix .claude exec sh",
     "git -C .cla* checkout -- settings.json",
     "env -iC .claude ls",
@@ -1030,3 +1034,47 @@ test("follow-up: every /proc/**/environ path and whole-env reads in more runtime
   ])
     assert.equal(decide(bash(cmd), ctx), null, cmd);
 });
+
+// Read-only calls an agent makes while bootstrapping a repo (client feedback, 2026-11): they must
+// pass, while the rails (push to main, force and tag pushes, secret reads) still deny.
+const READ_ONLY = [
+  "curl -s https://api.github.com/repos/o/r/pulls",
+  "curl -fsSL https://api.github.com/repos/o/r/releases/latest | jq -r .tag_name",
+  'curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/o/r',
+  "git ls-remote origin | grep refs/tags",
+  "git ls-remote --tags https://github.com/o/r | awk '{print $2}' | sort -V | tail -1",
+  "git fetch origin main && git log --oneline origin/main -3",
+  "cd /r && git fetch origin && git status -sb",
+  "git fetch --tags origin; git tag -l",
+  "cd .bosun",
+  "cd .bosun && ls && cat bosun.toml",
+  "cd .bosun/gates && grep -rn risk . 2>/dev/null | head",
+  "pushd .claude/hooks && ls -la && popd",
+  "cd .github/workflows && grep -l push *.yml",
+  "cd .bosun && git log --oneline -3 -- .",
+  "ls -d .*",
+  "ls -d .claude/*",
+  "ls -t .github/workflows/*.yml",
+  "grep -o 'uses: [^ ]*' .github/workflows/*.yml",
+  "cat .bosun/*.toml",
+];
+for (const c of READ_ONLY) {
+  test(`read-only allow: ${c}`, () => assert.equal(decide(bash(c), ctx), null));
+}
+test("a cwd persisted inside a guarded dir still guards relative writes", () => {
+  const c = { projectDir: "/r", cwd: "/r/.bosun" };
+  assert.equal(decide(bash("echo x > policy.toml"), c)?.decision, "deny");
+  assert.equal(decide(bash("ls"), c), null);
+});
+for (const c of [
+  "git push origin main",
+  "git push --force origin feat",
+  "git push --tags",
+  "git push origin refs/tags/v1.0.0",
+  "cd .bosun && git push origin main",
+  "cat .env",
+  "cd .bosun && rm -rf .",
+  'cd "$D" && ls',
+]) {
+  test(`rail stays: ${c}`, () => assert.equal(decide(bash(c), ctx)?.decision, "deny"));
+}

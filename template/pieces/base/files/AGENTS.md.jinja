@@ -27,7 +27,7 @@ Packages call `vp build/test/lint/fmt/pack` directly (Turbo caches); never `vp r
   in seed files, `docs/agents/project.md` or a package's `AGENTS.md`.
 - Never print, read or commit secrets (`.env*`, keys). Releases are tag pushes by a human: never publish,
   push tags or push the default branch; use a PR.
-- The guard hook is a rail, not a sandbox: the real fix is a server-side branch ruleset.
+- Guard hook: a rail, not a sandbox; real fix: a server-side branch ruleset. See `docs/agents/guard.md`.
 - A hook `ask` is a denial in unattended runs: use the alternative its reason names.
 - At most 2-3 parallel agents on barely overlapping files; note next steps in `docs/agents/project.md`.
 - Sibling package: `"@scope/name": "workspace:*"`, then `pnpm install`.

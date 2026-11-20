@@ -15,13 +15,13 @@
     "splice.yml": "0015dda69c1023fd323dd4a8e56cb4ad905c2daacb515a381774cdf2c8464cd9"
   },
   "rust": {
-    "ci.yml": "85646b9661411c3a3f830fd66ee1f3aa742be09b6eed602acf3064c1370752d3",
-    "release.yml": "8a97fb0aa9509845422a5f68e198fecead80b6d935da6d86130ed3074b617dc8",
+    "ci.yml": "b5f40d7b26d4c81dd7b395f9f343c20408f34c200fa4094899e797e564dfa7fb",
+    "release.yml": "9a168e55e4b6e66c1c17180fdc13c4103dfbe8a140d947826d851d6ca7c862a7",
     "splice.yml": "2e8d0810ea078e1e1f955df5d450342d93c39e2369f90d97ec4aaa554b85506b"
   },
   "rust-circleci": {
-    "ci.yml": "85646b9661411c3a3f830fd66ee1f3aa742be09b6eed602acf3064c1370752d3",
-    "release.yml": "8a97fb0aa9509845422a5f68e198fecead80b6d935da6d86130ed3074b617dc8",
+    "ci.yml": "b5f40d7b26d4c81dd7b395f9f343c20408f34c200fa4094899e797e564dfa7fb",
+    "release.yml": "9a168e55e4b6e66c1c17180fdc13c4103dfbe8a140d947826d851d6ca7c862a7",
     "splice.yml": "2e8d0810ea078e1e1f955df5d450342d93c39e2369f90d97ec4aaa554b85506b"
   }
 }

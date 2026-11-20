@@ -29,17 +29,18 @@ Also: `cargo fmt --all` (format), `cargo nextest run -p <crate>` (one crate),
   in seed files, `docs/agents/project.md` or a crate's `AGENTS.md`.
 - Never print, read or commit secrets (`.env*`, keys). Releases are tag pushes by a human: never publish,
   push tags or push the default branch; open a PR and `gh pr merge --auto`.
-- The guard hook is a rail, not a sandbox: the real fix is a server-side branch ruleset.
+- Guard hook: a rail, not a sandbox; real fix: a server-side branch ruleset. See `docs/agents/guard.md`.
 - A hook `ask` is a denial in unattended runs: use the alternative its reason names.
 - At most 2-3 parallel agents on barely overlapping files; note next steps in `docs/agents/project.md`
   before a long task.
 
 ## Crates
 
-- `crates/common`: shared library code (seed, unpublished).{% if "rust-cli" in pieces %}
-- `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit
-  codes and cargo-deny; see `crates/<name>/AGENTS.md`.{% endif %}
-
+{% if no_placeholder %}{% else %}- `crates/common`: shared library code (seed, unpublished). Template tests (crates/common, its test)
+  are removable in the bootstrap PR: `git rm -r crates/common`, then `cargo generate-lockfile`.
+{% endif %}{% if "rust-cli" in pieces %}- `crates/*` (rust-cli): distributable CLI skeleton with one JSON object on `--json`, fixed exit
+  codes and cargo-deny; see `crates/<name>/AGENTS.md`.
+{% endif %}
 ## Where to look
 
 - `docs/agents/project.md`: repo-specific notes; read first.

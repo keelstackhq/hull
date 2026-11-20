@@ -8,6 +8,11 @@
 //   node scripts/ready.mjs --answer id=v[,v]  record answers in docs/agents/onboarding.toml
 //   node scripts/ready.mjs --assess [--json]  read-only: which template and pieces fit an existing
 //                                             repo, and what would clash (works copied alone)
+// Non-interactive (scripts, unattended agents): give every answer as arguments in one call, e.g.
+//   node scripts/ready.mjs --answer pieces=cli,lib ci=github bosun=yes apps=claude,renovate
+//   update_bot=pat approvals=bootstrap release=no      (ids and values: --questions)
+// Run it after the tools are installed (the environment setup script): it needs Node 24+ and
+// splice on PATH, and stops early (exit 3) with what is missing.
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
@@ -485,6 +490,10 @@ export function runChecks({ root, run, node, today = new Date().toISOString().sl
       const ciWant = { github: undefined, circleci: "circleci-only", both: "circleci" }[answers.ci];
       if (ci !== ciWant)
         return fail(`ci = ${answers.ci}, but the lock has ${ci ?? "no CircleCI piece"}`);
+      if (file("Cargo.toml") && !file("Cargo.lock"))
+        return fail(
+          "no Cargo.lock: run `cargo generate-lockfile` and commit it (CI runs --locked)",
+        );
       return tool("splice", "check", "--offline");
     },
     plan() {
@@ -561,7 +570,7 @@ export const CLASH = {
       ".github/workflows/ci.yml .github/workflows/desktop.yml .github/workflows/preview-deploy.yml " +
       ".github/workflows/preview.yml .github/workflows/release.yml .github/workflows/splice.yml " +
       ".gitattributes .gitignore .node-version CLAUDE.md Cargo.toml renovate.json rust-toolchain.toml " +
-      "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
+      "docs/agents/guard.md scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/ready.mjs tsconfig.base.json vite.config.ts " +
       "packages/shared/tsconfig.json packages/shared/vite.config.ts",
     shared: "package.json pnpm-workspace.yaml turbo.json packages/shared/package.json",
     seed:
@@ -577,11 +586,11 @@ export const CLASH = {
       ".config/nextest.toml .github/scripts/docs-only.mjs .github/scripts/release-pending.mjs " +
       ".github/scripts/workflows.mjs " +
       ".github/workflows/ci.yml .github/workflows/release.yml .github/workflows/splice.yml " +
-      ".gitattributes .gitignore CLAUDE.md deny.toml renovate.json rust-toolchain.toml rustfmt.toml " +
-      "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/ready.mjs",
+      ".gitattributes .gitignore CLAUDE.md deny.toml docs/agents/guard.md pins.toml renovate.json rust-toolchain.toml rustfmt.toml " +
+      "scripts/agents-index.mjs scripts/deny.mjs scripts/licenses.mjs scripts/pins.mjs scripts/proxy-ca.sh scripts/ready.mjs",
     shared: "Cargo.toml crates/common/Cargo.toml",
     seed:
-      "AGENTS.md CHANGELOG.md README.md deny.local.toml docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
+      "AGENTS.md CHANGELOG.md Cargo.lock README.md deny.local.toml docs/agents/index.md docs/agents/onboarding.toml docs/agents/project.md hoist.toml " +
       "scripts/ci-pre.sh scripts/ci-extra.sh crates/common/src/**",
   },
 };
@@ -799,6 +808,15 @@ export function report(results, url) {
   return { text: `${lines.join("\n")}\n`, code: failed ? 1 : 0 };
 }
 
+/** Why the checks cannot run here (Node < 24, splice not on PATH), or null. */
+export function preflight({ node, has }) {
+  const after = "run it after the tools are installed (the environment setup script)";
+  if (Number(node.split(".")[0]) < 24)
+    return `ready: needs Node 24 or newer, have ${node}; ${after}`;
+  if (!has("splice")) return `ready: splice is not on PATH; ${after}`;
+  return null;
+}
+
 /** True when this file is the entry script; symlink-safe (Node resolves import.meta.url). */
 const isMain = () => {
   const entry = process.argv[1];
@@ -816,6 +834,13 @@ if (isMain()) {
   };
   const root = process.cwd();
   const [flag, ...rest] = process.argv.slice(2);
+  const has = (cmd) => run(cmd, ["--version"]).ok;
+  // --questions, --answer and --assess need no tools (only Node 24).
+  const stop = preflight({ node: process.versions.node, has: flag ? () => true : has });
+  if (stop) {
+    process.stderr.write(`${stop}\n`);
+    process.exit(3);
+  }
   if (flag === "--assess") {
     const a = assess(root);
     if (rest.includes("--json")) process.stdout.write(`${JSON.stringify(a, null, 2)}\n`);

@@ -1144,6 +1144,13 @@ precedent for a second template in this repo. `template-rust/splice.toml`: `form
 `name = "hull-rust"`, `base = "base"`, `min_splice = "0.3.0"` (raw blocks; rule 9.27 for
 circleci-only), no template `[vars]`. hull's `v<semver>` tags version all three templates.
 
+**Tool pins (2026-11-20).** `base` owns `pins.toml` (`[pins]`: `rust`, `nextest`, `cargo_deny`,
+`splice`, `bosun`, `hoist`) and `scripts/pins.mjs` (Node built-ins; `<key>`, `--shell`,
+`--github-output`, `--check`). ci.yml and release.yml read the pins at run time; CI's `pins` step
+fails when `rust-toolchain.toml` or `rust-version` differs from `rust`. CircleCI keeps its
+sha256-pinned downloads (a checksum belongs to one version); a hull test keeps them equal to
+`pins.toml`.
+
 **Shape** (`template-rust/pieces/`):
 
 - `base` (root): `Cargo.toml.jinja` [shared, toml]: a virtual workspace, `resolver = "3"`,
@@ -1245,11 +1252,11 @@ own `"vars"`. dogfood renders it from that template and runs `RUST_CI_STEPS` in 
 templates (root workspace `Cargo.toml` of `template/` and `template-rust/`). Measured on the
 `rust` combo, local, cargo CI steps (clippy, nextest, doc tests), toolchain 1.99.1:
 
-| `[profile.dev]` variant                              | cold   | warm (crate touched) | `target/` |
-| ---------------------------------------------------- | ------ | -------------------- | --------- |
-| `debug = "line-tables-only"` (before)                | 17.0 s | 1.16 s               | 392 MB    |
-| + `[profile.dev.package."*"] debug = false` (now)    | 15.8 s | 1.14 s               | 288 MB    |
-| `CARGO_INCREMENTAL=0` (rust-cache sets it in CI)     | 24.6 s | 2.07 s               | 362 MB    |
+| `[profile.dev]` variant                           | cold   | warm (crate touched) | `target/` |
+| ------------------------------------------------- | ------ | -------------------- | --------- |
+| `debug = "line-tables-only"` (before)             | 17.0 s | 1.16 s               | 392 MB    |
+| + `[profile.dev.package."*"] debug = false` (now) | 15.8 s | 1.14 s               | 288 MB    |
+| `CARGO_INCREMENTAL=0` (rust-cache sets it in CI)  | 24.6 s | 2.07 s               | 362 MB    |
 
 The first two rows ran back to back; the third ran earlier on a busier machine (its baseline then
 was 21.5 s cold), so read it only as "not faster".
@@ -1273,3 +1280,5 @@ was 21.5 s cold), so read it only as "not faster".
   every CI run and Linux-only config); `codegen-units` (release default 16 with thin LTO is the
   fast choice, release builds run only in release workflows); explicit `incremental` (cargo's
   defaults are already on for dev, off for release).
+
+**Placeholder crate and lockfile (2026-11-20).** Base ships a seed `Cargo.lock` (exactly what cargo writes for the base-only workspace) so the first push passes `--locked` even when the `cargo generate-lockfile` post could not run; `ready.mjs` fails a repo with `Cargo.toml` and no `Cargo.lock`. The var `no_placeholder` (default empty) renders `crates/common` and that lock empty (not written; contract §4) for repos whose first real crate comes from `rust-cli`; the post then writes the lock.

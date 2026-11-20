@@ -12,7 +12,8 @@
 // any other code is scanned (fail closed). Code from stdin (`source /dev/stdin`, `bash <(...)`, `xargs`) is scanned
 // as text. Comments, `case` patterns, quoted heredoc words (`E"OF"`) and `$'...'` escapes are read
 // like the shell; joined string literals are checked for secret file names.
-// `gh api` with an explicit GET and graphql queries are reads. A deny names its rule and the match.
+// `gh api` with an explicit GET and graphql queries are reads. `cd` into a guarded dir is allowed when
+// the rest of the chain only reads (docs/agents/guard.md lists the safe patterns). A deny names its rule and the match.
 // Known gaps: scripts that publish, editing guarded files from an interpreter, a dir reached through
 // a variable or substitution in a flag value (`tar -C "$D"`; `cd "$D"` itself is refused), a patch
 // piped in (refused) or made by a producer other than `git diff|show|format-patch -- <paths>`
@@ -537,7 +538,8 @@ export function commands(cmd) {
       continue;
     }
     if (seg.docs) t.docs = seg.docs;
-    for (const d of chdirs(seg)) out.push(["@chdir", d]);
+    // `ls -d`, `grep -o`, `sort -t`: these flags take no directory in read-only tools.
+    if (!READ_ONLY_PROGS.has(base(t[0]))) for (const d of chdirs(seg)) out.push(["@chdir", d]);
     out.push(t);
     const prog = base(t[0]);
     const segText = seg.join(" ");
@@ -831,6 +833,29 @@ function chdirs(tokens) {
   return out;
 }
 
+/** Tools that only read (no flag of theirs writes a file); a redirect still counts as a write. */
+const READ_ONLY_PROGS = new Set(
+  (
+    "ls cat head tail wc grep egrep fgrep rg ag stat file du tree less more diff cmp jq bat pwd " +
+    "echo printf true false test [ cd pushd popd basename dirname realpath readlink sha256sum md5sum"
+  ).split(" "),
+);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "ls-files", "blame", "rev-parse"]);
+
+/** True when a command cannot write: a read-only tool, no redirect except to /dev/null. */
+function readOnly(t) {
+  const prog = base(t[0]);
+  if (prog === "git" ? !READ_ONLY_GIT.has(gitSub(t).sub) : !READ_ONLY_PROGS.has(prog)) return false;
+  return !t.some((x, i) => {
+    if (!writesTarget(t, i)) return false;
+    return (
+      !/^(\d*>[>|]?|&>>?)?\/dev\/null$/.test(x) &&
+      !/^\d*>&\d$/.test(x) &&
+      !(/^\d*>[>|]?$|^&>>?$/.test(x) && t[i + 1] === "/dev/null")
+    );
+  });
+}
+
 const dirOf = (cwd, x) => resolve(cwd, stripTok(x));
 
 function bashRule(
@@ -847,9 +872,12 @@ function bashRule(
   if (["cd", "pushd"].includes(prog)) {
     const dirs = args.filter((a) => !a.startsWith("-"));
     // `cd "$(echo .claude)"`, `cd $X`: the target is unknown, so it is refused.
-    if (dirs.some((d) => d && (/[$`]/.test(d) || guardedDir(d, projectDir, cwd))))
-      return "protected";
+    if (dirs.some((d) => d && /[$`]/.test(d))) return "protected";
+    // Into a guarded dir: allowed, but the rest of the chain must only read (relative names
+    // there would hide a protected write).
+    if (dirs.some((d) => d && guardedDir(d, projectDir, cwd))) chain.guarded = true;
   }
+  if (chain.guarded && !readOnly(t)) return "protected";
   if (prog === "patch" || (prog === "git" && gitSub(t).sub === "apply")) {
     // The diff names the files it writes: read it (file operand, <redirect or heredoc). Piped or
     // unreadable input cannot be checked, so it is refused; apply it from a file in the repo.
@@ -1131,7 +1159,9 @@ export function decide(input, ctx) {
   };
   const cwd = [ctx.cwd, input?.cwd].find((x) => typeof x === "string" && x) ?? ctx.projectDir;
   if (name === "Bash") {
-    const chain = { made: new Set(), tainted: new Set() };
+    // A cwd persisted inside a guarded dir (an earlier `cd .bosun`) starts the chain read-only.
+    const guarded = cwd !== ctx.projectDir && guardedDir(cwd, ctx.projectDir, ctx.projectDir);
+    const chain = { made: new Set(), tainted: new Set(), guarded };
     for (const t of commands(ti.command)) {
       const rule = bashRule(t, ctx.projectDir, cwd, chain);
       if (rule) return deny(rule, matched(t));
