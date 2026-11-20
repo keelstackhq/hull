@@ -60,7 +60,12 @@ test("the mirror is byte-identical to template's circleci-only mirror", async ()
 });
 
 test("circleci-only render has no ci.yml but release, splice, the mirror and .circleci", () => {
-  assert.deepEqual(wfs(only.out), ["circleci-status.yml", "release.yml", "splice.yml"]);
+  assert.deepEqual(wfs(only.out), [
+    "advisories.yml",
+    "circleci-status.yml",
+    "release.yml",
+    "splice.yml",
+  ]);
   assert.ok(!existsSync(join(only.out, ".github/workflows/ci.yml")));
   for (const f of [".circleci/config.yml", ".circleci/src/jobs/ci-ok.yml"])
     assert.ok(existsSync(join(only.out, f)), f);
