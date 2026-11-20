@@ -9,11 +9,13 @@ COPY --from=proxy-ca / /usr/local/share/ca-certificates/
 RUN apk add --no-cache musl-dev binutils ca-certificates && update-ca-certificates
 ARG FEATURES=""
 ARG MAX_BYTES=25000000
+# crt-static for the target only: an explicit --target keeps RUSTFLAGS off host proc-macros.
 ENV RUSTFLAGS="-C target-feature=+crt-static"
 WORKDIR /src
 COPY . .
-RUN cargo build --release --locked -p {{ service }} ${FEATURES:+--features "$FEATURES"} \
- && cp target/release/{{ service }} /{{ service }} \
+RUN t="$(rustc -vV | sed -n 's/^host: //p')" \
+ && cargo build --release --locked --target "$t" -p {{ service }} ${FEATURES:+--features "$FEATURES"} \
+ && cp "target/$t/release/{{ service }}" /{{ service }} \
  && strip /{{ service }} \
  && mkdir -p /data \
  && if readelf -l /{{ service }} | grep -q INTERP; then echo "gate: {{ service }} has an INTERP header (not static)" >&2; exit 1; fi \
