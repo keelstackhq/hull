@@ -45,10 +45,10 @@ test("advisory plan: a long report is truncated and fences cannot be closed by i
   assert.equal(LABEL, "advisories");
 });
 
-test("advisories.yml: daily schedule, default-branch gate, least privilege, one job", () => {
+test("advisories.yml: weekly schedule, default-branch gate, least privilege, one job", () => {
   const wf = YAML.parse(wfText);
   assert.equal(wf.on.schedule.length, 1);
-  assert.match(wf.on.schedule[0].cron, /^([1-9]\d?) \d+ \* \* \*$/);
+  assert.match(wf.on.schedule[0].cron, /^([1-9]\d?) \d+ \* \* \d$/);
   assert.ok("workflow_dispatch" in wf.on);
   assert.deepEqual(wf.concurrency, { group: "advisories", "cancel-in-progress": true });
   assert.deepEqual(Object.keys(wf.jobs), ["scan"]);

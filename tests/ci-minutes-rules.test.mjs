@@ -55,8 +55,6 @@ for (const combo of combos) {
       for (const s of on.schedule ?? []) {
         const [min, hour, dom, mon, dow] = s.cron.trim().split(/\s+/);
         assert.ok(/^\d+$/.test(min) && /^\d+$/.test(hour), `${file}: ${s.cron}`);
-        // Exception: the daily RustSec scan (template-rust advisories.yml, one short job).
-        if (file === "advisories.yml" && dom === "*" && mon === "*" && dow === "*") continue;
         assert.ok(
           dom === "*" && mon === "*" && /^\d$/.test(dow),
           `${file}: ${s.cron} is not weekly`,

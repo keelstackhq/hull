@@ -15,7 +15,7 @@
 // No args = `--locked check advisories bans licenses sources`; on a push to the default branch
 // (GITHUB_EVENT_NAME=push, or CircleCI on `main`/DENY_DEFAULT_BRANCH without CIRCLE_PULL_REQUEST)
 // `advisories` is dropped, since
-// the daily scan covers main and a new advisory must not turn it red.
+// the weekly scan covers main and a new advisory must not turn it red.
 // Node built-ins only.
 import { spawnSync } from "node:child_process";
 import {

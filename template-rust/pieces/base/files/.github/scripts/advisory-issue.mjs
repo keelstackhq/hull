@@ -21,7 +21,7 @@ function body(report) {
   const text =
     report.length > MAX_REPORT ? `${report.slice(0, MAX_REPORT)}\n… (truncated)` : report;
   return [
-    "`node scripts/deny.mjs --locked check advisories` reports findings (daily scan, advisories.yml).",
+    "`node scripts/deny.mjs --locked check advisories` reports findings (weekly scan, advisories.yml).",
     "Update the dependency, or add a reviewed ignore with a reason to `deny.local.toml`.",
     "This issue closes itself when a scan is clean.",
     "",
@@ -37,7 +37,7 @@ export function plan({ ok, report, issues }) {
     return {
       action: "close",
       number: mine.number,
-      comment: "The daily advisory scan is clean. Closing.",
+      comment: "The weekly advisory scan is clean. Closing.",
     };
   }
   const text = body(report);

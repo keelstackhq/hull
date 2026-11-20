@@ -1,6 +1,6 @@
 # The policy for every crate in the workspace. CI runs `node scripts/deny.mjs` (all four checks with
 # deny.local.toml merged in: extra licenses and expiring advisory ignores go there, not here). On a
-# push to the default branch advisories are skipped: the daily scan covers main, so a new advisory
+# push to the default branch advisories are skipped: the weekly scan covers main, so a new advisory
 # never turns it red; pull requests and merge groups check them.
 
 [advisories]

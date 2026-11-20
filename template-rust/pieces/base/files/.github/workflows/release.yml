@@ -4,7 +4,7 @@ name: release
 # - detect: which workspace crates have a version without a tag (or a tag on HEAD)? Is releasing
 #   switched on (repository variable HOIST_RELEASE = enabled)?
 # - advisories: `node scripts/deny.mjs --locked check advisories` (pull request CI checks
-#   advisories too; advisories.yml scans main daily).
+#   advisories too; advisories.yml scans main weekly).
 # - build: release binaries for 5 targets as dist/<bin>-<target>. Runs when a release is pending
 #   and enabled, or on a manual run (workflow_dispatch = dry run: builds; publish and prepare run
 #   only on a push to main).

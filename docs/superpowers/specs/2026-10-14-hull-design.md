@@ -1338,9 +1338,8 @@ check advisories bans licenses sources`), runs in PR CI with advisories; on a pu
 branch `advisories` is skipped so a new advisory cannot turn `main` red. The seed `deny.local.toml`
 holds `[licenses] allow` and `[advisories] ignore = [{ id, reason, expires }]`; an ignore without
 reason or a valid, unexpired `expires` fails (checked only when advisories run; cargo-deny has no
-`expires`, so the overlay copy gets `{ id, reason }`). `advisories.yml` scans daily and keeps one
-issue current (green on findings). Ruling: daily, not weekly as D-007 says, because the owner's
-task asked for daily; the cost of reverting is one cron line. `renovate/cargo.json` makes Renovate
+`expires`, so the overlay copy gets `{ id, reason }`). `advisories.yml` scans main weekly (D-007, owner ruling
+2026-11-20) and keeps one issue current (green on findings); PR CI checks advisories on every PR. `renovate/cargo.json` makes Renovate
 keep exact `=x.y.z` pins (also `pins.toml [crates]`, which a test compares to every crate).
 
 **Combos.** `rust-service`, `rust-sqlite`, `rust-fly` and `rust-service-full` (base + rust-service +
