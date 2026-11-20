@@ -8,11 +8,13 @@
 //   ignore = [{ id = "RUSTSEC-2024-0001", reason = "not reachable", expires = "2027-01-31" }]
 // This script merges both into a temporary copy of deny.toml (ignores as { id, reason }: cargo-deny
 // has no `expires`) and runs `cargo deny --config <copy> <args>`. An ignore without `reason` or a
-// valid `expires`, or one that has expired (UTC), fails with exit 1 before cargo-deny runs.
+// valid `expires`, or one that has expired (UTC), fails with exit 1 before cargo-deny runs, but only
+// when `advisories` is among the checks run (an expired ignore must not fail a push to main).
 // Without deny.local.toml it runs `cargo deny <args>` as is.
 // Usage: node scripts/deny.mjs [cargo deny args]  (an explicit --config <file> is honoured).
 // No args = `--locked check advisories bans licenses sources`; on a push to the default branch
-// (GITHUB_EVENT_NAME=push, or CircleCI without CIRCLE_PULL_REQUEST) `advisories` is dropped, since
+// (GITHUB_EVENT_NAME=push, or CircleCI on `main`/DENY_DEFAULT_BRANCH without CIRCLE_PULL_REQUEST)
+// `advisories` is dropped, since
 // the daily scan covers main and a new advisory must not turn it red.
 // Node built-ins only.
 import { spawnSync } from "node:child_process";
@@ -120,20 +122,54 @@ function extendAllow(base, extraAll) {
   return base.replace(ALLOW, () => `allow = [${inner}${sep}${list}]`);
 }
 
-/** `deny.toml` text with the overlay's licenses and advisory ignores merged in. */
-export function mergeOverlay(base, local, today = todayUtc()) {
+/** Index of the `]` closing the array whose `[` is at `open` (quote-aware), or -1. */
+function closeOf(text, open) {
+  let quote = "";
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote) quote = "";
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "[") depth++;
+    else if (c === "]" && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/** `text` with `entries` (TOML inline tables) added to `[advisories] ignore`, creating what is missing. */
+function addIgnores(text, entries) {
+  const list = entries.join(", ");
+  const header = /^\[advisories\][ \t]*(?:#.*)?$/m.exec(text);
+  if (!header) return `${text.replace(/\n*$/, "\n")}\n[advisories]\nignore = [${list}]\n`;
+  const start = header.index + header[0].length;
+  const next = /^\[/m.exec(text.slice(start));
+  const end = next ? start + next.index : text.length;
+  const existing = /^ignore\s*=\s*\[/m.exec(text.slice(start, end));
+  if (!existing) return `${text.slice(0, start)}\nignore = [${list}]${text.slice(start)}`;
+  const open = start + existing.index + existing[0].length - 1;
+  const close = closeOf(text, open);
+  if (close === -1 || close > end) throw new Error("deny.toml: unterminated `ignore = [...]`");
+  const inner = text.slice(open + 1, close).replace(/[\s,]+$/, "");
+  const sep = inner.trim() === "" ? "" : ", ";
+  return `${text.slice(0, open + 1)}${inner}${sep}${list}${text.slice(close)}`;
+}
+
+/**
+ * `deny.toml` text with the overlay's licenses and advisory ignores merged in. Ignores are only
+ * validated (reason, expires, expiry) when `advisories` is among the checks being run.
+ */
+export function mergeOverlay(base, local, today = todayUtc(), advisories = true) {
   const { licenses, ignores } = parseOverlay(local);
-  checkIgnores(ignores, today);
+  if (advisories) checkIgnores(ignores, today);
   let out = extendAllow(base, licenses);
   if (ignores.length > 0) {
-    const list = ignores
-      .map((e) => `{ id = ${JSON.stringify(e.id)}, reason = ${JSON.stringify(e.reason)} }`)
-      .join(", ");
-    const line = `ignore = [${list}]`;
-    const header = /^\[advisories\][ \t]*$/m;
-    out = header.test(out)
-      ? out.replace(header, () => `[advisories]\n${line}`)
-      : `${out.replace(/\n*$/, "\n")}\n[advisories]\n${line}\n`;
+    out = addIgnores(
+      out,
+      ignores.map(
+        (e) => `{ id = ${JSON.stringify(e.id)}, reason = ${JSON.stringify(e.reason ?? "")} }`,
+      ),
+    );
   }
   return out;
 }
@@ -143,14 +179,35 @@ export function mergeAllow(base, local) {
   return mergeOverlay(base, local);
 }
 
+/**
+ * True on a push to the default branch, where advisories are not checked: GitHub push events, or
+ * CircleCI on the default branch (`main`, or DENY_DEFAULT_BRANCH) without a pull request. Merge
+ * queue branches (gh-readonly-queue/*) are not the default branch, so they check advisories.
+ */
+export function isDefaultBranchPush(env = process.env) {
+  if (env.GITHUB_EVENT_NAME) return env.GITHUB_EVENT_NAME === "push";
+  return (
+    env.CIRCLECI === "true" &&
+    !env.CIRCLE_PULL_REQUEST &&
+    env.CIRCLE_BRANCH === (env.DENY_DEFAULT_BRANCH || "main")
+  );
+}
+
 /** Arguments when none are given: every check, minus advisories on a push to the default branch. */
 export function defaultArgs(env = process.env) {
-  const push =
-    env.GITHUB_EVENT_NAME === "push" || (env.CIRCLECI === "true" && !env.CIRCLE_PULL_REQUEST);
+  const push = isDefaultBranchPush(env);
   const checks = ["advisories", "bans", "licenses", "sources"].filter(
     (c) => !(push && c === "advisories"),
   );
   return ["--locked", "check", ...checks];
+}
+
+/** True when `cargo deny <args>` runs the advisories check (`check` with no names runs all). */
+export function runsAdvisories(args) {
+  const i = args.indexOf("check");
+  if (i === -1) return false;
+  const names = args.slice(i + 1).filter((a) => !a.startsWith("-"));
+  return names.length === 0 || names.includes("advisories");
 }
 
 /** Splits `--config <file>` out of the arguments. */
@@ -167,7 +224,12 @@ function main(argv) {
   let cmd = ["deny", ...args];
   let tmp = null;
   if (existsSync(file) && existsSync(local)) {
-    const merged = mergeOverlay(readFileSync(file, "utf8"), readFileSync(local, "utf8"));
+    const merged = mergeOverlay(
+      readFileSync(file, "utf8"),
+      readFileSync(local, "utf8"),
+      todayUtc(),
+      runsAdvisories(rest),
+    );
     tmp = mkdtempSync(join(tmpdir(), "deny-"));
     const path = join(tmp, "deny.toml");
     writeFileSync(path, merged);

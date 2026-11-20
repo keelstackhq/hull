@@ -187,3 +187,20 @@ test("pins.mjs refuses a [crates] value that is not an exact X.Y.Z", async () =>
   assert.equal(r.status, 1);
   assert.match(r.stderr, /tokio .*not an exact version/);
 });
+
+test("pins.mjs --check also checks the root Cargo.toml [workspace.dependencies] crate pins", async () => {
+  const cargo = await read("Cargo.toml");
+  const toml = (await read("pins.toml")).replace(/^\[crates\]\n/m, '[crates]\ntokio = "1.54.1"\n');
+  const ok = await sandbox({
+    "pins.toml": toml,
+    "Cargo.toml": `${cargo}\n[workspace.dependencies]\ntokio = { version = "=1.54.1", features = ["rt"] }\n`,
+  });
+  assert.equal(run(ok, "--check").status, 0);
+  const bad = await sandbox({
+    "pins.toml": toml,
+    "Cargo.toml": `${cargo}\n[workspace.dependencies]\ntokio = "=1.0.0"\n`,
+  });
+  const r = run(bad, "--check");
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Cargo\.toml pins tokio to =1\.0\.0/);
+});

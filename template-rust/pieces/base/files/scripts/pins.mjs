@@ -57,6 +57,12 @@ export function checkCrates(crates, text, file) {
   return problems;
 }
 
+/** Pins of `[crates]` crates in the root Cargo.toml `[workspace.dependencies]`. */
+export function checkWorkspaceDeps(crates, text) {
+  const m = /^\[workspace\.dependencies\][^\n]*\n([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(text);
+  return m ? checkCrates(crates, m[1], "Cargo.toml") : [];
+}
+
 /** CircleCI downloads are sha256-pinned per version (bump them by hand): report drift. */
 export function checkCircleci(pins, text, file) {
   const problems = [];
@@ -103,6 +109,7 @@ function main(argv) {
       if (existsSync(join(root, f)))
         problems.push(...checkCircleci(pins, readFileSync(join(root, f), "utf8"), f));
     }
+    problems.push(...checkWorkspaceDeps(crates, readFileSync(join(root, "Cargo.toml"), "utf8")));
     const crateDir = join(root, "crates");
     if (existsSync(crateDir)) {
       for (const d of readdirSync(crateDir)) {

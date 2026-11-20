@@ -52,7 +52,14 @@ async function shim() {
   return { bin, log };
 }
 const CLEAN = { ...process.env };
-for (const k of ["GITHUB_EVENT_NAME", "CIRCLECI", "CIRCLE_PULL_REQUEST"]) delete CLEAN[k];
+for (const k of [
+  "GITHUB_EVENT_NAME",
+  "CIRCLECI",
+  "CIRCLE_PULL_REQUEST",
+  "CIRCLE_BRANCH",
+  "DENY_DEFAULT_BRANCH",
+])
+  delete CLEAN[k];
 const run = (cwd, bin, args, env = {}) =>
   execFileSync("node", [SCRIPT, ...args], {
     cwd,
@@ -157,12 +164,21 @@ test("deny.mjs: on a push to the default branch advisories are dropped from the 
   const want = "deny --locked check bans licenses sources";
   run(d, bin, [], { GITHUB_EVENT_NAME: "push" });
   assert.equal((await readFile(log, "utf8")).trim(), want);
-  run(d, bin, [], { CIRCLECI: "true" });
+  run(d, bin, [], { CIRCLECI: "true", CIRCLE_BRANCH: "main" });
+  assert.equal((await readFile(log, "utf8")).trim(), want);
+  run(d, bin, [], { CIRCLECI: "true", CIRCLE_BRANCH: "trunk", DENY_DEFAULT_BRANCH: "trunk" });
   assert.equal((await readFile(log, "utf8")).trim(), want);
   for (const env of [
     { GITHUB_EVENT_NAME: "pull_request" },
     { GITHUB_EVENT_NAME: "merge_group" },
-    { CIRCLECI: "true", CIRCLE_PULL_REQUEST: "https://github.com/o/r/pull/1" },
+    { CIRCLECI: "true", CIRCLE_BRANCH: "feature" },
+    { CIRCLECI: "true", CIRCLE_BRANCH: "gh-readonly-queue/main/pr-1-abc" },
+    { CIRCLECI: "true" },
+    {
+      CIRCLECI: "true",
+      CIRCLE_BRANCH: "main",
+      CIRCLE_PULL_REQUEST: "https://github.com/o/r/pull/1",
+    },
   ]) {
     run(d, bin, [], env);
     assert.match(await readFile(log, "utf8"), /check advisories bans/);
@@ -198,4 +214,41 @@ test("hull: the owned deny.toml keeps no advisory ignores and no file names a ba
   assert.deepEqual(hits, []);
   const rel = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
   assert.match(rel, /node scripts\/deny\.mjs --locked check advisories/);
+});
+
+test("an expired ignore only fails when advisories is among the checks run", async () => {
+  const { bin, log } = await shim();
+  const d = await mkdtemp(join(tmpdir(), "deny-proj-"));
+  await writeFile(join(d, "deny.toml"), BASE);
+  await writeFile(
+    join(d, "deny.local.toml"),
+    `[advisories]\nignore = [{ id = "RUSTSEC-9", reason = "r", expires = "2020-01-01" }]\n`,
+  );
+  run(d, bin, [], { GITHUB_EVENT_NAME: "push" });
+  assert.match(await readFile(log, "utf8"), /check bans licenses sources/);
+  run(d, bin, ["--locked", "check", "bans"]);
+  for (const args of [
+    ["--locked", "check"],
+    ["--locked", "check", "advisories", "bans"],
+  ]) {
+    assert.throws(
+      () => run(d, bin, args),
+      (e) => e.status === 1 && /RUSTSEC-9/.test(e.stderr),
+    );
+  }
+});
+
+test("mergeOverlay appends to an existing ignore list and finds a commented header", () => {
+  const add = `[advisories]\nignore = [{ id = "RUSTSEC-2", reason = "r", expires = "${future}" }]\n`;
+  const base = `[advisories] # policy\nyanked = "deny"\nignore = [\n  "RUSTSEC-1", # old ]\n]\n\n[licenses]\nallow = ["MIT"]\n`;
+  const out = mergeOverlay(base, add, "2026-11-20");
+  assert.equal(out.match(/\[advisories\]/g).length, 1);
+  assert.equal(out.match(/^ignore\s*=/gm).length, 1);
+  assert.match(
+    out,
+    /"RUSTSEC-1", # old \]\n?\s*, ?\{ id = "RUSTSEC-2"|"RUSTSEC-1"[\s\S]*\{ id = "RUSTSEC-2", reason = "r" \}\]/,
+  );
+  const bare = mergeOverlay(`[advisories] # x\nyanked = "deny"\n`, add, "2026-11-20");
+  assert.equal(bare.match(/\[advisories\]/g).length, 1);
+  assert.match(bare, /\[advisories\] # x\nignore = \[\{ id = "RUSTSEC-2"/);
 });

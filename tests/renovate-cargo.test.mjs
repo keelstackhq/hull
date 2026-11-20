@@ -1,19 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { parsePins } from "../template-rust/pieces/base/files/scripts/pins.mjs";
 
 const read = async (p) => JSON.parse(await readFile(new URL(p, import.meta.url), "utf8"));
-const CRATES = [
-  "tokio",
-  "axum",
-  "sqlx",
-  "hyper",
-  "hyper-util",
-  "http-body-util",
-  "rustls",
-  "tokio-rustls",
-  "webpki-roots",
-];
+const pinsToml = await readFile(
+  new URL("../template-rust/pieces/base/files/pins.toml", import.meta.url),
+  "utf8",
+);
+const PIN_CRATES = Object.keys(parsePins(pinsToml, "crates"));
 
 test("renovate cargo preset pins exactly, alerts on vulnerabilities, keeps transitive crates", async () => {
   const p = await read("../renovate/cargo.json");
@@ -39,7 +34,8 @@ test("renovate cargo preset reads pins.toml [crates] and groups the crates acros
   const m = p.customManagers.find((c) => c.managerFilePatterns.some((f) => f.includes("pins")));
   assert.equal(m.datasourceTemplate, "crate");
   assert.equal(m.matchStringsStrategy, "recursive");
-  // emulate Renovate's recursive strategy: each pattern runs on the previous matches
+  assert.equal(m.versioningTemplate, "semver");
+  // Renovate compiles matchStrings with flag "g" only (no "m"); emulate's recursive strategy: each pattern runs on the previous matches
   const text =
     '[tools]\nnode = "1.2.3"\n\n[crates]\ntokio = "1.40.0"\nhyper-util = "0.1.9"\n\n[other]\nx = "9.9.9"\n';
   let chunks = [text];
@@ -47,7 +43,7 @@ test("renovate cargo preset reads pins.toml [crates] and groups the crates acros
     const last = i === m.matchStrings.length - 1;
     const next = [];
     for (const c of chunks) {
-      for (const x of c.matchAll(new RegExp(s, "gm"))) next.push(last ? x.groups : x[0]);
+      for (const x of c.matchAll(new RegExp(s, "g"))) next.push(last ? x.groups : x[0]);
     }
     chunks = next;
   }
@@ -59,7 +55,8 @@ test("renovate cargo preset reads pins.toml [crates] and groups the crates acros
     ],
   );
   const rule = p.packageRules.find((r) => r.groupName === "rust service crates");
-  assert.deepEqual(rule.matchPackageNames, CRATES);
+  for (const c of PIN_CRATES) assert.ok(rule.matchPackageNames.includes(c), `group lacks ${c}`);
+  assert.deepEqual(rule.schedule, ["before 5am on monday"]);
   assert.equal(rule.matchManagers, undefined);
 });
 

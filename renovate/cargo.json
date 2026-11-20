@@ -20,9 +20,10 @@
       "matchStringsStrategy": "recursive",
       "matchStrings": [
         "\\[crates\\]\\n[^\\[]*",
-        "^(?<depName>[a-z0-9_-]+) = \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
+        "(?:^|\\n)(?<depName>[a-z0-9_-]+) = \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
       ],
-      "datasourceTemplate": "crate"
+      "datasourceTemplate": "crate",
+      "versioningTemplate": "semver"
     }
   ],
   "packageRules": [
@@ -49,8 +50,10 @@
         "http-body-util",
         "rustls",
         "tokio-rustls",
-        "webpki-roots"
-      ]
+        "webpki-roots",
+        "tower"
+      ],
+      "schedule": ["before 5am on monday"]
     }
   ]
 }
