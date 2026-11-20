@@ -80,7 +80,7 @@ test("Dockerfile: builder tag equals pins.toml rust, proxy-ca stage, gates, scra
   assert.match(docker, /readelf -l .*INTERP/);
   assert.match(docker, /readelf -d .*NEEDED/);
   assert.match(docker, /MAX_BYTES/);
-  assert.match(docker, /cargo build --release --locked -p api /);
+  assert.match(docker, /cargo build --release --locked --target "\$t" -p api /);
   assert.match(docker, /^ENTRYPOINT \["\/api"\]$/m);
   assert.match(docker, /^USER 65532:65532$/m);
   assert.match(docker, /^FROM scratch$/m);
