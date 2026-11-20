@@ -22,6 +22,21 @@ binary has an `INTERP` header, `NEEDED` libraries, or is larger than `MAX_BYTES`
 4. Set `app` and `primary_region` in `fly.toml`; set `FEATURES` in `[build.args]` when the service
    needs cargo features (for example `s3-backup`).
 
+## Volume ownership
+
+The image runs as uid 65532 and a new Fly volume may mount root-owned. Then the service exits at
+start with `DATA_DIR /data is not writable ... uid 65532`. Fix it once, before the first deploy (a
+volume attaches to one machine, so stop or destroy an app machine that already holds it):
+
+```bash
+bash scripts/fly-setup.sh --app APP --region iad --fix-volume-owner
+# the same by hand:
+fly machine run alpine:3 --app APP --region iad --volume data:/data --rm chown -R 65532:65532 /data
+```
+
+The throwaway machine chowns `/data` and is removed (`--rm`). Verify the flags against
+`fly machine run --help` for your flyctl version.
+
 ## Deploys
 
 `deploy.yml` runs after `ci` succeeds on the default branch (or by hand) and deploys the tested sha

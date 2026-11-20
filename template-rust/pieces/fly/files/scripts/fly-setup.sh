@@ -10,6 +10,9 @@
 #   --host H             certificate for H (point DNS first, grey cloud / DNS-only; docs/fly.md)
 #   --set-gh-secret ENV  create a Fly deploy token and store it as FLY_API_TOKEN in the GitHub
 #                        environment ENV (for example production); skipped when it already exists
+#   --fix-volume-owner   needs --region; run a throwaway alpine machine on volume "data" that chowns
+#                        /data to 65532 (the image's user). Only when the volume is root-owned and no
+#                        app machine uses it yet (docs/fly.md, Volume ownership). Re-runnable.
 #   --deploy             fly deploy --remote-only
 #   --dry-run            print every change instead of making it; read-only checks still run
 # --app is always required. Without --region the app must already exist.
@@ -18,10 +21,10 @@
 #             4 a fly or gh step failed.
 set -uo pipefail
 
-app="" region="" host="" ghenv="" deploy=0 dry=0 stdin_secrets=0
+app="" region="" host="" ghenv="" deploy=0 fixvol=0 dry=0 stdin_secrets=0
 
 usage() {
-  echo "usage: fly-setup.sh --app NAME [--region R] [--host H] [--secrets-stdin] [--set-gh-secret ENV] [--deploy] [--dry-run]" >&2
+  echo "usage: fly-setup.sh --app NAME [--region R] [--host H] [--secrets-stdin] [--set-gh-secret ENV] [--fix-volume-owner] [--deploy] [--dry-run]" >&2
   exit 2
 }
 need() { [ $# -ge 2 ] && [ -n "$2" ] || usage; }
@@ -32,6 +35,7 @@ while [ $# -gt 0 ]; do
     --host) need "$@"; host="$2"; shift 2 ;;
     --set-gh-secret) need "$@"; ghenv="$2"; shift 2 ;;
     --secrets-stdin) stdin_secrets=1; shift ;;
+    --fix-volume-owner) fixvol=1; shift ;;
     --deploy) deploy=1; shift ;;
     --dry-run) dry=1; shift ;;
     *) usage ;;
@@ -39,6 +43,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$app" ] || usage
 [[ "$app" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "fly-setup: bad app name '$app'" >&2; exit 2; }
+[ "$fixvol" = 0 ] || [ -n "$region" ] || usage
 if [ -z "$region" ] && [ -z "$host" ] && [ -z "$ghenv" ] && [ "$deploy" = 0 ] && [ "$stdin_secrets" = 0 ]; then
   usage
 fi
@@ -105,6 +110,12 @@ if [ -n "$region" ]; then
   else
     do_it "allocate IPv6" fly ips allocate-v6 --app "$app"
   fi
+fi
+
+if [ "$fixvol" = 1 ]; then
+  do_it "chown volume data to 65532 with a throwaway machine" \
+    fly machine run alpine:3 --app "$app" --region "$region" --volume data:/data --rm \
+    chown -R 65532:65532 /data
 fi
 
 if [ "$stdin_secrets" = 1 ]; then

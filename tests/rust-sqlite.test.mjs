@@ -92,3 +92,12 @@ test("the rust-sqlite combo renders base + rust-service + sqlite", async () => {
   assert.equal(combo.template, "template-rust");
   assert.deepEqual(combo.pieces, ["base", "rust-service", "sqlite"]);
 });
+
+test("an unwritable data dir is explained: DATA_DIR, uid 65532, docs/fly.md Volume ownership", async () => {
+  const { dir } = await render(["base", "rust-service", "sqlite"]);
+  const pool = await read(dir, "crates/server/src/db/pool.rs");
+  for (const s of ["DATA_DIR", "65532", "docs/fly.md", "Volume ownership"])
+    assert.ok(pool.includes(s), s);
+  assert.match(pool, /fn not_writable_message/);
+  assert.match(pool, /fn not_writable_message_names_dir_uid_and_doc/);
+});

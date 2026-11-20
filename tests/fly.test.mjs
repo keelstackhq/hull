@@ -168,6 +168,7 @@ case "$1 $2" in
       echo "{\\"Name\\": \\"\${l%%=*}\\"}" >> "$st/secrets"
     done ;;
   "tokens create") echo "FLY-TOKEN-VALUE-123" ;;
+  "machine run") ;;
 esac
 exit 0
 `;
@@ -182,7 +183,7 @@ esac
 exit 0
 `;
 const MUTATING =
-  /^(fly (apps create|volumes create|ips allocate|certs add|secrets import|tokens create|deploy)|gh secret set)/;
+  /^(fly (apps create|volumes create|machine run|ips allocate|certs add|secrets import|tokens create|deploy)|gh secret set)/;
 
 async function sandbox({ fly = true } = {}) {
   const dir = await mkdtemp(join(tmpdir(), "hull-fly-stub-"));
@@ -347,4 +348,41 @@ test("smoke.sh: 0 on 200, 1 on timeout, 2 on usage", async () => {
     ok.close();
     bad.close();
   }
+});
+
+test("docs/fly.md: Volume ownership section with the one-time chown machine", async () => {
+  const { dir } = await render();
+  const doc = await read(dir, "docs/fly.md");
+  assert.match(doc, /^## Volume ownership$/m);
+  assert.match(
+    doc,
+    /fly machine run alpine:3 .*--volume data:\/data .*chown -R 65532:65532 \/data/,
+  );
+  assert.match(doc, /--fix-volume-owner/);
+});
+
+test("fly-setup.sh --fix-volume-owner: opt-in, runs one throwaway chown machine, needs --region", async () => {
+  const s = await sandbox();
+  const plain = s.run(FULL);
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.deepEqual(
+    (await s.calls()).filter((c) => c.includes("machine run")),
+    [],
+  );
+  const dry = s.run([...FULL, "--fix-volume-owner", "--dry-run"]);
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.match(dry.stdout, /\[dry-run\] would .*chown/);
+  const r = s.run([...FULL, "--fix-volume-owner"]);
+  assert.equal(r.status, 0, r.stderr);
+  const runs = (await s.calls()).filter((c) => c.startsWith("fly machine run"));
+  assert.equal(runs.length, 1);
+  assert.match(
+    runs[0],
+    /alpine:3 --app my-api --region iad --volume data:\/data --rm .*chown -R 65532:65532 \/data/,
+  );
+  assert.equal(s.run(["--app", "my-api", "--fix-volume-owner"]).status, 2);
+  assert.equal(
+    s.run(FULL.concat("--fix-volume-owner"), { env: { STUB_FAIL: "machine run" } }).status,
+    4,
+  );
 });

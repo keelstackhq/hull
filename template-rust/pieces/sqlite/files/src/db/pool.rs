@@ -25,6 +25,7 @@ impl Db {
     pub async fn open(config: &DbConfig) -> Result<Self, String> {
         std::fs::create_dir_all(&config.data_dir)
             .map_err(|e| format!("cannot create {}: {e}", config.data_dir.display()))?;
+        check_writable(&config.data_dir)?;
         Self::open_at(&config.db_path(), &config.data_dir, config.readers).await
     }
 
@@ -58,6 +59,23 @@ impl Db {
     }
 }
 
+/// Fails early, with the fix, when the data directory is not writable (a Fly volume can mount
+/// root-owned while the image runs as uid 65532).
+fn check_writable(dir: &Path) -> Result<(), String> {
+    let probe = dir.join(".write-check");
+    std::fs::File::create(&probe).map_err(|e| not_writable_message(dir, &e))?;
+    let _ = std::fs::remove_file(&probe);
+    Ok(())
+}
+
+fn not_writable_message(dir: &Path, err: &std::io::Error) -> String {
+    format!(
+        "DATA_DIR {} is not writable ({err}); the service runs as uid 65532, so the volume must be \
+         owned by it: see docs/fly.md (Volume ownership)",
+        dir.display()
+    )
+}
+
 /// Connection options with the pragmas every connection needs. The temp directory is set with a
 /// pragma because `SQLITE_TMPDIR` would need `set_var`, which is unsafe (the workspace forbids it).
 pub fn options(path: &Path, tmp_dir: &Path) -> SqliteConnectOptions {
@@ -82,7 +100,7 @@ pub fn options(path: &Path, tmp_dir: &Path) -> SqliteConnectOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{Db, MIGRATOR};
+    use super::{Db, MIGRATOR, not_writable_message};
     use crate::db::testing::temp_dir;
 
     async fn pragma(pool: &sqlx::SqlitePool, name: &str) -> String {
@@ -92,6 +110,15 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    #[test]
+    fn not_writable_message_names_dir_uid_and_doc() {
+        let err = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let m = not_writable_message(std::path::Path::new("/data"), &err);
+        assert!(m.contains("DATA_DIR /data"));
+        assert!(m.contains("65532"));
+        assert!(m.contains("docs/fly.md (Volume ownership)"));
     }
 
     #[tokio::test]
