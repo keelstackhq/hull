@@ -46,6 +46,12 @@ test("loadCombos returns exactly the combos hull CI renders, sorted by name", ()
       vars: {},
     },
     {
+      name: "rust-service-full",
+      template: "template-rust",
+      pieces: ["base", "rust-service", "sqlite", "fly"],
+      vars: {},
+    },
+    {
       name: "rust-sqlite",
       template: "template-rust",
       pieces: ["base", "rust-service", "sqlite"],

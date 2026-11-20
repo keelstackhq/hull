@@ -1,0 +1,6 @@
+{
+  "name": "rust-service-full",
+  "template": "template-rust",
+  "pieces": ["base", "rust-service", "sqlite", "fly"],
+  "vars": {}
+}

@@ -101,3 +101,18 @@ test("an unwritable data dir is explained: DATA_DIR, uid 65532, docs/fly.md Volu
   assert.match(pool, /fn not_writable_message/);
   assert.match(pool, /fn not_writable_message_names_dir_uid_and_doc/);
 });
+
+test("root AGENTS.md lists the service pieces within 60 lines; the add-piece skill names them", async () => {
+  const { dir } = await render(["base", "rust-service", "sqlite", "fly"]);
+  const agents = await read(dir, "AGENTS.md");
+  assert.match(agents, /- `crates\/\*` \(rust-service\)/);
+  assert.match(agents, /sqlite/);
+  assert.match(agents, /docs\/fly\.md/);
+  assert.ok(agents.trimEnd().split("\n").length <= 60);
+  const none = (await render(["base"])).dir;
+  assert.doesNotMatch(await read(none, "AGENTS.md"), /rust-service|docs\/fly\.md/);
+  assert.match(
+    await read(dir, ".claude/skills/add-piece/SKILL.md"),
+    /\(rust-cli, rust-service, sqlite, fly\)/,
+  );
+});

@@ -1,6 +1,6 @@
 ---
 name: add-piece
-description: Add a template piece (rust-cli) to this workspace with splice. Use when asked to add a CLI crate to the repo.
+description: Add a template piece (rust-cli, rust-service, sqlite, fly) to this workspace with splice. Use when asked to add a CLI crate, an HTTP service, SQLite storage or Fly.io deploy to the repo.
 ---
 
 1. Run `splice add <id> [--name <name>] --yes --json` (for example `add rust-cli --name tool --yes --json`; without splice on PATH: `npx @keelstackhq/splice …`).

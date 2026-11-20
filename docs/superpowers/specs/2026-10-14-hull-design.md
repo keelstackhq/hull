@@ -1282,3 +1282,63 @@ was 21.5 s cold), so read it only as "not faster".
   defaults are already on for dev, off for release).
 
 **Placeholder crate and lockfile (2026-11-20).** Base ships a seed `Cargo.lock` (exactly what cargo writes for the base-only workspace) so the first push passes `--locked` even when the `cargo generate-lockfile` post could not run; `ready.mjs` fails a repo with `Cargo.toml` and no `Cargo.lock`. `crates/common` and its test stay plain seed files (no var: a `.jinja` rename reads as a deleted test to bosun's test-integrity gate); AGENTS.md says they are removable in the bootstrap PR (`git rm -r crates/common`, then `cargo generate-lockfile`).
+
+### Service pieces: `rust-service`, `sqlite`, `fly` (2026-11-20)
+
+Plan `2026-11-20-rust-service-sqlite-fly`. Three optional pieces for an HTTP service with SQLite on
+Fly.io, in `template-rust/`. They share one piece var `service` (crate and binary name, default
+`server`; same name, prompt, default and pattern in all three, contract rule 28); `fly` adds `app`
+(Fly app name, default `app`).
+
+- `rust-service` (`crates/{{ service }}`, requires `base`): tokio + axum, env config read once at
+  boot (`PORT`, default 8080), `GET /healthz`, graceful shutdown on SIGTERM/SIGINT, Fly-Client-IP
+  read only through `client_ip::fly_client_ip`. `Cargo.toml` shared (toml merge), `src/**` and
+  `CLAUDE.md` seed, per-crate `AGENTS.md` owned. rustls only; `deny.toml` bans openssl/native-tls.
+- `sqlite` (same crate, requires `rust-service`): sqlx without default features; one writer
+  connection and a read-only pool, WAL, `synchronous = FULL`, foreign keys, `secure_delete`,
+  busy timeout, STRICT tables (a test rejects non-STRICT migrations), embedded migrations, snapshot
+  backups (every `BACKUP_INTERVAL_SECS`, keep `BACKUP_KEEP`), `--restore <snapshot>`
+  (`docs/restore.md`), optional TTL sweeper. `src/db/**`, `migrations/**` seed; `tests/**` owned.
+  Env: `DATA_DIR` (`/data`), `DB_READERS` (4), `BACKUP_DIR`, `BACKUP_KEEP` (7),
+  `BACKUP_INTERVAL_SECS` (86400), `TTL_SWEEP_SECS` (0 = off). The cargo feature `s3-backup` adds
+  off-site copies to R2/S3 with `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`,
+  `R2_SECRET_ACCESS_KEY` (all four or none) and optional `BACKUP_S3_REGION` (default `auto`); the
+  names follow the owner's Cloudflare R2 secrets. `SQLITE_TMPDIR` is not used: setting it needs
+  `std::env::set_var`, which is unsafe in edition 2024 and the workspace forbids unsafe, so the
+  temp directory is `PRAGMA temp_store_directory` on every connection. When `DATA_DIR` is not
+  writable the error names `DATA_DIR`, uid 65532 and `docs/fly.md` (Volume ownership).
+- `fly` (root files, requires `rust-service`): `Dockerfile` (builder `rust:<pins.rust>-alpine`
+  for an explicit musl target, `FROM scratch`, user 65532; the build fails on an `INTERP` header,
+  `NEEDED` libraries or a binary over `MAX_BYTES`; measured 2026-11-20: 1.93 MB without sqlite,
+  9.81 MB with sqlite and `s3-backup`), `fly.toml` (seed; one machine, one volume on `/data`),
+  `scripts/fly-setup.sh`, `scripts/smoke.sh`, `docs/fly.md`, `deploy.yml`, `image.yml`.
+  - `fly-setup.sh --app NAME` plus `--region R` (app, volume `data`, shared IPv4, IPv6), `--host H`
+    (certificate), `--secrets-stdin` (KEY=VALUE lines on stdin only, staged, only keys not yet
+    set), `--set-gh-secret ENV` (deploy token into `FLY_API_TOKEN` of that GitHub environment),
+    `--fix-volume-owner` (needs `--region`; throwaway alpine machine chowns `/data` to 65532, for a
+    root-owned volume), `--deploy`, `--dry-run`. Every step checks first, so a second run changes
+    nothing. Exit codes: 0 ok, 2 usage, 3 missing tool or not logged in, 4 a step failed.
+  - `smoke.sh`: polls `$SMOKE_URL/healthz` until 200 or `SMOKE_TIMEOUT_SECS` (60); exit 0, 1
+    timeout, 2 usage. `deploy.yml` deploys the sha `ci` just tested on the default branch, in
+    environment `production`, then runs it. A deploy is never cancelled.
+  - `image.yml` is split from `deploy.yml`: the workflow-secrets rule forbids secrets in a
+    PR-triggered workflow, so the pull-request image build has no secrets, no login and no push, and
+    only `deploy.yml` (environment-gated, default-branch code) holds `FLY_API_TOKEN`.
+  - DNS is grey cloud (DNS-only): Fly issues the certificate and Fly-Client-IP must be the client.
+
+**Supply chain in `base` (same plan).** One command, `node scripts/deny.mjs` (no args: `--locked
+check advisories bans licenses sources`), runs in PR CI with advisories; on a push to the default
+branch `advisories` is skipped so a new advisory cannot turn `main` red. The seed `deny.local.toml`
+holds `[licenses] allow` and `[advisories] ignore = [{ id, reason, expires }]`; an ignore without
+reason or a valid, unexpired `expires` fails (checked only when advisories run; cargo-deny has no
+`expires`, so the overlay copy gets `{ id, reason }`). `advisories.yml` scans daily and keeps one
+issue current (green on findings). Ruling: daily, not weekly as D-007 says, because the owner's
+task asked for daily; the cost of reverting is one cron line. `renovate/cargo.json` makes Renovate
+keep exact `=x.y.z` pins (also `pins.toml [crates]`, which a test compares to every crate).
+
+**Combos.** `rust-service`, `rust-sqlite`, `rust-fly` and `rust-service-full` (base + rust-service +
+sqlite + fly), all `template-rust` and dogfooded with the cargo CI steps. The image build is not in
+hull CI (Docker is heavy); verified by hand 2026-11-20 with `docker build --build-arg
+FEATURES=s3-backup .`, serving `/healthz` as uid 65532 on a 65532-owned `/data`. Fly volumes may
+mount root-owned: the service then exits 1 with the Volume ownership hint, and `docs/fly.md` has
+the one-time fix.
