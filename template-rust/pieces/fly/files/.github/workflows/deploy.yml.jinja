@@ -14,13 +14,19 @@ on:
 permissions:
   contents: read
 
-# A deploy is never cancelled: the next one waits for it.
+# A deploy is never cancelled: the next one waits for it. The group is on the job, not the workflow:
+# skipped runs (pull requests, merge_group) then never take the single pending slot and cancel a
+# waiting deploy of the default branch. The top-level group is unique per run, so it cancels nothing;
+# it is there because bosun's ci-minutes gate wants a top-level concurrency on every workflow.
 {% raw %}concurrency:
-  group: deploy-production
-  cancel-in-progress: false
+  group: deploy-run-${{ github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == github.event.repository.default_branch) || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-latest
     timeout-minutes: 20

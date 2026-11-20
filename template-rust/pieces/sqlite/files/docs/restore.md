@@ -31,4 +31,7 @@ hundred MB; for a bigger database, replace it with a streamed multipart upload i
 4. Start the service. It applies any newer migrations at boot.
 5. Delete the `app.db.pre-restore*` files once you are sure; they hold the data you replaced.
 
+On Fly, stop the machine and run the restore in a one-off machine on the same volume: see
+`docs/fly.md`, "Restore on Fly".
+
 Practise this on a copy before you need it.

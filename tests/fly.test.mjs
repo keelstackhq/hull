@@ -114,8 +114,11 @@ test("deploy.yml: tested sha, production environment, never cancelled, no pull_r
   const wf = YAML.parse(text);
   assert.deepEqual(Object.keys(wf.on).sort(), ["workflow_dispatch", "workflow_run"]);
   assert.deepEqual(wf.on.workflow_run.workflows, ["ci"]);
-  assert.equal(wf.concurrency["cancel-in-progress"], false);
-  assert.match(wf.concurrency.group, /^deploy-/);
+  // job-level: skipped workflow_run events (PRs, merge_group) must not take the pending slot
+  // Top-level group is unique per run (cancels nothing); the job group serialises deploys.
+  assert.equal(wf.concurrency.group, "deploy-run-${{ github.run_id }}");
+  assert.equal(wf.jobs.deploy.concurrency["cancel-in-progress"], false);
+  assert.equal(wf.jobs.deploy.concurrency.group, "deploy-production");
   assert.equal(wf.jobs.deploy.environment, "production");
   assert.match(wf.jobs.deploy.if, /conclusion == 'success'/);
   assert.match(wf.jobs.deploy.if, /head_branch == github\.event\.repository\.default_branch/);
@@ -222,7 +225,7 @@ async function sandbox({ fly = true } = {}) {
   }
   await writeFile(join(bin, "gh"), STUB_GH);
   await chmod(join(bin, "gh"), 0o755);
-  for (const tool of ["bash", "cat", "grep", "env", "mkdir"]) {
+  for (const tool of ["bash", "cat", "grep", "env", "mkdir", "awk"]) {
     const found = spawnSync("sh", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
     await symlink(found, join(bin, tool)).catch(() => {});
   }
@@ -235,7 +238,7 @@ async function sandbox({ fly = true } = {}) {
   const calls = async () =>
     (await readFile(join(dir, "calls.log"), "utf8").catch(() => "")).split("\n").filter(Boolean);
   const stdinLog = () => readFile(join(dir, "stdin.log"), "utf8").catch(() => "");
-  return { run, calls, stdinLog };
+  return { run, calls, stdinLog, dir };
 }
 
 const FULL = ["--app", "my-api", "--region", "iad", "--host", "api.example.com"];
@@ -412,4 +415,32 @@ test("fly-setup.sh --fix-volume-owner: opt-in, runs one throwaway chown machine,
     s.run(FULL.concat("--fix-volume-owner"), { env: { STUB_FAIL: "machine run" } }).status,
     4,
   );
+});
+
+test("docs/fly.md: Restore on Fly stops the machine, restores on the volume, restarts", async () => {
+  const { dir } = await render();
+  const doc = await read(dir, "docs/fly.md");
+  assert.match(doc, /## Restore on Fly/);
+  assert.match(doc, /fly machine stop /);
+  assert.match(doc, /fly machine run .*--volume data:\/data .*--rm .*--restore \/data\/backups\//s);
+  assert.match(doc, /fly machine start /);
+  assert.match(doc, /fly machine run --help/);
+});
+
+test("fly-setup.sh: listed matches whole words only; --fix-volume-owner help says it is unconditional", async () => {
+  const s = await sandbox();
+  await mkdir(join(s.dir, "state"), { recursive: true });
+  await writeFile(join(s.dir, "state/apps"), '{"Name": "apiapi"}\n');
+  await writeFile(join(s.dir, "state/volumes"), '{"name": "datadata"}\n');
+  const r = s.run(["--app", "api", "--region", "iad"]);
+  assert.equal(r.status, 0, r.stderr);
+  const calls = await s.calls();
+  assert.ok(calls.includes("fly apps create api"), calls.join("\n"));
+  assert.ok(
+    calls.some((c) => c.startsWith("fly volumes create data ")),
+    calls.join("\n"),
+  );
+  const sh = await readFile(SETUP, "utf8");
+  assert.match(sh, /unconditionally/);
+  assert.match(sh, /exit 4/);
 });

@@ -45,6 +45,24 @@ image on pull requests with no secrets and no push.
 
 A manual run (`workflow_dispatch`) deploys the default branch head, which may not have passed ci.
 
+## Restore on Fly
+
+The running service holds a lock on the database, so restore with the machine stopped (details:
+`docs/restore.md`). Put the snapshot on the volume first (`/data/backups/` has the local ones).
+
+```bash
+fly machine list --app APP                    # note the machine id
+fly machine stop MACHINE_ID --app APP
+# one-off machine, same image and volume, restores and is removed (--rm):
+fly machine run registry.fly.io/APP:deployment-XXXX --app APP --region iad \
+  --volume data:/data --rm --restore /data/backups/snapshot-20260101T000000Z.db
+fly machine start MACHINE_ID --app APP
+```
+
+Use the current image (`fly releases --app APP --image`). A volume attaches to one machine, so the
+app machine must be stopped first. Verify the flyctl flags (`--volume`, `--rm`, how the command
+after the image is passed) against `fly machine run --help` for your version.
+
 ## DNS: Cloudflare grey cloud
 
 Point the hostname at Fly with DNS-only records (grey cloud, not proxied). Fly issues and renews the

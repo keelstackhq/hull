@@ -11,8 +11,10 @@
 #   --set-gh-secret ENV  create a Fly deploy token and store it as FLY_API_TOKEN in the GitHub
 #                        environment ENV (for example production); skipped when it already exists
 #   --fix-volume-owner   needs --region; run a throwaway alpine machine on volume "data" that chowns
-#                        /data to 65532 (the image's user). Only when the volume is root-owned and no
-#                        app machine uses it yet (docs/fly.md, Volume ownership). Re-runnable.
+#                        /data to 65532 (the image's user). Runs unconditionally (no check whether
+#                        the volume is already owned) and fails (exit 4) while an app machine holds
+#                        the volume. Use it only for a root-owned volume (docs/fly.md, Volume
+#                        ownership); chown is harmless to repeat.
 #   --deploy             fly deploy --remote-only
 #   --dry-run            print every change instead of making it; read-only checks still run
 # --app is always required. Without --region the app must already exist.
@@ -84,19 +86,9 @@ listed() { # listed VALUE CMD...: does the read-only listing contain VALUE as a 
   local v="$1" out
   shift
   out="$("$@" 2>/dev/null)" || fail "$*"
-  # Literal match (grep -F, no regex from $v); then check the word boundaries on each hit.
-  local line rest
-  while IFS= read -r line; do
-    rest="$line"
-    while [[ "$rest" == *"$v"* ]]; do
-      local before="${rest%%"$v"*}" after="${rest#*"$v"}"
-      if [[ ! "${before: -1}" =~ [A-Za-z0-9_.-] && ! "${after:0:1}" =~ [A-Za-z0-9_.-] ]]; then
-        return 0
-      fi
-      rest="$after"
-    done
-  done < <(grep -F -- "$v" <<<"$out")
-  return 1
+  # Literal prefilter (grep -F, no regex from $v), then split into words and compare exactly, so
+  # "data" does not match "datadata". A word is a run of [A-Za-z0-9_.-].
+  grep -F -- "$v" <<<"$out" | awk -v v="$v" -F '[^A-Za-z0-9_.-]+' '{ for (i = 1; i <= NF; i++) if ($i == v) found = 1 } END { exit !found }'
 }
 app_exists=0
 listed "$app" fly apps list --json && app_exists=1

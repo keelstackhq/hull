@@ -1314,7 +1314,8 @@ Fly.io, in `template-rust/`. They share one piece var `service` (crate and binar
   for an explicit musl target, `FROM scratch`, user 65532; the build fails on an `INTERP` header,
   `NEEDED` libraries or a binary over `MAX_BYTES`; measured 2026-11-20: 1.93 MB without sqlite,
   9.81 MB with sqlite and `s3-backup`), `fly.toml` (seed; one machine, one volume on `/data`),
-  `scripts/fly-setup.sh`, `scripts/smoke.sh`, `docs/fly.md`, `deploy.yml`, `image.yml`.
+  `.dockerignore` (owned), `scripts/fly-setup.sh`, `scripts/smoke.sh`, `docs/fly.md`, `deploy.yml`,
+  `image.yml`.
   - `fly-setup.sh --app NAME` plus `--region R` (app, volume `data`, shared IPv4, IPv6), `--host H`
     (certificate), `--secrets-stdin` (KEY=VALUE lines on stdin only, staged, only keys not yet
     set), `--set-gh-secret ENV` (deploy token into `FLY_API_TOKEN` of that GitHub environment),
@@ -1323,7 +1324,10 @@ Fly.io, in `template-rust/`. They share one piece var `service` (crate and binar
     nothing. Exit codes: 0 ok, 2 usage, 3 missing tool or not logged in, 4 a step failed.
   - `smoke.sh`: polls `$SMOKE_URL/healthz` until 200 or `SMOKE_TIMEOUT_SECS` (60); exit 0, 1
     timeout, 2 usage. `deploy.yml` deploys the sha `ci` just tested on the default branch, in
-    environment `production`, then runs it. A deploy is never cancelled.
+    environment `production`, then runs it. Deploy guard: `workflow_run.event == 'push'`, same-repo
+    `head_repository`, head branch is the default branch. Concurrency is on the job (group
+    `deploy-production`, never cancelled), so skipped runs cannot take the pending slot; a top-level group unique per run
+    (`deploy-run-<run_id>`) satisfies the ci-minutes gate and cancels nothing.
   - `image.yml` is split from `deploy.yml`: the workflow-secrets rule forbids secrets in a
     PR-triggered workflow, so the pull-request image build has no secrets, no login and no push, and
     only `deploy.yml` (environment-gated, default-branch code) holds `FLY_API_TOKEN`.

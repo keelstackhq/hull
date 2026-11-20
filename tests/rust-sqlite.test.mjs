@@ -116,3 +116,11 @@ test("root AGENTS.md lists the service pieces within 60 lines; the add-piece ski
     /\(rust-cli, rust-service, sqlite, fly\)/,
   );
 });
+
+test("restore: Db::open holds the lock (tested in restore.rs) and docs/restore.md points to Restore on Fly", async () => {
+  const { dir } = await render(["base", "rust-service", "sqlite"]);
+  const rs = await read(dir, "crates/server/src/db/restore.rs");
+  assert.match(rs, /async fn an_open_db_holds_the_lock_until_it_is_dropped/);
+  assert.match(rs, /Db::open\(&config\)/);
+  assert.match(await read(dir, "crates/server/docs/restore.md"), /Restore on Fly/);
+});

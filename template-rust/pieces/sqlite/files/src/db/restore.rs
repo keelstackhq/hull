@@ -185,6 +185,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_open_db_holds_the_lock_until_it_is_dropped() {
+        let other = temp_dir("restore-src");
+        let src = Db::open_at(&other.join("app.db"), &other, 1).await.unwrap();
+        let snap = snapshot_at(&src.readers, &other.join("b"), 3, "20260101T000000Z")
+            .await
+            .unwrap();
+        src.close().await;
+        let dir = temp_dir("restore-open");
+        let data = dir.to_str().unwrap().to_owned();
+        let config =
+            crate::db::DbConfig::from_lookup(|k| (k == "DATA_DIR").then(|| data.clone())).unwrap();
+        let db = Db::open(&config).await.unwrap();
+
+        let err = restore(&snap, &config.db_path()).await.unwrap_err();
+        assert!(err.contains("locked"), "{err}");
+
+        db.close().await;
+        drop(db);
+        restore(&snap, &config.db_path()).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn a_corrupt_snapshot_is_refused_and_the_database_untouched() {
         let dir = temp_dir("restore-bad");
         let path = dir.join("app.db");
